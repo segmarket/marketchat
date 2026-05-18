@@ -4,6 +4,7 @@ export type Product = {
   id: number;
   sku: string;
   name: string;
+  search_aliases: string;
   price: string;
   status: ProductStatus;
   created_at?: string;
@@ -12,6 +13,7 @@ export type Product = {
 
 export type ProductPatchPayload = {
   name?: string;
+  search_aliases?: string;
   price?: string | number;
   status?: ProductStatus;
 };

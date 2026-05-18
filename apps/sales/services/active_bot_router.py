@@ -6,6 +6,7 @@ import logging
 
 from apps.chatbot.services.chat_history import append_assistant_message
 from apps.chatbot.services.chatbot_core import (
+    STATIC_COMPLAINT_ASSISTANT,
     STATIC_GENERAL_ASSISTANT,
     ChatbotCoreError,
     complete_with_session_history,
@@ -15,6 +16,7 @@ from apps.residents.models import ChatSession, Resident
 from apps.residents.services.whatsapp_reply import send_whatsapp_reply
 from apps.sales.services.cart_repository import get_or_create_open_cart
 from apps.sales.services.intent_gatekeeper import (
+    COMPLAINT,
     GENERAL,
     MAINTENANCE_ISSUE,
     PAYMENT_ERROR,
@@ -22,12 +24,14 @@ from apps.sales.services.intent_gatekeeper import (
     STOCK_ISSUE,
     classify_user_intent,
 )
+from apps.notifications.services import create_critical_panel_notification
 from apps.sales.services.owner_alert import (
     SUPPORT_RESIDENT_MESSAGE,
     notify_owner_support_issue,
 )
 from apps.sales.services.stock_issue_handler import handle_stock_issue_report
 from apps.sales.services.resident_ai_context import (
+    build_complaint_dynamic_context,
     build_payment_error_recovery_message,
     build_resident_dynamic_context,
     resident_display_name,
@@ -63,6 +67,12 @@ def handle_maintenance_issue(
         original_message=message,
         issue_label="Manutenção",
     )
+    create_critical_panel_notification(
+        tenant_id=tenant_id,
+        resident=resident,
+        intent_type=MAINTENANCE_ISSUE,
+        original_message=message,
+    )
     return True
 
 
@@ -82,6 +92,12 @@ def handle_payment_error_pivot(
         resident=resident,
         original_message=message,
         issue_label="Pagamento",
+    )
+    create_critical_panel_notification(
+        tenant_id=tenant_id,
+        resident=resident,
+        intent_type=PAYMENT_ERROR,
+        original_message=message,
     )
 
     recovery_text = build_payment_error_recovery_message(resident)
@@ -120,6 +136,61 @@ def handle_stock_issue(
         phone=phone,
         message=message,
     )
+    return True
+
+
+def handle_complaint(
+    *,
+    instance: WhatsappInstance,
+    tenant_id: int,
+    phone: str,
+    resident: Resident,
+    session: ChatSession,
+    message: str,
+) -> bool:
+    """Reclamação: registra alerta ao dono e responde via ChatGPT com contexto de reclamação."""
+    notify_owner_support_issue(
+        instance=instance,
+        tenant_id=tenant_id,
+        resident=resident,
+        original_message=message,
+        issue_label="Reclamação",
+    )
+
+    dynamic_tail = (
+        f"Empresa do mercado: {_tenant_display_name(tenant_id)}.\n"
+        f"{build_complaint_dynamic_context(resident)}"
+    )
+    try:
+        reply = complete_with_session_history(
+            session=session,
+            static_system=STATIC_COMPLAINT_ASSISTANT,
+            user_content=message,
+            dynamic_system_tail=dynamic_tail,
+            max_tokens=100,
+        )
+    except ChatbotCoreError:
+        reply = (
+            "Sinto muito pelo transtorno. Pode me contar com mais detalhes o que aconteceu? "
+            "Já avisei a equipe responsável pelo mercado."
+        )
+        append_assistant_message(session, reply)
+    except Exception:
+        logger.exception("Falha na resposta de reclamação")
+        reply = (
+            "Recebi sua reclamação e já encaminhei para a equipe do mercado. "
+            "Pode descrever melhor o que aconteceu?"
+        )
+        append_assistant_message(session, reply)
+
+    if reply:
+        send_whatsapp_reply(
+            instance,
+            phone,
+            reply,
+            intent_type=COMPLAINT,
+            session=session,
+        )
     return True
 
 
@@ -182,6 +253,16 @@ def route_active_bot_message(
 
     if intent == MAINTENANCE_ISSUE:
         return handle_maintenance_issue(
+            instance=instance,
+            tenant_id=tenant_id,
+            phone=phone,
+            resident=resident,
+            session=session,
+            message=message,
+        )
+
+    if intent == COMPLAINT:
+        return handle_complaint(
             instance=instance,
             tenant_id=tenant_id,
             phone=phone,

@@ -20,6 +20,11 @@ def unlock_resident_chat_session(
     if clear_cart_link:
         updates["active_cart"] = None
 
+    from django.utils import timezone
+
+    updates["last_activity_at"] = timezone.now()
+    updates["inactivity_notified"] = False
+
     ChatSession.objects.filter(
         tenant_id=resident.tenant_id,
         phone_number=resident.phone_number,

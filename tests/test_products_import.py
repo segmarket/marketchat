@@ -10,6 +10,8 @@ from apps.products.services.import_apply import ImportApplyError, confirm_import
 from apps.products.services.import_compare import build_import_preview
 from apps.products.services.import_session import create_import_session
 from apps.products.services.spreadsheet import parse_csv_upload
+from apps.products.services.template import build_template_workbook
+from openpyxl import load_workbook
 from tests.factories import ProductFactory, TenantFactory, UserFactory
 
 
@@ -21,6 +23,79 @@ def _csv_bytes(content: str) -> io.BytesIO:
 
 def _rows_from_csv(content: str) -> list[dict]:
     return parse_csv_upload(_csv_bytes(content))
+
+
+def test_template_workbook_includes_search_aliases_column():
+    wb = load_workbook(io.BytesIO(build_template_workbook()), read_only=True)
+    ws = wb.active
+    headers = [str(cell or "").strip() for cell in next(ws.iter_rows(values_only=True))]
+    wb.close()
+    assert headers == ["sku", "name", "search_aliases", "price", "status"]
+
+
+@pytest.mark.django_db
+def test_csv_import_parses_search_aliases_column():
+    rows = _rows_from_csv(
+        'sku,name,search_aliases,price,status\n'
+        'SKU-A,Refrigerante,"coca, cola",10.00,Ativo\n'
+    )
+    assert rows[0]["search_aliases"] == "coca, cola"
+
+
+@pytest.mark.django_db
+def test_csv_import_accepts_sinonimos_header_alias():
+    rows = _rows_from_csv(
+        "sku,name,sinonimos,price,status\n"
+        "SKU-A,Refrigerante,coca,10.00,Ativo\n"
+    )
+    assert rows[0]["search_aliases"] == "coca"
+
+
+@pytest.mark.django_db
+def test_preview_detects_search_aliases_change():
+    tenant = TenantFactory()
+    ProductFactory(
+        tenant=tenant,
+        sku="ABC",
+        name="Item ABC",
+        price=Decimal("10.00"),
+        status=Product.Status.ACTIVE,
+        search_aliases="antigo",
+    )
+    rows = _rows_from_csv(
+        "sku,name,search_aliases,price,status\n"
+        "ABC,Item ABC,novo alias,10.00,Ativo\n"
+    )
+    preview = build_import_preview(tenant.id, rows)
+    assert preview.updated_count == 1
+    assert preview.operations[0]["search_aliases"] == "novo alias"
+
+
+@pytest.mark.django_db
+def test_confirm_import_persists_search_aliases(api_client):
+    tenant = TenantFactory()
+    user = UserFactory(tenant=tenant, email="products-aliases@example.com")
+    api_client.credentials(
+        HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(user).access_token}"
+    )
+
+    csv_content = (
+        'sku,name,search_aliases,price,status\n'
+        'ALIAS-1,Produto com alias,"coca, cola",9.99,Ativo\n'
+    )
+    preview_resp = api_client.post(
+        reverse("products-upload-preview"),
+        {"file": _csv_bytes(csv_content)},
+        format="multipart",
+    )
+    token = preview_resp.json()["import_token"]
+    api_client.post(
+        reverse("products-upload-confirm"),
+        {"import_token": token},
+        format="json",
+    )
+    product = Product.all_objects.get(tenant=tenant, sku="ALIAS-1")
+    assert product.search_aliases == "coca, cola"
 
 
 @pytest.mark.django_db

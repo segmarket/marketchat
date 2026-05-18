@@ -18,10 +18,13 @@ class PreviewResult:
 
 def _row_differs(existing: Product, row: dict[str, Any]) -> bool:
     price = Decimal(row["price"]).quantize(Decimal("0.01"))
+    aliases = (row.get("search_aliases") or "").strip()
+    existing_aliases = (existing.search_aliases or "").strip()
     return (
         existing.name != row["name"]
         or existing.price != price
         or existing.status != row["status"]
+        or existing_aliases != aliases
     )
 
 
@@ -29,7 +32,12 @@ def build_import_preview(tenant_id: int, rows: list[dict[str, Any]]) -> PreviewR
     existing_by_sku = {
         p.sku: p
         for p in Product.all_objects.filter(tenant_id=tenant_id).only(
-            "id", "sku", "name", "price", "status"
+            "id",
+            "sku",
+            "name",
+            "search_aliases",
+            "price",
+            "status",
         )
     }
 

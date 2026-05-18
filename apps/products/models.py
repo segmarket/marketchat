@@ -14,6 +14,11 @@ class Product(TenantAwareModel):
 
     sku = models.CharField(max_length=64)
     name = models.CharField(max_length=255)
+    search_aliases = models.TextField(
+        blank=True,
+        default="",
+        help_text="Sinônimos de busca (vírgula ou quebra de linha).",
+    )
     price = models.DecimalField(max_digits=12, decimal_places=2)
     status = models.CharField(
         max_length=16,

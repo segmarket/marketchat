@@ -54,7 +54,7 @@ Requer JWT (`IsAuthenticated`). Dados isolados por `tenant_id` do usuário logad
 |--------|---------|--------------|-----------|
 | GET | `/api/products/` | JWT | Lista produtos do tenant. Query opcional: `name`, `sku`, `status` (`active` \| `inactive`). |
 | PATCH | `/api/products/<id>/` | JWT | Atualização rápida: apenas `name`, `price`, `status`. |
-| GET | `/api/products/download-template/` | JWT | Download do modelo `.xlsx` (colunas: `sku`, `name`, `price`, `status`). |
+| GET | `/api/products/download-template/` | JWT | Download do modelo `.xlsx` (colunas: `sku`, `name`, `search_aliases`, `price`, `status`). |
 | POST | `/api/products/upload-preview/` | JWT | Upload multipart (`file`: `.xlsx` ou `.csv`). Compara por SKU e retorna resumo sem gravar. |
 | POST | `/api/products/upload-confirm/` | JWT | Confirma importação com o token do preview. |
 
@@ -76,7 +76,7 @@ Resposta 200:
 ```
 
 - **Novo:** SKU inexistente no tenant.
-- **Alterado:** SKU existente com diferença em `name`, `price` ou `status`.
+- **Alterado:** SKU existente com diferença em `name`, `search_aliases`, `price` ou `status`.
 - Linhas idênticas ao banco são ignoradas.
 - SKUs duplicados na planilha: mantém a primeira ocorrência.
 
@@ -179,6 +179,31 @@ Estados `ChatSession`: `ACTIVE_BOT`, `AWAITING_PRODUCT_SELECTION`, `AWAITING_QUA
 Modelos em `apps/sales`: `Cart` (`OPEN`, `AWAITING_PHOTO`, `AWAITING_PAYMENT`, `COMPLETED`), `CartItem`.
 
 Dependências: `OPENAI_API_KEY` / `OPENAI_MODEL` (extração do termo de produto), subconta Asaas do tenant com `asaas_wallet_id`, `MEDIA_ROOT` (foto do carrinho), Evolution GO (`/send/text` para o fluxo de venda; catálogo e carrinho em mensagens de texto numeradas — sem carrossel/lista/botões nativos, por compatibilidade com todas as versões do WhatsApp).
+
+## Notificações do painel (`/api/notifications/`)
+
+Alertas em tempo real gerados quando o gatekeeper trata incidentes críticos (`PAYMENT_ERROR`, `MAINTENANCE_ISSUE`).
+
+| Método | Caminho | Autenticação | Descrição |
+|--------|---------|--------------|-----------|
+| GET | `/api/notifications/latest/` | JWT | Últimas 5 notificações não lidas do tenant + `unread_count` total. |
+| POST | `/api/notifications/<id>/read/` | JWT | Marca uma notificação como lida (somente do tenant do usuário). |
+| POST | `/api/notifications/read-all/` | JWT | Marca todas as notificações não lidas do tenant como lidas. |
+
+Resposta `GET latest`: `{ "unread_count": number, "results": [{ "id", "title", "message", "severity", "is_read", "created_at", "market_id", "market_name", "intent_type" }] }`.
+
+Resposta `POST read-all`: `{ "marked_read": number }`.
+
+## Onboarding gamificado (`/api/onboarding/`)
+
+Jornada de setup (4 missões). O `GET status` sincroniza automaticamente o progresso com mercados, pelo menos um produto cadastrado, WhatsApp conectado e primeiro pedido concluído com foto de auditoria.
+
+| Método | Caminho | Autenticação | Descrição |
+|--------|---------|--------------|-----------|
+| GET | `/api/onboarding/status/` | JWT | Status das missões, `completed_count`, `completion_percent`, `show_mission_panel`. |
+| POST | `/api/onboarding/dismiss/` | JWT | Marca `onboarding_finished=true` (exige 100% das missões). |
+
+Resposta `GET status`: `{ "step_market_created", "step_product_created", "step_whatsapp_connected", "step_test_order_completed", "onboarding_finished", "completed_count", "completion_percent", "show_mission_panel" }`.
 
 ## Exemplo multi-tenant (`/api/`)
 

@@ -38,6 +38,7 @@ def confirm_import(session: ProductImportSession) -> ApplyResult:
                     tenant_id=session.tenant_id,
                     sku=op["sku"],
                     name=op["name"],
+                    search_aliases=(op.get("search_aliases") or "").strip(),
                     price=price,
                     status=op["status"],
                 )
@@ -49,6 +50,7 @@ def confirm_import(session: ProductImportSession) -> ApplyResult:
                     tenant_id=session.tenant_id,
                     sku=op["sku"],
                     name=op["name"],
+                    search_aliases=(op.get("search_aliases") or "").strip(),
                     price=price,
                     status=op["status"],
                 )
@@ -64,7 +66,7 @@ def confirm_import(session: ProductImportSession) -> ApplyResult:
         if to_update:
             Product.all_objects.bulk_update(
                 to_update,
-                fields=["name", "price", "status", "updated_at"],
+                fields=["name", "search_aliases", "price", "status", "updated_at"],
             )
         session.confirmed_at = timezone.now()
         session.save(update_fields=["confirmed_at"])

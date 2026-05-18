@@ -37,7 +37,7 @@ class Cart(models.Model):
         default=Decimal("0"),
     )
     product_photo = models.ImageField(
-        upload_to="carts/%Y/%m/",
+        upload_to="security_photos/%Y/%m/%d/",
         blank=True,
         default="",
     )

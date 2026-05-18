@@ -10,6 +10,7 @@ from apps.chatbot.services.chatbot_core import classify_gatekeeper_intent as _cl
 logger = logging.getLogger(__name__)
 
 MAINTENANCE_ISSUE = "MAINTENANCE_ISSUE"
+COMPLAINT = "COMPLAINT"
 PAYMENT_ERROR = "PAYMENT_ERROR"
 PURCHASE = "PURCHASE"
 STOCK_ISSUE = "STOCK_ISSUE"
@@ -17,6 +18,7 @@ GENERAL = "GENERAL"
 
 ALL_INTENTS = (
     MAINTENANCE_ISSUE,
+    COMPLAINT,
     PAYMENT_ERROR,
     PURCHASE,
     STOCK_ISSUE,
@@ -43,6 +45,23 @@ _STOCK_SHORTAGE_PATTERNS = (
     r"\bquando chega\b",
 )
 
+_COMPLAINT_PATTERNS = (
+    r"\breclama",
+    r"\breclam",
+    r"\binsatisfeit",
+    r"\bn[aã]o gostei\b",
+    r"\batendimento (foi |est[aá] )?(p[eé]ssim|ruim|horr[ií]vel)",
+    r"\bden[uú]ncia",
+    r"\bproduto (estragado|vencido|estragad)",
+)
+
+
+def _detect_complaint_heuristic(message: str) -> bool:
+    text = (message or "").strip().lower()
+    if not text:
+        return False
+    return any(re.search(pattern, text) for pattern in _COMPLAINT_PATTERNS)
+
 
 def _detect_stock_issue_heuristic(message: str) -> bool:
     """Fallback local: compra + falta na mesma mensagem → STOCK_ISSUE."""
@@ -64,6 +83,10 @@ def classify_user_intent(message: str) -> str:
     if _detect_stock_issue_heuristic(stripped):
         logger.info("Gatekeeper heurístico: STOCK_ISSUE para %r", stripped[:80])
         return STOCK_ISSUE
+
+    if _detect_complaint_heuristic(stripped):
+        logger.info("Gatekeeper heurístico: COMPLAINT para %r", stripped[:80])
+        return COMPLAINT
 
     tag = _classify_gatekeeper(stripped).strip().upper()
     if tag in ALL_INTENTS:

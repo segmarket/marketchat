@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import PageBreadcrumb from "../../components/common/PageBreadCrumb";
-import PageMeta from "../../components/common/PageMeta";
+import AdminPageLayout from "../../components/layout/AdminPageShell";
 import ResidentEditModal from "../../components/residents/ResidentEditModal";
 import ResidentsSearchPanel from "../../components/residents/ResidentsSearchPanel";
 import ResidentsTable from "../../components/residents/ResidentsTable";
@@ -89,14 +88,11 @@ export default function ResidentsPage() {
 
   return (
     <>
-      <PageMeta title="Moradores | MarketChat" description="Moradores cadastrados via WhatsApp" />
-      <PageBreadcrumb pageTitle="Moradores" />
-
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
-        <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-          Moradores que concluíram o cadastro pelo WhatsApp.
-        </p>
-
+      <AdminPageLayout
+        pageTitle="Moradores"
+        metaDescription="Moradores cadastrados via WhatsApp"
+        description="Moradores que concluíram o cadastro pelo WhatsApp."
+      >
         <ResidentsSearchPanel
           markets={markets}
           busy={loading}
@@ -111,7 +107,7 @@ export default function ResidentsPage() {
           filtersActive={filtersActive}
           onEdit={setEditingResident}
         />
-      </div>
+      </AdminPageLayout>
 
       <ResidentEditModal
         resident={editingResident}

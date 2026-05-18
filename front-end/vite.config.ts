@@ -11,6 +11,8 @@ export default defineConfig(({ mode }) => {
 
   return {
     server: {
+      host: true,
+      allowedHosts: ["localhost", "127.0.0.1", "app.localhost", "marketchat.localhost"],
       // Com `VITE_API_BASE_URL` vazio em dev, o axios usa URLs relativas (/api/...)
       // e o Vite encaminha para o Django (porta em VITE_DEV_API_PORT, padrão 8001).
       proxy: {

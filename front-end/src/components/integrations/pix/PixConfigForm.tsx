@@ -56,7 +56,7 @@ export default function PixConfigForm({ config, disabled, submitting, onSubmit }
       {!config.has_market_address && (
         <div className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-sm text-warning-800 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-100">
           Cadastre ao menos um mercado com endereço completo em{" "}
-          <Link to="/admin/markets" className="font-medium underline">
+          <Link to="/admin/settings?section=markets" className="font-medium underline">
             Meus Mercados
           </Link>{" "}
           antes de salvar as configurações Pix.

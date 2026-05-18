@@ -6,6 +6,7 @@ from apps.residents.models import ChatSession
 from apps.sales.models import Cart
 from apps.sales.services.cart_flow import process_cart_flow
 from apps.sales.services.intent_gatekeeper import (
+    COMPLAINT,
     PURCHASE,
     STOCK_ISSUE,
     classify_user_intent,
@@ -24,6 +25,11 @@ MAGNUM_MESSAGE = "Boa noite, queria comprar o Magnum mas esta em falta"
 
 def test_heuristic_classifies_magnum_stock_issue_without_openai():
     assert classify_user_intent(MAGNUM_MESSAGE) == STOCK_ISSUE
+
+
+def test_heuristic_classifies_complaint_without_openai():
+    assert classify_user_intent("Quero fazer uma reclamação sobre o atendimento") == COMPLAINT
+    assert classify_user_intent("Estou muito insatisfeito com a compra de ontem") == COMPLAINT
 
 
 @pytest.mark.django_db

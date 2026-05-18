@@ -58,7 +58,7 @@ class ProductDetailView(APIView):
         data = ser.validated_data
         if not data:
             return Response(
-                {"detail": "Informe ao menos um campo: name, price ou status."},
+                {"detail": "Informe ao menos um campo: name, price, status ou search_aliases."},
                 status=400,
             )
 
@@ -66,6 +66,9 @@ class ProductDetailView(APIView):
         if "name" in data:
             product.name = data["name"]
             update_fields.append("name")
+        if "search_aliases" in data:
+            product.search_aliases = data["search_aliases"].strip()
+            update_fields.append("search_aliases")
         if "price" in data:
             product.price = data["price"]
             update_fields.append("price")

@@ -67,8 +67,8 @@ api.interceptors.response.use(
     }
 
     if (status === 402) {
-      if (!window.location.pathname.startsWith("/admin/billing")) {
-        window.location.assign("/admin/billing");
+      if (!window.location.pathname.startsWith("/admin/settings")) {
+        window.location.assign("/admin/settings?tab=plan");
       }
     }
 

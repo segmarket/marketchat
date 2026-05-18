@@ -7,8 +7,17 @@ from apps.chatbot.views import (
     ChatbotWorkflowListView,
     ChatbotWorkflowSaveView,
 )
+from apps.chatbot.views_analytics import ChatbotAnalyticsView
+from apps.chatbot.views_chat_logs import ChatLogsConversationView, ChatLogsListView
 
 urlpatterns = [
+    path("analytics/", ChatbotAnalyticsView.as_view(), name="chatbot-analytics"),
+    path("logs/", ChatLogsListView.as_view(), name="chatbot-logs-list"),
+    path(
+        "logs/conversation/",
+        ChatLogsConversationView.as_view(),
+        name="chatbot-logs-conversation",
+    ),
     path("workflows/", ChatbotWorkflowListView.as_view(), name="chatbot-workflows-list"),
     path(
         "workflows/active/",

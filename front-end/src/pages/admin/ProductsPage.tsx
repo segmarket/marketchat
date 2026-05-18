@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import PageBreadcrumb from "../../components/common/PageBreadCrumb";
-import PageMeta from "../../components/common/PageMeta";
-import FormContentCard from "../../components/layout/FormContentCard";
-import FormPageLayout from "../../components/layout/FormPageLayout";
+import AdminPageLayout from "../../components/layout/AdminPageShell";
 import ProductEditModal from "../../components/products/ProductEditModal";
 import ProductImportConfirmModal from "../../components/products/ProductImportConfirmModal";
 import ProductsSearchPanel from "../../components/products/ProductsSearchPanel";
@@ -24,7 +21,11 @@ import {
 import type { ImportPreviewResponse, Product } from "../../features/products/types";
 import { getAxiosErrorMessage } from "../../utils/apiError";
 
-export default function ProductsPage() {
+type Props = {
+  embedded?: boolean;
+};
+
+export default function ProductsPage({ embedded = false }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,17 +121,9 @@ export default function ProductsPage() {
   const filtersActive = hasActiveProductsFilters(appliedFilters);
   const listBusy = loading || analyzing;
 
-  return (
+  const panelBody = (
     <>
-      <PageMeta title="Produtos | MarketChat" description="Gerenciamento de produtos e planilha." />
-      <FormPageLayout>
-        <PageBreadcrumb pageTitle="Produtos" />
-
-        <FormContentCard>
-        <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <h2 className="text-theme-xl font-semibold text-gray-900 dark:text-white/90">
-            Gerenciamento de Produtos
-          </h2>
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => void handleDownloadTemplate()} disabled={analyzing}>
               Baixar Modelo de Planilha
@@ -168,8 +161,22 @@ export default function ProductsPage() {
           filtersActive={filtersActive}
           onEdit={(product) => setEditingProduct(product)}
         />
-        </FormContentCard>
-      </FormPageLayout>
+    </>
+  );
+
+  return (
+    <>
+      {!embedded ? (
+        <AdminPageLayout
+          pageTitle="Produtos"
+          metaDescription="Gerenciamento de produtos e estoque"
+          description="Importe planilhas e gerencie o catálogo do mercado."
+        >
+          {panelBody}
+        </AdminPageLayout>
+      ) : (
+        panelBody
+      )}
 
       <ProductEditModal
         product={editingProduct}

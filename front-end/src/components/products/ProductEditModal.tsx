@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
+import TextArea from "../form/input/TextArea";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
 import { patchProduct } from "../../features/products/api";
@@ -17,6 +18,7 @@ type Props = {
 
 export default function ProductEditModal({ product, isOpen, onClose, onSaved }: Props) {
   const [name, setName] = useState("");
+  const [searchAliases, setSearchAliases] = useState("");
   const [price, setPrice] = useState("");
   const [status, setStatus] = useState<ProductStatus>("active");
   const [busy, setBusy] = useState(false);
@@ -24,6 +26,7 @@ export default function ProductEditModal({ product, isOpen, onClose, onSaved }: 
   useEffect(() => {
     if (!product) return;
     setName(product.name);
+    setSearchAliases(product.search_aliases ?? "");
     setPrice(product.price);
     setStatus(product.status);
   }, [product]);
@@ -45,6 +48,7 @@ export default function ProductEditModal({ product, isOpen, onClose, onSaved }: 
     try {
       const updated = await patchProduct(product.id, {
         name: trimmedName,
+        search_aliases: searchAliases.trim(),
         price: priceNum.toFixed(2),
         status,
       });
@@ -68,6 +72,18 @@ export default function ProductEditModal({ product, isOpen, onClose, onSaved }: 
         <div>
           <Label>Nome</Label>
           <Input value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div>
+          <Label>Sinônimos de busca</Label>
+          <TextArea
+            rows={3}
+            placeholder="coca, refrigerante, cola"
+            value={searchAliases}
+            onChange={setSearchAliases}
+          />
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Separe por vírgula ou quebra de linha. Usado pelo robô para encontrar o produto.
+          </p>
         </div>
         <div>
           <Label>Preço</Label>

@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 from apps.tenants.models import Tenant, TenantAwareModel
 
@@ -77,6 +78,16 @@ class ChatSession(models.Model):
         blank=True,
         related_name="pending_in_sessions",
     )
+    last_activity_at = models.DateTimeField(
+        default=timezone.now,
+        db_index=True,
+        help_text="Última mensagem recebida ou enviada nesta sessão.",
+    )
+    inactivity_notified = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Evita envio duplicado do encerramento por inatividade.",
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -85,6 +96,12 @@ class ChatSession(models.Model):
             models.UniqueConstraint(
                 fields=["tenant", "phone_number"],
                 name="uniq_chat_session_tenant_phone",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["state", "inactivity_notified", "last_activity_at"],
+                name="residents_cha_inactiv_idx",
             ),
         ]
 

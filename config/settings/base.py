@@ -38,6 +38,8 @@ INSTALLED_APPS = [
     "apps.residents",
     "apps.chatbot",
     "apps.sales",
+    "apps.notifications",
+    "apps.onboarding",
 ]
 
 MIDDLEWARE = [

@@ -55,3 +55,10 @@ export type PaymentMethodSummary = {
 };
 
 export type SettingsTabId = "account" | "plan" | "history";
+
+export type SettingsSectionId =
+  | "account"
+  | "markets"
+  | "integrations"
+  | "plan"
+  | "history";

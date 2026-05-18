@@ -10,6 +10,13 @@ from typing import Any
 from openpyxl import load_workbook
 
 REQUIRED_COLUMNS = ("sku", "name", "price", "status")
+SEARCH_ALIASES_HEADER_ALIASES = (
+    "search_aliases",
+    "sinonimos",
+    "sinônimos",
+    "sinonimo",
+    "sinônimo",
+)
 
 
 class SpreadsheetError(ValueError):
@@ -48,12 +55,32 @@ def normalize_row(raw: dict[str, Any], *, line_number: int) -> dict[str, Any]:
         raise SpreadsheetError(f"Linha {line_number}: sku é obrigatório.")
     if not name:
         raise SpreadsheetError(f"Linha {line_number}: name é obrigatório.")
+    search_aliases = str(raw.get("search_aliases") or "").strip()
     return {
         "sku": sku,
         "name": name,
+        "search_aliases": search_aliases,
         "price": str(normalize_price(raw.get("price"))),
         "status": normalize_status(raw.get("status")),
     }
+
+
+def _canonicalize_search_aliases_header(mapping: dict[str, str]) -> None:
+    if "search_aliases" in mapping:
+        return
+    for alias in SEARCH_ALIASES_HEADER_ALIASES:
+        if alias in mapping:
+            mapping["search_aliases"] = mapping[alias]
+            return
+
+
+def _canonicalize_search_aliases_col(col_map: dict[str, int]) -> None:
+    if "search_aliases" in col_map:
+        return
+    for alias in SEARCH_ALIASES_HEADER_ALIASES:
+        if alias in col_map:
+            col_map["search_aliases"] = col_map[alias]
+            return
 
 
 def _normalize_headers(fieldnames: list[str] | None) -> dict[str, str]:
@@ -68,8 +95,10 @@ def _normalize_headers(fieldnames: list[str] | None) -> dict[str, str]:
     if missing:
         raise SpreadsheetError(
             f"Colunas obrigatórias ausentes: {', '.join(missing)}. "
-            f"Use: {', '.join(REQUIRED_COLUMNS)}."
+            f"Use: {', '.join(REQUIRED_COLUMNS)} "
+            f"(opcional: search_aliases ou sinonimos)."
         )
+    _canonicalize_search_aliases_header(mapping)
     return mapping
 
 
@@ -97,6 +126,8 @@ def parse_csv_upload(file_obj) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for line_number, row in enumerate(reader, start=2):
         keyed = {col: row.get(header_map[col]) for col in REQUIRED_COLUMNS}
+        if "search_aliases" in header_map:
+            keyed["search_aliases"] = row.get(header_map["search_aliases"])
         if all(v is None or str(v).strip() == "" for v in keyed.values()):
             continue
         rows.append(normalize_row(keyed, line_number=line_number))
@@ -127,6 +158,7 @@ def parse_xlsx_upload(file_obj) -> list[dict[str, Any]]:
         raise SpreadsheetError(
             f"Colunas obrigatórias ausentes: {', '.join(missing)}."
         )
+    _canonicalize_search_aliases_col(col_map)
 
     rows: list[dict[str, Any]] = []
     for line_number, row in enumerate(rows_iter, start=2):
@@ -135,6 +167,9 @@ def parse_xlsx_upload(file_obj) -> list[dict[str, Any]]:
             col: cells[col_map[col]] if col_map[col] < len(cells) else None
             for col in REQUIRED_COLUMNS
         }
+        if "search_aliases" in col_map:
+            idx = col_map["search_aliases"]
+            keyed["search_aliases"] = cells[idx] if idx < len(cells) else None
         if all(v is None or str(v).strip() == "" for v in keyed.values()):
             continue
         rows.append(normalize_row(keyed, line_number=line_number))

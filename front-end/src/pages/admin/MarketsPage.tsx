@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import PageBreadcrumb from "../../components/common/PageBreadCrumb";
-import PageMeta from "../../components/common/PageMeta";
-import FormContentCard from "../../components/layout/FormContentCard";
-import FormPageLayout from "../../components/layout/FormPageLayout";
+import AdminPageLayout from "../../components/layout/AdminPageShell";
 import MarketDeleteConfirmModal from "../../components/markets/MarketDeleteConfirmModal";
 import MarketFormModal from "../../components/markets/MarketFormModal";
 import MarketsSearchPanel from "../../components/markets/MarketsSearchPanel";
@@ -18,7 +15,11 @@ import {
 import type { Market } from "../../features/markets/types";
 import { getAxiosErrorMessage } from "../../utils/apiError";
 
-export default function MarketsPage() {
+type Props = {
+  embedded?: boolean;
+};
+
+export default function MarketsPage({ embedded = false }: Props) {
   const [markets, setMarkets] = useState<Market[]>([]);
   const [loading, setLoading] = useState(true);
   const [appliedFilters, setAppliedFilters] = useState<MarketsSearchFilters>(
@@ -86,17 +87,9 @@ export default function MarketsPage() {
 
   const filtersActive = hasActiveMarketsFilters(appliedFilters);
 
-  return (
+  const panelBody = (
     <>
-      <PageMeta title="Meus Mercados | MarketChat" description="Gerenciamento de mercados" />
-      <FormPageLayout>
-        <PageBreadcrumb pageTitle="Meus Mercados" />
-
-        <FormContentCard>
-        <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Cadastre e gerencie seus mercados
-          </p>
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
           <Button onClick={openCreateModal}>+ Adicionar Novo Mercado</Button>
         </div>
 
@@ -114,8 +107,22 @@ export default function MarketsPage() {
           onEdit={openEditModal}
           onDelete={setDeleteTarget}
         />
-        </FormContentCard>
-      </FormPageLayout>
+    </>
+  );
+
+  return (
+    <>
+      {!embedded ? (
+        <AdminPageLayout
+          pageTitle="Mercados"
+          metaDescription="Gerenciamento de mercados e condomínios"
+          description="Cadastre e gerencie os mercados do seu condomínio."
+        >
+          {panelBody}
+        </AdminPageLayout>
+      ) : (
+        panelBody
+      )}
 
       <MarketFormModal
         isOpen={formOpen}

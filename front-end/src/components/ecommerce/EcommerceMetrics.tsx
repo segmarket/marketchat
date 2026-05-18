@@ -5,55 +5,70 @@ import {
   GroupIcon,
 } from "../../icons";
 import Badge from "../ui/badge/Badge";
+import type { ChatbotAnalyticsCards } from "../../features/chatbotAnalytics/types";
+import { formatCount, formatPercentChange } from "../../features/chatbotAnalytics/format";
 
-export default function EcommerceMetrics() {
+type Props = {
+  cards: ChatbotAnalyticsCards | null;
+  loading?: boolean;
+};
+
+function ChangeBadge({ value }: { value: number }) {
+  const isPositive = value >= 0;
+  return (
+    <Badge color={isPositive ? "success" : "error"}>
+      {isPositive ? <ArrowUpIcon /> : <ArrowDownIcon />}
+      {formatPercentChange(Math.abs(value))}
+    </Badge>
+  );
+}
+
+export default function EcommerceMetrics({ cards, loading = false }: Props) {
+  const interactions = cards?.total_interactions ?? 0;
+  const incidents = cards?.critical_incidents ?? 0;
+  const interactionsChange = cards?.total_interactions_change_pct ?? 0;
+  const incidentsChange = cards?.critical_incidents_change_pct ?? 0;
+
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6">
-      {/* <!-- Metric Item Start --> */}
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
-        <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl dark:bg-gray-800">
-          <GroupIcon className="text-gray-800 size-6 dark:text-white/90" />
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-800">
+          <GroupIcon className="size-6 text-gray-800 dark:text-white/90" />
         </div>
 
-        <div className="flex items-end justify-between mt-5">
+        <div className="mt-5 flex items-end justify-between">
           <div>
             <span className="text-sm text-gray-500 dark:text-gray-400">
-              Customers
+              Interações no mês
             </span>
-            <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">
-              3,782
+            <h4 className="mt-2 text-title-sm font-bold text-gray-800 dark:text-white/90">
+              {loading ? "—" : formatCount(interactions)}
             </h4>
           </div>
-          <Badge color="success">
-            <ArrowUpIcon />
-            11.01%
-          </Badge>
+          {!loading && cards ? (
+            <ChangeBadge value={interactionsChange} />
+          ) : null}
         </div>
       </div>
-      {/* <!-- Metric Item End --> */}
 
-      {/* <!-- Metric Item Start --> */}
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
-        <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl dark:bg-gray-800">
-          <BoxIconLine className="text-gray-800 size-6 dark:text-white/90" />
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-800">
+          <BoxIconLine className="size-6 text-gray-800 dark:text-white/90" />
         </div>
-        <div className="flex items-end justify-between mt-5">
+        <div className="mt-5 flex items-end justify-between">
           <div>
             <span className="text-sm text-gray-500 dark:text-gray-400">
-              Orders
+              Incidentes críticos
             </span>
-            <h4 className="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">
-              5,359
+            <h4 className="mt-2 text-title-sm font-bold text-gray-800 dark:text-white/90">
+              {loading ? "—" : formatCount(incidents)}
             </h4>
           </div>
-
-          <Badge color="error">
-            <ArrowDownIcon />
-            9.05%
-          </Badge>
+          {!loading && cards ? (
+            <ChangeBadge value={-incidentsChange} />
+          ) : null}
         </div>
       </div>
-      {/* <!-- Metric Item End --> */}
     </div>
   );
 }

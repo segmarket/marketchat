@@ -46,7 +46,7 @@ STATIC_PRODUCT_EXTRACTOR = (
 GATEKEEPER_STATIC_SYSTEM = (
     "Você é um classificador de intenções estrito para um chatbot de mercado autônomo em condomínio.\n"
     "Sua única tarefa é responder com uma das seguintes tags: PURCHASE, MAINTENANCE_ISSUE, "
-    "PAYMENT_ERROR, STOCK_ISSUE, ou GENERAL.\n\n"
+    "COMPLAINT, PAYMENT_ERROR, STOCK_ISSUE, ou GENERAL.\n\n"
     "⚠️ REGRA DE PRIORIDADE MÁXIMA:\n"
     "Se o usuário mencionar que um produto ACABOU, ESTÁ EM FALTA, NÃO TEM na gôndola/geladeira "
     "ou que ele QUERIA COMPRAR MAS NÃO ACHOU, a intenção OBRIGATORIAMENTE é STOCK_ISSUE. "
@@ -60,6 +60,8 @@ GATEKEEPER_STATIC_SYSTEM = (
     "- 'A maquininha de cartão tá sem sinal' -> PAYMENT_ERROR\n"
     "- 'Problema para finalizar o pagamento' -> PAYMENT_ERROR\n"
     "- 'A lâmpada do mercado queimou' -> MAINTENANCE_ISSUE\n"
+    "- 'Quero fazer uma reclamação sobre o atendimento' -> COMPLAINT\n"
+    "- 'Estou insatisfeito com a compra de ontem' -> COMPLAINT\n"
     "- 'Oi, boa noite' -> GENERAL\n\n"
     "Responda APENAS E STRICTAMENTE com a palavra-chave da tag em letras maiúsculas, "
     "sem pontuação, justificativas ou saudações."
@@ -69,10 +71,21 @@ GATEKEEPER_TAGS = frozenset(
     {
         "PURCHASE",
         "MAINTENANCE_ISSUE",
+        "COMPLAINT",
         "PAYMENT_ERROR",
         "STOCK_ISSUE",
         "GENERAL",
     },
+)
+
+STATIC_COMPLAINT_ASSISTANT = (
+    "Você é o assistente de atendimento de um mercado autônomo de condomínio. "
+    "O morador está registrando uma RECLAMAÇÃO (insatisfação com produto, serviço, "
+    "atendimento ou experiência no mercado). "
+    "Ouça com empatia, peça desculpas pelo transtorno quando fizer sentido e "
+    "convide-o a descrever o que aconteceu com calma. "
+    "Não minimize o problema nem discuta. "
+    "Se faltar detalhe, faça uma pergunta objetiva para entender melhor."
 )
 
 

@@ -36,6 +36,17 @@ def build_resident_personalization_instructions(resident: Resident) -> str:
     return build_resident_dynamic_context(resident)
 
 
+def build_complaint_dynamic_context(resident: Resident) -> str:
+    """Contexto dinâmico quando a intenção classificada é reclamação."""
+    base = build_resident_dynamic_context(resident)
+    return (
+        f"{base}\n\n"
+        "Tipo de atendimento atual: RECLAMAÇÃO. "
+        "Trate a mensagem do morador como uma insatisfação com produto, serviço "
+        "ou experiência no mercado — não como pedido de compra nem falta de estoque."
+    )
+
+
 def build_payment_error_recovery_message(resident: Resident) -> str:
     name = resident_display_name(resident)
     return (
