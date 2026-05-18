@@ -9,6 +9,8 @@ class Tenant(models.Model):
 
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=80, unique=True)
+    phone = models.CharField(max_length=32, blank=True, default="")
+    cpf_cnpj = models.CharField(max_length=18, blank=True, default="")
     trial_ends_at = models.DateTimeField()
     billing_blocked_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

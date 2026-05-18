@@ -48,7 +48,7 @@ export function getAxiosErrorMessage(err: unknown, options?: AxiosErrorMessageOp
 
   if (!err.response) {
     if (err.code === "ERR_NETWORK" || err.message === "Network Error") {
-      return "Sem resposta do servidor. Confira se o Django está rodando e se VITE_API_BASE_URL no front aponta para a API (ex.: http://127.0.0.1:8000), sem barra no final.";
+      return "Sem resposta do servidor. Confira se o Django está rodando (porta 8001 em dev) e se VITE_API_BASE_URL no front aponta para a API (ex.: http://127.0.0.1:8001), sem barra no final.";
     }
     return err.message || "Falha de rede ou tempo esgotado.";
   }
@@ -58,7 +58,7 @@ export function getAxiosErrorMessage(err: unknown, options?: AxiosErrorMessageOp
 
   const status = err.response.status;
   if (status === 404) {
-    return "Rota da API não encontrada (404). O pedido provavelmente foi para o servidor do front (Vite), não para o Django: defina VITE_API_BASE_URL=http://127.0.0.1:8000 no .env do front ou, em desenvolvimento, deixe essa variável vazia e use o proxy do Vite (já configurado em vite.config.ts) com o Django rodando na porta 8000.";
+    return "Rota da API não encontrada (404). O pedido provavelmente foi para o servidor do front (Vite), não para o Django: defina VITE_API_BASE_URL=http://127.0.0.1:8001 no .env do front ou, em desenvolvimento, deixe essa variável vazia e use o proxy do Vite (porta padrão 8001; veja VITE_DEV_API_PORT em vite.config.ts) com o Django rodando.";
   }
   return (
     options?.genericHttpMessage ??

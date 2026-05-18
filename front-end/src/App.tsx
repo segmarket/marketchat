@@ -21,6 +21,12 @@ import { ScrollToTop } from "./components/common/ScrollToTop";
 import Home from "./pages/Dashboard/Home";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import BillingPage from "./pages/admin/BillingPage";
+import SettingsPage from "./pages/admin/SettingsPage";
+import IntegrationsPage from "./pages/admin/IntegrationsPage";
+import ProductsPage from "./pages/admin/ProductsPage";
+import MarketsPage from "./pages/admin/MarketsPage";
+import ResidentsPage from "./pages/admin/ResidentsPage";
+import ChatbotFlowsPage from "./pages/admin/ChatbotFlowsPage";
 
 export default function App() {
   return (
@@ -39,6 +45,12 @@ export default function App() {
           <Route path="/admin" element={<AppLayout />}>
             <Route index element={<Home />} />
             <Route path="billing" element={<BillingPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+            <Route path="integrations" element={<IntegrationsPage />} />
+            <Route path="products" element={<ProductsPage />} />
+            <Route path="markets" element={<MarketsPage />} />
+            <Route path="residents" element={<ResidentsPage />} />
+            <Route path="chatbot-flows" element={<ChatbotFlowsPage />} />
             <Route path="profile" element={<UserProfiles />} />
             <Route path="calendar" element={<Calendar />} />
             <Route path="blank" element={<Blank />} />

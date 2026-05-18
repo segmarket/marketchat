@@ -36,13 +36,21 @@ class AsaasClient:
             "access_token": key,
         }
 
-    def _request(self, method: str, path: str, json: Mapping[str, Any] | None = None) -> Any:
+    def _request(
+        self,
+        method: str,
+        path: str,
+        json: Mapping[str, Any] | None = None,
+        *,
+        params: Mapping[str, Any] | None = None,
+    ) -> Any:
         url = f"{self.base_url}/{path.lstrip('/')}"
         try:
             response = requests.request(
                 method,
                 url,
                 json=json,
+                params=params,
                 headers=self._headers(),
                 timeout=90,
             )
@@ -68,6 +76,31 @@ class AsaasClient:
         assert isinstance(data, dict)
         return data
 
+    def get_customer(self, customer_id: str) -> dict[str, Any]:
+        data = self._request("GET", f"/customers/{customer_id}")
+        assert isinstance(data, dict)
+        return data
+
+    def create_payment(self, body: Mapping[str, Any]) -> dict[str, Any]:
+        data = self._request("POST", "/payments", dict(body))
+        assert isinstance(data, dict)
+        return data
+
+    def get_payment(self, payment_id: str) -> dict[str, Any]:
+        data = self._request("GET", f"/payments/{payment_id}")
+        if data is None:
+            return {}
+        assert isinstance(data, dict)
+        return data
+
+    def get_payment_pix_qrcode(self, payment_id: str) -> dict[str, Any]:
+        """QR Code Pix dinâmico (payload copia e cola) — chamada separada após criar cobrança."""
+        data = self._request("GET", f"/payments/{payment_id}/pixQrCode")
+        if data is None:
+            return {}
+        assert isinstance(data, dict)
+        return data
+
     def tokenize_credit_card(self, body: Mapping[str, Any]) -> dict[str, Any]:
         data = self._request("POST", "/creditCard/tokenizeCreditCard", dict(body))
         assert isinstance(data, dict)
@@ -75,5 +108,35 @@ class AsaasClient:
 
     def create_subscription(self, body: Mapping[str, Any]) -> dict[str, Any]:
         data = self._request("POST", "/subscriptions", dict(body))
+        assert isinstance(data, dict)
+        return data
+
+    def list_payments(self, **params: Any) -> dict[str, Any]:
+        data = self._request("GET", "/payments", params=params)
+        assert isinstance(data, dict)
+        return data
+
+    def get_subscription(self, subscription_id: str) -> dict[str, Any]:
+        data = self._request("GET", f"/subscriptions/{subscription_id}")
+        assert isinstance(data, dict)
+        return data
+
+    def create_subaccount(self, body: Mapping[str, Any]) -> dict[str, Any]:
+        data = self._request("POST", "/accounts", dict(body))
+        assert isinstance(data, dict)
+        return data
+
+    def update_subscription_credit_card(
+        self,
+        subscription_id: str,
+        body: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        data = self._request(
+            "PUT",
+            f"/subscriptions/{subscription_id}/creditCard",
+            dict(body),
+        )
+        if data is None:
+            return {}
         assert isinstance(data, dict)
         return data

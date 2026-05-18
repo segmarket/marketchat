@@ -68,6 +68,19 @@ def create_trial_subscription(
     except ValueError:
         sub_status = Subscription.Status.ACTIVE
 
+    tenant_updates: list[str] = []
+    cpf = (credit_card_holder_info.get("cpfCnpj") or "").strip()
+    if cpf:
+        tenant.cpf_cnpj = cpf
+        tenant_updates.append("cpf_cnpj")
+    phone = (credit_card_holder_info.get("phone") or "").strip()
+    if phone:
+        tenant.phone = phone
+        tenant_updates.append("phone")
+    if tenant_updates:
+        tenant_updates.append("updated_at")
+        tenant.save(update_fields=tenant_updates)
+
     return Subscription.objects.create(
         tenant=tenant,
         asaas_customer_id=str(customer_id),

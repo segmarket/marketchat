@@ -32,6 +32,12 @@ INSTALLED_APPS = [
     "apps.tenants",
     "apps.accounts",
     "apps.billing",
+    "apps.integrations",
+    "apps.products",
+    "apps.markets",
+    "apps.residents",
+    "apps.chatbot",
+    "apps.sales",
 ]
 
 MIDDLEWARE = [
@@ -88,6 +94,8 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "accounts.User"
@@ -97,6 +105,13 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
+}
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "marketchat",
+    }
 }
 
 SIMPLE_JWT = {
@@ -137,6 +152,29 @@ ASAAS_WEBHOOK_VERIFY = env.bool("ASAAS_WEBHOOK_VERIFY", default=True)
 
 TRIAL_DAYS = env.int("TRIAL_DAYS", default=7)
 DEFAULT_SUBSCRIPTION_VALUE = env.float("DEFAULT_SUBSCRIPTION_VALUE", default=29.9)
+ASAAS_SUBACCOUNT_INCOME_VALUE = env.float("ASAAS_SUBACCOUNT_INCOME_VALUE", default=5000.0)
+# CPF usado ao criar cliente Asaas do morador (sandbox); use um CPF válido de teste.
+ASAAS_RESIDENT_DEFAULT_CPF = env("ASAAS_RESIDENT_DEFAULT_CPF", default="11144477735")
+# Dev only (com DEBUG=True): cobrança Pix na conta principal, sem split para subconta.
+ASAAS_PIX_USE_MAIN_ACCOUNT_IN_DEV = env.bool("ASAAS_PIX_USE_MAIN_ACCOUNT_IN_DEV", default=False)
+
+RESIDENT_CONDO_MATCH_MIN_RATIO = env.float("RESIDENT_CONDO_MATCH_MIN_RATIO", default=0.55)
+
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_MODEL = env("OPENAI_MODEL", default="gpt-4o-mini")
+OPENAI_HISTORY_WINDOW = env.int("OPENAI_HISTORY_WINDOW", default=6)
+
+EVOLUTION_API_BASE_URL = env("EVOLUTION_API_BASE_URL", default="http://127.0.0.1:8080")
+EVOLUTION_GLOBAL_API_KEY = env("EVOLUTION_GLOBAL_API_KEY", default="")
+PUBLIC_WEBHOOK_BASE_URL = env(
+    "PUBLIC_WEBHOOK_BASE_URL",
+    default="http://host.docker.internal:8001",
+)
+EVOLUTION_WEBHOOK_EVENTS = env.list(
+    "EVOLUTION_WEBHOOK_EVENTS",
+    default=["MESSAGE", "CONNECTION", "QRCODE"],
+)
+WEBHOOK_SHARED_SECRET = env("WEBHOOK_SHARED_SECRET", default="")
 
 LOGGING = {
     "version": 1,

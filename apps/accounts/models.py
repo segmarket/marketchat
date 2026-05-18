@@ -38,6 +38,7 @@ class User(AbstractUser):
         blank=True,
     )
     is_tenant_admin = models.BooleanField(default=False)
+    phone = models.CharField(max_length=32, blank=True, default="")
 
     objects = UserManager()
 

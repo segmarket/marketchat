@@ -55,7 +55,9 @@ def test_register_client_success(api_client):
     data = response.json()
     assert data["email"] == "admin@acme.com"
     assert User.objects.filter(email="admin@acme.com").exists()
-    assert Tenant.objects.filter(slug="acme-test").exists()
+    tenant = Tenant.objects.get(slug="acme-test")
+    assert tenant.cpf_cnpj == "24971563792"
+    assert tenant.phone == "11999999999"
     assert Subscription.objects.filter(asaas_subscription_id="sub_test_1").exists()
 
 

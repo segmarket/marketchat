@@ -36,7 +36,11 @@ BILLING_BYPASS_PREFIXES = (
     "/api/auth/token",
     "/api/auth/me",
     "/api/auth/password/reset",
+    "/api/settings/account",
+    "/api/settings/billing",
     "/api/billing/webhooks/asaas",
+    "/api/webhooks/asaas",
+    "/api/integrations/webhooks",
 )
 
 

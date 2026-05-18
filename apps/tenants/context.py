@@ -1,7 +1,8 @@
 """Contexto do tenant atual (por requisição) via contextvars."""
 
+from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Optional
+from typing import Iterator, Optional
 
 _current_tenant_id: ContextVar[Optional[int]] = ContextVar("current_tenant_id", default=None)
 
@@ -16,3 +17,12 @@ def set_current_tenant_id(tenant_id: Optional[int]) -> None:
 
 def clear_current_tenant_id() -> None:
     _current_tenant_id.set(None)
+
+
+@contextmanager
+def tenant_scope(tenant_id: int | None) -> Iterator[None]:
+    token = _current_tenant_id.set(tenant_id)
+    try:
+        yield
+    finally:
+        _current_tenant_id.reset(token)

@@ -20,6 +20,8 @@ if not ASAAS_API_KEY.strip():  # noqa: F405
     )
 
 DEBUG = True
+# Pix WhatsApp: cobrança na conta principal Asaas (sem split) para validar sandbox sem subconta aprovada.
+ASAAS_PIX_USE_MAIN_ACCOUNT_IN_DEV = env.bool("ASAAS_PIX_USE_MAIN_ACCOUNT_IN_DEV", default=True)
 # True = qualquer origem (lista CORS_ALLOWED_ORIGINS é ignorada pelo django-cors-headers).
 # False = use apenas CORS_ALLOWED_ORIGINS do .env.development (ex.: só o Vite).
 CORS_ALLOW_ALL_ORIGINS = env.bool("CORS_ALLOW_ALL_ORIGINS", default=True)

@@ -1,0 +1,24 @@
+# Referência para Evolution GO em desenvolvimento local.
+# Se você já roda o container na porta 8080 (ex.: Portainer), alinhe EVOLUTION_GLOBAL_API_KEY
+# no .env.development com AUTHENTICATION_API_KEY desse container — não é obrigatório usar este arquivo.
+
+services:
+  evolution-go:
+    image: ghcr.io/evolution-foundation/evolution-go:latest
+    container_name: evolution-go
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      AUTHENTICATION_API_KEY: change-me-use-secrets-token-urlsafe
+      WEBHOOK_GLOBAL_URL: ""
+      WEBHOOK_GLOBAL_ENABLED: "false"
+      WEBHOOK_FILES: "true"
+      LOG_LEVEL: "info"
+    volumes:
+      - evolution_data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  evolution_data:

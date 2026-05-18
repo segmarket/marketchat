@@ -4,6 +4,8 @@ import logging
 from typing import Any
 
 from apps.billing.models import Subscription
+from apps.billing.services.asaas_webhook_payload import normalize_asaas_webhook
+from apps.sales.services.asaas_payment_webhook import process_cart_asaas_event
 
 logger = logging.getLogger(__name__)
 
@@ -17,16 +19,7 @@ def _subscription_id_from_payment(payment: dict[str, Any]) -> str | None:
     return None
 
 
-def process_asaas_webhook_payload(payload: dict[str, Any]) -> None:
-    """
-    Processa eventos principais do webhook Asaas.
-    Estrutura típica: {"event": "PAYMENT_CONFIRMED", "payment": {...}}.
-    """
-    event = (payload.get("event") or payload.get("type") or "").upper()
-    payment = payload.get("payment")
-    if not isinstance(payment, dict):
-        payment = {}
-
+def _process_subscription_webhook(*, event: str, payment: dict[str, Any], payload: dict[str, Any]) -> None:
     subscription_block = payload.get("subscription")
     sub_id: str | None = None
     if isinstance(subscription_block, dict):
@@ -66,4 +59,24 @@ def process_asaas_webhook_payload(payload: dict[str, Any]) -> None:
         sub.tenant.block_billing_access()
         return
 
-    logger.debug("Evento Asaas não tratado: %s", event)
+    logger.debug("Evento Asaas (assinatura) não tratado: %s", event)
+
+
+def process_asaas_webhook_payload(payload: dict[str, Any]) -> None:
+    """
+    Processa webhooks do Asaas: carrinhos WhatsApp (Pix) e assinaturas SaaS.
+    Estrutura típica: {"event": "PAYMENT_RECEIVED", "payment": {...}}.
+    """
+    event, payment = normalize_asaas_webhook(payload)
+
+    logger.info(
+        "Webhook Asaas recebido: event=%s payment_id=%s externalReference=%s",
+        event,
+        payment.get("id"),
+        payment.get("externalReference"),
+    )
+
+    if process_cart_asaas_event(event=event, payment=payment):
+        return
+
+    _process_subscription_webhook(event=event, payment=payment, payload=payload)

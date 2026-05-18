@@ -11,7 +11,6 @@ import {
   ListIcon,
   PageIcon,
   PieChartIcon,
-  PlugInIcon,
   TableIcon,
   UserCircleIcon,
 } from "../icons";
@@ -83,12 +82,15 @@ const othersItems: NavItem[] = [
     ],
   },
   {
-    icon: <PlugInIcon />,
-    name: "Conta",
+    icon: <UserCircleIcon />,
+    name: "Configurações",
     subItems: [
-      { name: "Cobrança", path: "/admin/billing", pro: false },
-      { name: "Entrar (público)", path: "/login", pro: false },
-      { name: "Criar conta", path: "/auth/signup", pro: false },
+      { name: "Conta e Cobrança", path: "/admin/settings", pro: false },
+      { name: "Integrações", path: "/admin/integrations", pro: false },
+      { name: "Produtos", path: "/admin/products", pro: false },
+      { name: "Mercados", path: "/admin/markets", pro: false },
+      { name: "Moradores", path: "/admin/residents", pro: false },
+      { name: "Fluxos do Chatbot", path: "/admin/chatbot-flows", pro: false },
     ],
   },
 ];

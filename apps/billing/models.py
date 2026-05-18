@@ -34,3 +34,44 @@ class Subscription(models.Model):
 
     def __str__(self) -> str:
         return f"Subscription({self.asaas_subscription_id})"
+
+
+class AsaasSubaccount(models.Model):
+    """Subconta Asaas do tenant para recebimentos Pix (split/transferências)."""
+
+    class PixKeyType(models.TextChoices):
+        CPF = "CPF", "CPF"
+        CNPJ = "CNPJ", "CNPJ"
+        EMAIL = "EMAIL", "E-mail"
+        PHONE = "PHONE", "Celular"
+        RANDOM = "RANDOM", "Chave aleatória"
+
+    class AccountStatus(models.TextChoices):
+        PENDING = "PENDING", "Em análise"
+        APPROVED = "APPROVED", "Aprovada"
+        REJECTED = "REJECTED", "Rejeitada"
+
+    tenant = models.OneToOneField(
+        Tenant,
+        on_delete=models.CASCADE,
+        related_name="asaas_subaccount",
+    )
+    name = models.CharField(max_length=255)
+    email = models.EmailField()
+    cpf_cnpj = models.CharField(max_length=18)
+    pix_key_type = models.CharField(max_length=16, choices=PixKeyType.choices)
+    pix_key = models.CharField(max_length=255)
+    asaas_wallet_id = models.CharField(max_length=64, blank=True, default="")
+    account_status = models.CharField(
+        max_length=16,
+        choices=AccountStatus.choices,
+        default=AccountStatus.PENDING,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"AsaasSubaccount(tenant={self.tenant_id})"
