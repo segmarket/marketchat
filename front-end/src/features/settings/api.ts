@@ -58,3 +58,17 @@ export async function updatePaymentMethod(
   );
   return data;
 }
+
+export async function cancelSubscription(): Promise<{ detail: string }> {
+  const { data } = await api.post<{ detail: string }>(
+    "/api/settings/billing/subscription/cancel/",
+  );
+  return data;
+}
+
+export async function reactivateSubscription(): Promise<PaymentMethodSummary & { detail: string }> {
+  const { data } = await api.post<PaymentMethodSummary & { detail: string }>(
+    "/api/settings/billing/subscription/reactivate/",
+  );
+  return data;
+}

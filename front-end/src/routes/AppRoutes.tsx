@@ -12,6 +12,8 @@ import SalesDashboard from "../pages/admin/SalesDashboard";
 import ResidentsPage from "../pages/admin/ResidentsPage";
 import ProductsPage from "../pages/admin/ProductsPage";
 import NotFound from "../pages/OtherPage/NotFound";
+import BillingBlocked from "../pages/admin/BillingBlocked";
+import TrialExpired from "../pages/admin/TrialExpired";
 import AppRootRedirect from "./AppRootRedirect";
 
 export default function AppRoutes() {
@@ -19,14 +21,16 @@ export default function AppRoutes() {
     <Routes>
       <Route path="/" element={<AppRootRedirect />} />
 
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/signin" element={<Navigate to="/login" replace />} />
+      <Route path="/signin" element={<LoginPage />} />
+      <Route path="/login" element={<Navigate to="/signin" replace />} />
       <Route path="/auth/signup" element={<SignupPage />} />
       <Route path="/signup" element={<Navigate to="/auth/signup" replace />} />
       <Route path="/register" element={<SignupPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       <Route element={<ProtectedRoute />}>
+        <Route path="/admin/trial-expired" element={<TrialExpired />} />
+        <Route path="/admin/billing-blocked" element={<BillingBlocked />} />
         <Route path="/admin" element={<AppLayout />}>
           <Route index element={<Home />} />
           <Route path="chat-logs" element={<ChatLogsPage />} />

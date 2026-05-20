@@ -1,4 +1,4 @@
-import { appUrl } from "../../utils/host";
+import { getAppUrl } from "../../utils/host";
 
 export default function MarketingFooter() {
   const year = new Date().getFullYear();
@@ -16,7 +16,7 @@ export default function MarketingFooter() {
           © {year} MarketChat. Mercados autônomos inteligentes via WhatsApp.
         </p>
         <a
-          href={appUrl("/login")}
+          href={getAppUrl()}
           className="text-sm font-medium text-brand-600 hover:text-brand-700"
         >
           Acessar o sistema

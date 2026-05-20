@@ -47,11 +47,30 @@ export type BillingHistoryResponse = {
   results: BillingHistoryItem[];
 };
 
+export type TenantSubscriptionStatus =
+  | "TRIAL"
+  | "ACTIVE"
+  | "OVERDUE"
+  | "SUSPENDED"
+  | "CANCELED";
+
 export type PaymentMethodSummary = {
   billing_type: string;
   card_brand: string | null;
   card_last_four: string | null;
   display_label: string;
+  next_due_date?: string | null;
+  asaas_status?: string;
+  subscription_status?: TenantSubscriptionStatus;
+  subscription_canceled?: boolean;
+  can_cancel?: boolean;
+  can_reactivate?: boolean;
+  in_trial_period?: boolean;
+  trial_ends_at?: string;
+  active_markets_count?: number;
+  monthly_total?: number;
+  unit_price?: number;
+  is_in_grace_period?: boolean;
 };
 
 export type SettingsTabId = "account" | "plan" | "history";

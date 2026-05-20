@@ -48,7 +48,7 @@ def test_global_escape_cancele_essa_compra_via_cart_flow():
     session = ChatSessionFactory(
         tenant=tenant,
         phone_number=resident.phone_number,
-        state=ChatSession.State.AWAITING_LOOP_DECISION,
+        state=ChatSession.State.CART_REVIEW,
         active_cart=cart,
     )
 
@@ -65,7 +65,7 @@ def test_global_escape_cancele_essa_compra_via_cart_flow():
     cart.refresh_from_db()
     session.refresh_from_db()
     assert cart.status == Cart.Status.CANCELLED
-    assert session.state == ChatSession.State.ACTIVE_BOT
+    assert session.state == ChatSession.State.IDLE
     assert session.active_cart_id is None
     assert "Atendimento reiniciado" in send.call_args[0][2]
 
@@ -115,7 +115,7 @@ def test_loop_decision_finalizar_text_goes_to_photo():
     session = ChatSessionFactory(
         tenant=tenant,
         phone_number=resident.phone_number,
-        state=ChatSession.State.AWAITING_LOOP_DECISION,
+        state=ChatSession.State.CART_REVIEW,
         active_cart=cart,
     )
 
@@ -145,7 +145,7 @@ def test_loop_decision_adicionar_mais_text_returns_active_bot():
     session = ChatSessionFactory(
         tenant=tenant,
         phone_number=resident.phone_number,
-        state=ChatSession.State.AWAITING_LOOP_DECISION,
+        state=ChatSession.State.CART_REVIEW,
         active_cart=cart,
     )
 
@@ -160,7 +160,7 @@ def test_loop_decision_adicionar_mais_text_returns_active_bot():
 
     assert handled is True
     session.refresh_from_db()
-    assert session.state == ChatSession.State.ACTIVE_BOT
+    assert session.state == ChatSession.State.IDLE
     assert "O que mais" in send.call_args[0][2]
 
 
@@ -173,7 +173,7 @@ def test_loop_decision_unknown_text_shows_friendly_fallback():
     ChatSessionFactory(
         tenant=tenant,
         phone_number=resident.phone_number,
-        state=ChatSession.State.AWAITING_LOOP_DECISION,
+        state=ChatSession.State.CART_REVIEW,
         active_cart=cart,
     )
 

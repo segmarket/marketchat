@@ -68,7 +68,7 @@ def test_magnum_stock_issue_skips_purchase_flow():
     ChatSessionFactory(
         tenant=tenant,
         phone_number=resident.phone_number,
-        state=ChatSession.State.ACTIVE_BOT,
+        state=ChatSession.State.IDLE,
     )
 
     with (
@@ -118,7 +118,7 @@ def test_purchase_still_routes_when_no_stock_signal():
     ChatSessionFactory(
         tenant=tenant,
         phone_number=resident.phone_number,
-        state=ChatSession.State.ACTIVE_BOT,
+        state=ChatSession.State.IDLE,
     )
 
     with (

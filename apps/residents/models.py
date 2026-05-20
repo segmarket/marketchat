@@ -40,16 +40,10 @@ class ChatSession(models.Model):
     class State(models.TextChoices):
         AWAITING_NAME = "AWAITING_NAME", "Aguardando nome"
         AWAITING_CONDO = "AWAITING_CONDO", "Aguardando condomínio"
-        ACTIVE_BOT = "ACTIVE_BOT", "Bot ativo"
-        AWAITING_PRODUCT_SELECTION = (
-            "AWAITING_PRODUCT_SELECTION",
-            "Aguardando seleção de produto",
-        )
-        AWAITING_QUANTITY = "AWAITING_QUANTITY", "Aguardando quantidade"
-        AWAITING_LOOP_DECISION = (
-            "AWAITING_LOOP_DECISION",
-            "Aguardando decisão do carrinho",
-        )
+        IDLE = "IDLE", "Conversa livre / compra"
+        PRODUCT_SEARCH = "PRODUCT_SEARCH", "Busca de produto"
+        QUANTITY_SELECTION = "QUANTITY_SELECTION", "Seleção de quantidade"
+        CART_REVIEW = "CART_REVIEW", "Revisão do carrinho"
         AWAITING_PHOTO = "AWAITING_PHOTO", "Aguardando foto"
 
     tenant = models.ForeignKey(
@@ -77,6 +71,14 @@ class ChatSession(models.Model):
         null=True,
         blank=True,
         related_name="pending_in_sessions",
+    )
+    last_discussed_product = models.ForeignKey(
+        "products.Product",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="discussed_in_sessions",
+        help_text="Último produto citado em disponibilidade ou busca (memória de curto prazo).",
     )
     last_activity_at = models.DateTimeField(
         default=timezone.now,

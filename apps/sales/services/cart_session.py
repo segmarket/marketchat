@@ -11,11 +11,12 @@ def unlock_resident_chat_session(
     resident: Resident,
     clear_cart_link: bool = True,
 ) -> None:
-    """Libera o morador para novas interações (estado ACTIVE_BOT)."""
+    """Libera o morador para novas interações (estado IDLE)."""
     updates = {
-        "state": ChatSession.State.ACTIVE_BOT,
+        "state": ChatSession.State.IDLE,
         "pending_product": None,
         "temporary_name": "",
+        "last_discussed_product": None,
     }
     if clear_cart_link:
         updates["active_cart"] = None

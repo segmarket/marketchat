@@ -43,7 +43,8 @@ def register_tenant_with_admin(
     remote_ip: str,
 ) -> tuple[Tenant, User]:
     base = slugify(slug or company_name) or "empresa"
-    trial_end = timezone.now() + timedelta(days=settings.TRIAL_DAYS)
+    now = timezone.now()
+    trial_end = now + timedelta(days=settings.TRIAL_DAYS)
     final_slug = _unique_slug(base)
 
     prospective = User(email=admin_email)
@@ -54,7 +55,9 @@ def register_tenant_with_admin(
             tenant = Tenant.objects.create(
                 name=company_name,
                 slug=final_slug,
+                trial_started_at=now,
                 trial_ends_at=trial_end,
+                subscription_status=Tenant.SubscriptionStatus.TRIAL,
             )
             user = User.objects.create_user(
                 admin_email,

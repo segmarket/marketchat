@@ -206,7 +206,10 @@ class EvolutionClient:
         try:
             payload = self._request("GET", "/instance/all", apikey=self.global_api_key)
             rows = _parse_fetch_instances_payload(payload)
-        except urllib.error.HTTPError:
+        except urllib.error.HTTPError as exc:
+            # Não fazer fallback em indisponibilidade/auth: evita 404 falso no fetchInstances.
+            if exc.code not in (404,) and not self._http_error_is_not_found(exc):
+                raise
             params: list[tuple[str, str]] = []
             if instance_name:
                 params.append(("instanceName", instance_name))
@@ -215,8 +218,14 @@ class EvolutionClient:
             path = "/instance/fetchInstances"
             if params:
                 path = f"{path}?{urllib.parse.urlencode(params)}"
-            payload = self._request("GET", path, apikey=self.global_api_key)
-            rows = _parse_fetch_instances_payload(payload)
+            try:
+                payload = self._request("GET", path, apikey=self.global_api_key)
+                rows = _parse_fetch_instances_payload(payload)
+            except urllib.error.HTTPError as fallback_exc:
+                if self._http_error_is_not_found(fallback_exc):
+                    rows = []
+                else:
+                    raise
 
         if instance_name:
             rows = [r for r in rows if r.get("instanceName") == instance_name]

@@ -4,6 +4,7 @@ import logging
 
 from apps.integrations.models import WhatsappInstance
 from apps.residents.models import ChatSession, Resident
+from apps.sales.services.resident_ai_context import resident_first_name_from_string
 from apps.residents.services.condo_match import find_market_by_query
 from apps.residents.services.greeting import greeting_for_now
 from apps.residents.services.whatsapp_reply import send_whatsapp_reply
@@ -45,7 +46,13 @@ def process_inbound_message(
         phone_number=phone,
     ).first()
 
-    if session is None:
+    onboarding_states = (
+        ChatSession.State.AWAITING_NAME,
+        ChatSession.State.AWAITING_CONDO,
+    )
+    # O webhook cria ChatSession com ACTIVE_BOT antes do onboarding; sem isso o fluxo
+    # cai no return final e o contato novo não recebe resposta.
+    if session is None or session.state not in onboarding_states:
         _start_onboarding(instance, phone, tenant_id)
         return True
 
@@ -96,10 +103,11 @@ def _handle_awaiting_name(
     session.state = ChatSession.State.AWAITING_CONDO
     session.save(update_fields=["temporary_name", "state", "updated_at"])
 
+    primeiro_nome = resident_first_name_from_string(name)
     send_whatsapp_reply(
         instance,
         session.phone_number,
-        f"Prazer em te conhecer, {name}! Agora, digite o Nome do seu Condomínio "
+        f"Prazer em te conhecer, {primeiro_nome}! Agora, digite o Nome do seu Condomínio "
         "para localizarmos sua unidade:",
     )
 
@@ -125,7 +133,7 @@ def _handle_awaiting_condo(
             "market": market,
         },
     )
-    session.state = ChatSession.State.ACTIVE_BOT
+    session.state = ChatSession.State.IDLE
     session.temporary_name = ""
     session.active_cart = None
     session.pending_product = None

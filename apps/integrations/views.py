@@ -14,6 +14,7 @@ from apps.integrations.services.provisioning import (
     WhatsappAlreadyProvisionedError,
     disconnect_whatsapp_instance,
     provision_whatsapp_instance,
+    reconcile_whatsapp_with_evolution,
     refresh_qrcode,
     sync_connection_status,
 )
@@ -31,14 +32,27 @@ def _get_active_instance(request: Request) -> WhatsappInstance | None:
     )
 
 
+def _get_reconciled_active_instance(request: Request) -> WhatsappInstance | None:
+    instance = _get_active_instance(request)
+    if not instance:
+        return None
+    return reconcile_whatsapp_with_evolution(instance)
+
+
 class WhatsappInstanceView(APIView):
     """Estado da integração: leitura para qualquer membro autenticado do tenant."""
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request: Request) -> Response:
-        instance = _get_active_instance(request)
-        return Response(build_dashboard_payload(instance, request_user=request.user))
+        instance = _get_reconciled_active_instance(request)
+        return Response(
+            build_dashboard_payload(
+                instance,
+                request_user=request.user,
+                sync_evolution=bool(instance and instance.is_active),
+            )
+        )
 
 
 class WhatsappProvisionView(APIView):
@@ -107,16 +121,23 @@ class WhatsappStatusView(APIView):
     permission_classes = [IsAuthenticated, IsTenantAdmin]
 
     def get(self, request: Request) -> Response:
-        instance = _get_active_instance(request)
+        instance = _get_reconciled_active_instance(request)
         if not instance:
-            return Response({"detail": "Nenhuma instância WhatsApp ativa."}, status=404)
+            return Response(build_dashboard_payload(None, request_user=request.user))
         try:
             sync_connection_status(instance)
-        except Exception as exc:
+        except EvolutionProvisionError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+        instance.refresh_from_db()
+        if not instance.is_active:
+            return Response(build_dashboard_payload(None, request_user=request.user))
 
         return Response(
-            build_dashboard_payload(instance, request_user=request.user, sync_evolution=False)
+            build_dashboard_payload(
+                instance,
+                request_user=request.user,
+                sync_evolution=True,
+            )
         )
 
 

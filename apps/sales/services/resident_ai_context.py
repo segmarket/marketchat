@@ -5,8 +5,16 @@ from __future__ import annotations
 from apps.residents.models import Resident
 
 
+def resident_first_name_from_string(raw: str | None) -> str:
+    """Extrai o primeiro nome para saudações e prompts (ex.: 'João das Couves' -> 'João')."""
+    cleaned = (raw or "").strip()
+    if not cleaned:
+        return "Morador"
+    return cleaned.split()[0].capitalize()
+
+
 def resident_display_name(resident: Resident) -> str:
-    return (resident.name or "").strip() or "Morador"
+    return resident_first_name_from_string(resident.name)
 
 
 def resident_market_name(resident: Resident) -> str:
@@ -20,14 +28,17 @@ def resident_market_name(resident: Resident) -> str:
 
 
 def build_resident_dynamic_context(resident: Resident) -> str:
-    """Bloco dinâmico (final do system prompt) — nome e condomínio do morador atual."""
+    """Bloco dinâmico (final do system prompt) — primeiro nome e condomínio do morador atual."""
     name = resident_display_name(resident)
     market = resident_market_name(resident)
     return (
-        f"Você está conversando com o morador chamado {name}, do condomínio {market}. "
-        f"Sempre que o usuário iniciar uma conversa, cumprimente-o pelo nome de forma "
-        f"calorosa e natural (ex: 'Olá, {name}! Como posso te ajudar hoje aqui no "
-        f"mercado do {market}?'). Nunca seja genérico se você já sabe o nome dele."
+        f"Você está conversando com o morador {name}, do condomínio {market}. "
+        f"Use sempre apenas o primeiro nome dele ({name}) — nunca o nome completo. "
+        f"Gírias e tom casual ('E ae', 'beleza', 'fala mano') são normais — responda com "
+        f"simpatia e emojis quando fizer sentido. Em cumprimentos e dúvidas sobre compras "
+        f"ou Pix, seja caloroso (ex: 'Fala, {name}! Beleza? Como posso te ajudar no mercado "
+        f"do {market}?'). Modo seco e sem emojis apenas para abuso explícito, conforme a "
+        f"diretriz anti-abuso do system prompt."
     )
 
 

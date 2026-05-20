@@ -1,4 +1,4 @@
-"""Roteamento de mensagens no estado ACTIVE_BOT (gatekeeper + respostas)."""
+"""Roteamento de mensagens no estado IDLE (gatekeeper + respostas)."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from apps.chatbot.services.chatbot_core import (
     ChatbotCoreError,
     complete_with_session_history,
 )
+from apps.chatbot.services.occurrence_tags import process_ai_assistant_reply
 from apps.integrations.models import WhatsappInstance
 from apps.residents.models import ChatSession, Resident
 from apps.residents.services.whatsapp_reply import send_whatsapp_reply
@@ -108,7 +109,7 @@ def handle_payment_error_pivot(
     session.active_cart = cart
     session.temporary_name = ""
     session.pending_product = None
-    session.state = ChatSession.State.AWAITING_PRODUCT_SELECTION
+    session.state = ChatSession.State.PRODUCT_SEARCH
     session.save(
         update_fields=[
             "active_cart",
@@ -135,6 +136,7 @@ def handle_stock_issue(
         resident=resident,
         phone=phone,
         message=message,
+        session=session,
     )
     return True
 
@@ -148,33 +150,52 @@ def handle_complaint(
     session: ChatSession,
     message: str,
 ) -> bool:
-    """Reclamação: registra alerta ao dono e responde via ChatGPT com contexto de reclamação."""
-    notify_owner_support_issue(
-        instance=instance,
-        tenant_id=tenant_id,
-        resident=resident,
-        original_message=message,
-        issue_label="Reclamação",
-    )
-
+    """Reclamação: responde via IA com matriz de ocorrências e tags de comando."""
     dynamic_tail = (
         f"Empresa do mercado: {_tenant_display_name(tenant_id)}.\n"
         f"{build_complaint_dynamic_context(resident)}"
     )
+    intent_for_log = COMPLAINT
     try:
-        reply = complete_with_session_history(
+        raw = complete_with_session_history(
             session=session,
             static_system=STATIC_COMPLAINT_ASSISTANT,
             user_content=message,
             dynamic_system_tail=dynamic_tail,
-            max_tokens=100,
+            max_tokens=180,
+            record_assistant=False,
         )
+        reply, tag = process_ai_assistant_reply(
+            raw_reply=raw,
+            session=session,
+            tenant_id=tenant_id,
+            instance=instance,
+            resident=resident,
+            user_message=message,
+        )
+        if not tag:
+            notify_owner_support_issue(
+                instance=instance,
+                tenant_id=tenant_id,
+                resident=resident,
+                original_message=message,
+                issue_label="Reclamação",
+            )
+        if tag:
+            intent_for_log = tag
     except ChatbotCoreError:
         reply = (
             "Sinto muito pelo transtorno. Pode me contar com mais detalhes o que aconteceu? "
             "Já avisei a equipe responsável pelo mercado."
         )
         append_assistant_message(session, reply)
+        notify_owner_support_issue(
+            instance=instance,
+            tenant_id=tenant_id,
+            resident=resident,
+            original_message=message,
+            issue_label="Reclamação",
+        )
     except Exception:
         logger.exception("Falha na resposta de reclamação")
         reply = (
@@ -182,13 +203,20 @@ def handle_complaint(
             "Pode descrever melhor o que aconteceu?"
         )
         append_assistant_message(session, reply)
+        notify_owner_support_issue(
+            instance=instance,
+            tenant_id=tenant_id,
+            resident=resident,
+            original_message=message,
+            issue_label="Reclamação",
+        )
 
     if reply:
         send_whatsapp_reply(
             instance,
             phone,
             reply,
-            intent_type=COMPLAINT,
+            intent_type=intent_for_log,
             session=session,
         )
     return True
@@ -207,14 +235,26 @@ def handle_general_message(
         f"Empresa do mercado: {_tenant_display_name(tenant_id)}.\n"
         f"{build_resident_dynamic_context(resident)}"
     )
+    intent_for_log = ""
     try:
-        reply = complete_with_session_history(
+        raw = complete_with_session_history(
             session=session,
             static_system=STATIC_GENERAL_ASSISTANT,
             user_content=message,
             dynamic_system_tail=dynamic_tail,
-            max_tokens=80,
+            max_tokens=180,
+            record_assistant=False,
         )
+        reply, tag = process_ai_assistant_reply(
+            raw_reply=raw,
+            session=session,
+            tenant_id=tenant_id,
+            instance=instance,
+            resident=resident,
+            user_message=message,
+        )
+        if tag:
+            intent_for_log = tag
     except ChatbotCoreError:
         reply = (
             "Obrigado pela mensagem! Em instantes um atendente pode te ajudar melhor."
@@ -228,11 +268,17 @@ def handle_general_message(
         append_assistant_message(session, reply)
 
     if reply:
-        send_whatsapp_reply(instance, phone, reply)
+        send_whatsapp_reply(
+            instance,
+            phone,
+            reply,
+            intent_type=intent_for_log,
+            session=session,
+        )
     return True
 
 
-def route_active_bot_message(
+def route_idle_message(
     *,
     tenant_id: int,
     instance: WhatsappInstance,
@@ -243,9 +289,30 @@ def route_active_bot_message(
     on_purchase,
 ) -> bool:
     """
-    Gatekeeper: classifica intenção e roteia.
+    IDLE: disponibilidade → slot de produto → gatekeeper OpenAI.
     on_purchase: callable() -> bool executado apenas se intenção for PURCHASE.
     """
+    from apps.sales.services.availability_handler import handle_availability_question
+
+    if handle_availability_question(
+        tenant_id=tenant_id,
+        instance=instance,
+        phone=phone,
+        resident=resident,
+        session=session,
+        text=message,
+    ):
+        return True
+
+    from apps.sales.services.purchase_context import is_purchase_without_product
+
+    if (
+        is_purchase_without_product(message)
+        and session.last_discussed_product_id
+        and on_purchase is not None
+    ):
+        return on_purchase()
+
     intent = classify_user_intent(message)
 
     if intent == PURCHASE:
@@ -299,3 +366,7 @@ def route_active_bot_message(
         session=session,
         message=message,
     )
+
+
+# Compatibilidade com imports legados
+route_active_bot_message = route_idle_message

@@ -121,6 +121,24 @@ class AsaasClient:
         assert isinstance(data, dict)
         return data
 
+    def cancel_subscription(self, subscription_id: str) -> dict[str, Any]:
+        data = self._request("DELETE", f"/subscriptions/{subscription_id}")
+        if data is None:
+            return {"deleted": True, "id": subscription_id}
+        assert isinstance(data, dict)
+        return data
+
+    def update_subscription(
+        self,
+        subscription_id: str,
+        body: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        data = self._request("PUT", f"/subscriptions/{subscription_id}", dict(body))
+        if data is None:
+            return {}
+        assert isinstance(data, dict)
+        return data
+
     def create_subaccount(self, body: Mapping[str, Any]) -> dict[str, Any]:
         data = self._request("POST", "/accounts", dict(body))
         assert isinstance(data, dict)

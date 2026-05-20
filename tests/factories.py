@@ -26,7 +26,9 @@ class TenantFactory(DjangoModelFactory):
 
     name = factory.Sequence(lambda n: f"Empresa {n}")
     slug = factory.Sequence(lambda n: f"empresa-{n}")
+    trial_started_at = factory.LazyFunction(timezone.now)
     trial_ends_at = factory.LazyFunction(lambda: timezone.now() + timedelta(days=7))
+    subscription_status = Tenant.SubscriptionStatus.TRIAL
 
 
 class UserFactory(DjangoModelFactory):

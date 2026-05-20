@@ -14,6 +14,10 @@ from apps.residents.models import ChatSession, Resident
 from apps.residents.services.whatsapp_reply import send_whatsapp_reply
 from apps.sales.models import Cart
 from apps.sales.services.cart_escape import cancel_open_carts_for_resident
+from apps.sales.services.resident_ai_context import (
+    resident_display_name,
+    resident_first_name_from_string,
+)
 from apps.tenants.context import tenant_scope
 
 logger = logging.getLogger(__name__)
@@ -24,15 +28,15 @@ DEFAULT_MAX_IDLE_MINUTES = 15
 # Estados elegíveis: conversa geral ou decisão de carrinho (não fluxo Pix/foto).
 INACTIVITY_ELIGIBLE_STATES = frozenset(
     {
-        ChatSession.State.ACTIVE_BOT,
-        ChatSession.State.AWAITING_LOOP_DECISION,
+        ChatSession.State.IDLE,
+        ChatSession.State.CART_REVIEW,
     },
 )
 
 PURCHASE_FLOW_STATES = frozenset(
     {
-        ChatSession.State.AWAITING_PRODUCT_SELECTION,
-        ChatSession.State.AWAITING_QUANTITY,
+        ChatSession.State.PRODUCT_SEARCH,
+        ChatSession.State.QUANTITY_SELECTION,
         ChatSession.State.AWAITING_PHOTO,
     },
 )
@@ -107,9 +111,10 @@ def session_excluded_from_inactivity(session: ChatSession) -> bool:
 
 def reset_chat_session_after_inactivity(session: ChatSession) -> None:
     """Volta ao modo limpo após encerramento por inatividade."""
-    session.state = ChatSession.State.ACTIVE_BOT
+    session.state = ChatSession.State.IDLE
     session.active_cart = None
     session.pending_product = None
+    session.last_discussed_product = None
     session.temporary_name = ""
     session.inactivity_notified = False
     session.last_activity_at = timezone.now()
@@ -118,6 +123,7 @@ def reset_chat_session_after_inactivity(session: ChatSession) -> None:
             "state",
             "active_cart",
             "pending_product",
+            "last_discussed_product",
             "temporary_name",
             "inactivity_notified",
             "last_activity_at",
@@ -163,9 +169,9 @@ def process_inactivity_followup_for_session(
 
     resident = resolve_resident_for_session(session)
     market_name = ""
-    resident_name = session.temporary_name or ""
+    resident_name = resident_first_name_from_string(session.temporary_name)
     if resident:
-        resident_name = resident.name or resident_name
+        resident_name = resident_display_name(resident)
         if resident.market_id and resident.market:
             market_name = resident.market.name or ""
 

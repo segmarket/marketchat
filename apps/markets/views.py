@@ -1,15 +1,28 @@
+from django.db import transaction
+
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.billing.services.subscription_sync import update_tenant_subscription_value
 from apps.markets.models import Market
+from apps.tenants.models import Tenant
 from apps.markets.serializers import (
     MarketCreateSerializer,
     MarketSerializer,
     MarketWriteSerializer,
 )
+
+
+def _schedule_subscription_sync(tenant_id: int) -> None:
+    def _sync() -> None:
+        tenant = Tenant.objects.filter(pk=tenant_id).first()
+        if tenant:
+            update_tenant_subscription_value(tenant)
+
+    transaction.on_commit(_sync)
 
 
 class MarketListCreateView(APIView):
@@ -42,6 +55,7 @@ class MarketListCreateView(APIView):
             address=data["address"],
             status=data.get("status", Market.Status.ACTIVE),
         )
+        _schedule_subscription_sync(request.user.tenant_id)
         return Response(MarketSerializer(market).data, status=status.HTTP_201_CREATED)
 
 
@@ -88,6 +102,7 @@ class MarketDetailView(APIView):
         if update_fields:
             update_fields.append("updated_at")
             market.save(update_fields=update_fields)
+            _schedule_subscription_sync(market.tenant_id)
 
         return Response(MarketSerializer(market).data)
 
@@ -103,11 +118,14 @@ class MarketDetailView(APIView):
         market.address = data["address"]
         market.status = data.get("status", Market.Status.ACTIVE)
         market.save(update_fields=["name", "address", "status", "updated_at"])
+        _schedule_subscription_sync(market.tenant_id)
         return Response(MarketSerializer(market).data)
 
     def delete(self, request: Request, pk: int) -> Response:
         market = self._get_market(pk)
         if market is None:
             return Response({"detail": "Mercado não encontrado."}, status=404)
+        tenant_id = market.tenant_id
         market.delete()
+        _schedule_subscription_sync(tenant_id)
         return Response(status=status.HTTP_204_NO_CONTENT)

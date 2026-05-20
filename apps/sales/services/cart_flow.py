@@ -11,13 +11,17 @@ from apps.residents.models import ChatSession, Resident
 from apps.residents.services.onboarding_flow import resident_has_completed_onboarding
 from apps.residents.services.whatsapp_reply import send_whatsapp_reply
 from apps.sales.models import Cart, CartItem
-from apps.sales.services.active_bot_router import route_active_bot_message
+from apps.sales.services.active_bot_router import route_idle_message
+from apps.sales.services.availability_handler import handle_availability_question
 from apps.sales.services.cart_escape import (
+    CHECKOUT_PHOTO_MESSAGE,
     LOOP_DECISION_FALLBACK,
     handle_global_escape,
     resolve_loop_choice_from_text,
+    try_checkout_from_text,
 )
 from apps.sales.services.cart_repository import get_or_create_open_cart
+from apps.sales.services.chat_fsm import record_discussed_product, transition
 from apps.sales.services.evolution_media import save_cart_photo_from_webhook
 from apps.sales.services.product_search import (
     ASK_PRODUCT_MESSAGE,
@@ -28,11 +32,11 @@ from apps.sales.services.product_term_extractor import (
     ProductTermExtractorError,
     extract_product_term,
 )
+from apps.sales.services.purchase_context import is_purchase_without_product
 from apps.sales.services.whatsapp_interactive import (
     CART_ADD_MORE,
     CART_CHECKOUT,
     PROD_ID_PREFIX,
-    parse_numeric_loop_choice,
     parse_numeric_product_choice,
     send_cart_decision_buttons,
     send_product_list,
@@ -42,12 +46,13 @@ logger = logging.getLogger(__name__)
 
 CART_SESSION_STATES = frozenset(
     {
-        ChatSession.State.AWAITING_PRODUCT_SELECTION,
-        ChatSession.State.AWAITING_QUANTITY,
-        ChatSession.State.AWAITING_LOOP_DECISION,
+        ChatSession.State.PRODUCT_SEARCH,
+        ChatSession.State.QUANTITY_SELECTION,
+        ChatSession.State.CART_REVIEW,
         ChatSession.State.AWAITING_PHOTO,
     },
 )
+
 
 def _format_brl(value: Decimal) -> str:
     return f"R$ {value:.2f}".replace(".", ",")
@@ -57,7 +62,7 @@ def _get_or_create_session(tenant_id: int, phone: str) -> ChatSession:
     session, _ = ChatSession.objects.get_or_create(
         tenant_id=tenant_id,
         phone_number=phone,
-        defaults={"state": ChatSession.State.ACTIVE_BOT},
+        defaults={"state": ChatSession.State.IDLE},
     )
     return session
 
@@ -84,10 +89,10 @@ def _resolve_interactive_id(
     if event.interactive_id:
         return event.interactive_id
     text = (event.message_text or "").strip()
-    if session.state == ChatSession.State.AWAITING_PRODUCT_SELECTION:
+    if session.state == ChatSession.State.PRODUCT_SEARCH:
         products = _load_products_from_session(session, tenant_id)
         return parse_numeric_product_choice(text, products) or ""
-    if session.state == ChatSession.State.AWAITING_LOOP_DECISION:
+    if session.state == ChatSession.State.CART_REVIEW:
         return resolve_loop_choice_from_text(text) or ""
     return ""
 
@@ -127,6 +132,15 @@ def process_cart_flow(
     session = _get_or_create_session(tenant_id, phone)
     interactive_id = _resolve_interactive_id(event, session, tenant_id)
 
+    if text and try_checkout_from_text(
+        instance=instance,
+        phone=phone,
+        resident=resident,
+        session=session,
+        text=text,
+    ):
+        return True
+
     if session.state in CART_SESSION_STATES:
         return _dispatch_cart_state(
             tenant_id,
@@ -139,7 +153,7 @@ def process_cart_flow(
             interactive_id,
         )
 
-    if session.state == ChatSession.State.ACTIVE_BOT:
+    if session.state == ChatSession.State.IDLE:
         if event.message_kind == "interactive" or interactive_id:
             return _dispatch_cart_state(
                 tenant_id,
@@ -152,19 +166,44 @@ def process_cart_flow(
                 interactive_id,
             )
         if text:
-            return route_active_bot_message(
+            return route_idle_message(
                 tenant_id=tenant_id,
                 instance=instance,
                 phone=phone,
                 resident=resident,
                 session=session,
                 message=text,
-                on_purchase=lambda: _handle_product_search(
+                on_purchase=lambda: _handle_idle_purchase(
                     tenant_id, instance, phone, resident, session, text,
                 ),
             )
 
     return False
+
+
+def _handle_idle_purchase(
+    tenant_id: int,
+    instance: WhatsappInstance,
+    phone: str,
+    resident: Resident,
+    session: ChatSession,
+    text: str,
+) -> bool:
+    """PURCHASE em IDLE: slot fill com last_discussed_product ou busca normal."""
+    if is_purchase_without_product(text) and session.last_discussed_product_id:
+        product = session.last_discussed_product
+        transition(session, ChatSession.State.PRODUCT_SEARCH, reason="slot_fill_discussed")
+        return _handle_product_search(
+            tenant_id,
+            instance,
+            phone,
+            resident,
+            session,
+            product.name,
+        )
+    return _handle_product_search(
+        tenant_id, instance, phone, resident, session, text,
+    )
 
 
 def _dispatch_cart_state(
@@ -177,17 +216,28 @@ def _dispatch_cart_state(
     text: str,
     interactive_id: str,
 ) -> bool:
-    if session.state == ChatSession.State.AWAITING_PRODUCT_SELECTION:
-        return _handle_product_selection(
-            tenant_id, instance, phone, resident, session, text, interactive_id,
-        )
-    if session.state == ChatSession.State.AWAITING_QUANTITY:
+    if session.state == ChatSession.State.PRODUCT_SEARCH:
+        if interactive_id and interactive_id.startswith(PROD_ID_PREFIX):
+            return _handle_product_selection(
+                tenant_id, instance, phone, resident, session, text, interactive_id,
+            )
+        if text.strip():
+            return _handle_product_search(
+                tenant_id, instance, phone, resident, session, text.strip(),
+            )
+        send_whatsapp_reply(instance, phone, "Digite o nome do produto que deseja buscar.")
+        return True
+
+    if session.state == ChatSession.State.QUANTITY_SELECTION:
         return _handle_quantity(instance, phone, resident, session, text)
-    if session.state == ChatSession.State.AWAITING_LOOP_DECISION:
+
+    if session.state == ChatSession.State.CART_REVIEW:
         return _handle_loop_decision(instance, phone, resident, session, interactive_id, text)
+
     if session.state == ChatSession.State.AWAITING_PHOTO:
         return _handle_photo(instance, phone, resident, session, event)
-    if session.state == ChatSession.State.ACTIVE_BOT and interactive_id:
+
+    if session.state == ChatSession.State.IDLE and interactive_id:
         if interactive_id.startswith(PROD_ID_PREFIX):
             return _handle_product_selection(
                 tenant_id, instance, phone, resident, session, text, interactive_id,
@@ -214,22 +264,28 @@ def _handle_product_search(
         return True
 
     if is_product_term_none(term):
-        cart = get_or_create_open_cart(resident)
-        session.active_cart = cart
-        session.state = ChatSession.State.AWAITING_PRODUCT_SELECTION
-        session.pending_product = None
-        session.temporary_name = ""
-        session.save(
-            update_fields=[
-                "active_cart",
-                "state",
-                "pending_product",
-                "temporary_name",
-                "updated_at",
-            ],
-        )
-        send_whatsapp_reply(instance, phone, ASK_PRODUCT_MESSAGE)
-        return True
+        if session.last_discussed_product_id:
+            term = session.last_discussed_product.name
+        else:
+            cart = get_or_create_open_cart(resident)
+            session.active_cart = cart
+            transition(
+                session,
+                ChatSession.State.PRODUCT_SEARCH,
+                reason="purchase_without_term",
+            )
+            session.pending_product = None
+            session.temporary_name = ""
+            session.save(
+                update_fields=[
+                    "active_cart",
+                    "pending_product",
+                    "temporary_name",
+                    "updated_at",
+                ],
+            )
+            send_whatsapp_reply(instance, phone, ASK_PRODUCT_MESSAGE)
+            return True
 
     products = search_active_products(tenant_id, term)
     if not products:
@@ -240,12 +296,15 @@ def _handle_product_search(
         )
         return True
 
+    if len(products) == 1:
+        record_discussed_product(session, products[0])
+
     cart = get_or_create_open_cart(resident)
     session.active_cart = cart
-    session.state = ChatSession.State.AWAITING_PRODUCT_SELECTION
+    transition(session, ChatSession.State.PRODUCT_SEARCH, reason="search_results")
     session.pending_product = None
     _save_product_skus(session, products)
-    session.save(update_fields=["active_cart", "state", "pending_product", "updated_at"])
+    session.save(update_fields=["active_cart", "pending_product", "updated_at"])
 
     send_product_list(instance, phone, products)
     return True
@@ -261,11 +320,6 @@ def _handle_product_selection(
     interactive_id: str,
 ) -> bool:
     row_id = interactive_id
-    if not row_id and text.strip() and not _load_products_from_session(session, tenant_id):
-        return _handle_product_search(
-            tenant_id, instance, phone, resident, session, text.strip(),
-        )
-
     if not row_id.startswith(PROD_ID_PREFIX):
         send_whatsapp_reply(instance, phone, "Selecione um produto da lista enviada.")
         return True
@@ -278,13 +332,13 @@ def _handle_product_selection(
     ).first()
     if not product:
         send_whatsapp_reply(instance, phone, "Produto não encontrado. Busque novamente.")
-        session.state = ChatSession.State.ACTIVE_BOT
-        session.save(update_fields=["state", "updated_at"])
+        transition(session, ChatSession.State.IDLE, reason="product_not_found")
         return True
 
+    record_discussed_product(session, product)
     cart = session.active_cart or get_or_create_open_cart(resident)
     session.active_cart = cart
-    item, _ = CartItem.objects.update_or_create(
+    CartItem.objects.update_or_create(
         cart=cart,
         product=product,
         defaults={
@@ -293,10 +347,8 @@ def _handle_product_selection(
         },
     )
     session.pending_product = product
-    session.state = ChatSession.State.AWAITING_QUANTITY
-    session.save(
-        update_fields=["active_cart", "pending_product", "state", "updated_at"],
-    )
+    transition(session, ChatSession.State.QUANTITY_SELECTION, reason="product_selected")
+    session.save(update_fields=["active_cart", "pending_product", "updated_at"])
 
     send_whatsapp_reply(
         instance,
@@ -314,7 +366,11 @@ def _handle_quantity(
     text: str,
 ) -> bool:
     if not text.isdigit():
-        send_whatsapp_reply(instance, phone, "Digite apenas um número inteiro, ex.: 2")
+        send_whatsapp_reply(
+            instance,
+            phone,
+            "Digite apenas um número inteiro para a quantidade, ou *Cancelar* para desistir.",
+        )
         return True
 
     try:
@@ -331,15 +387,13 @@ def _handle_quantity(
     product = session.pending_product
     if not cart or not product:
         send_whatsapp_reply(instance, phone, "Sessão expirada. Digite o que deseja comprar.")
-        session.state = ChatSession.State.ACTIVE_BOT
-        session.save(update_fields=["state", "updated_at"])
+        transition(session, ChatSession.State.IDLE, reason="quantity_session_expired")
         return True
 
     item = CartItem.objects.filter(cart=cart, product=product).first()
     if not item:
         send_whatsapp_reply(instance, phone, "Item não encontrado. Comece uma nova busca.")
-        session.state = ChatSession.State.ACTIVE_BOT
-        session.save(update_fields=["state", "updated_at"])
+        transition(session, ChatSession.State.IDLE, reason="quantity_item_missing")
         return True
 
     item.quantity = qty
@@ -347,9 +401,8 @@ def _handle_quantity(
     cart.recalculate_total()
     subtotal = item.subtotal
 
-    session.state = ChatSession.State.AWAITING_LOOP_DECISION
     session.pending_product = None
-    session.save(update_fields=["state", "pending_product", "updated_at"])
+    transition(session, ChatSession.State.CART_REVIEW, reason="quantity_set")
 
     send_cart_decision_buttons(
         instance,
@@ -375,9 +428,8 @@ def _handle_loop_decision(
         return True
 
     if choice == CART_ADD_MORE:
-        session.state = ChatSession.State.ACTIVE_BOT
         session.pending_product = None
-        session.save(update_fields=["state", "pending_product", "updated_at"])
+        transition(session, ChatSession.State.IDLE, reason="add_more_items")
         send_whatsapp_reply(instance, phone, "O que mais deseja levar? Digite o nome do produto.")
         return True
 
@@ -386,6 +438,7 @@ def _handle_loop_decision(
         if not cart:
             cart = get_or_create_open_cart(resident)
             session.active_cart = cart
+            session.save(update_fields=["active_cart", "updated_at"])
         cart.recalculate_total()
         if cart.total_value <= Decimal("0"):
             send_whatsapp_reply(instance, phone, "Seu carrinho está vazio. Adicione itens primeiro.")
@@ -393,16 +446,9 @@ def _handle_loop_decision(
 
         cart.status = Cart.Status.AWAITING_PHOTO
         cart.save(update_fields=["status", "updated_at"])
-        session.state = ChatSession.State.AWAITING_PHOTO
-        session.save(update_fields=["state", "updated_at"])
+        transition(session, ChatSession.State.AWAITING_PHOTO, reason="checkout")
 
-        send_whatsapp_reply(
-            instance,
-            phone,
-            "Para garantir a segurança do nosso mercado de condomínio, por favor, "
-            "tire uma foto nítida de todos os produtos que você está levando "
-            "antes de prosseguirmos com o pagamento.",
-        )
+        send_whatsapp_reply(instance, phone, CHECKOUT_PHOTO_MESSAGE)
         return True
 
     return False
@@ -426,7 +472,6 @@ def _handle_photo(
     )
     if not is_image:
         text = (event.message_text or "").strip()
-        # Evolution pode enviar evento vazio antes da mídia; não irritar o morador.
         if not text:
             logger.info(
                 "AWAITING_PHOTO: evento sem imagem ignorado tenant=%s phone=%s kind=%s",
@@ -459,8 +504,7 @@ def _handle_photo(
         send_whatsapp_reply(instance, phone, str(exc))
         return True
 
-    session.state = ChatSession.State.ACTIVE_BOT
-    session.save(update_fields=["state", "updated_at"])
+    transition(session, ChatSession.State.IDLE, reason="pix_sent")
 
     send_whatsapp_reply(
         instance,

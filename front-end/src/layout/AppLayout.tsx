@@ -1,6 +1,10 @@
 import { NotificationsProvider } from "../context/NotificationsContext";
 import { SidebarProvider, useSidebar } from "../context/SidebarContext";
 import { Outlet, useLocation } from "react-router";
+import GracePeriodBanner from "../components/billing/GracePeriodBanner";
+import { useAuth } from "../context/AuthContext";
+import BillingBlocked from "../pages/admin/BillingBlocked";
+import TrialExpired from "../pages/admin/TrialExpired";
 import AppHeader from "./AppHeader";
 import Backdrop from "./Backdrop";
 import AppSidebar from "./AppSidebar";
@@ -10,7 +14,18 @@ const FULLSCREEN_ROUTES = ["/admin/chatbot-flows"];
 const LayoutContent: React.FC = () => {
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
   const { pathname } = useLocation();
+  const { user } = useAuth();
   const isFullscreen = FULLSCREEN_ROUTES.some((route) => pathname.startsWith(route));
+  const onBillingSettings = pathname.startsWith("/admin/settings");
+  const onBillingBlocked = pathname.startsWith("/admin/billing-blocked");
+
+  if (user?.subscription_status === "SUSPENDED" && !onBillingSettings && !onBillingBlocked) {
+    return <BillingBlocked />;
+  }
+
+  if (user?.trial_expired && !onBillingSettings) {
+    return <TrialExpired />;
+  }
 
   return (
     <NotificationsProvider pollingEnabled={!isFullscreen}>
@@ -24,6 +39,7 @@ const LayoutContent: React.FC = () => {
             isExpanded || isHovered ? "lg:ml-[290px]" : "lg:ml-[90px]"
           } ${isMobileOpen ? "ml-0" : ""}`}
         >
+          <GracePeriodBanner />
           <AppHeader />
           <div
             className={

@@ -1,0 +1,54 @@
+# Exemplo de VirtualHosts Apache para staging MarketChat (192.168.1.23).
+# Ajuste caminhos de certificado SSL e habilite os módulos proxy proxy_http ssl headers.
+#
+#   a2enmod proxy proxy_http ssl headers rewrite
+#   include este arquivo em sites-available e a2ensite
+
+# App React / painel (container :3000) — use staging-app (hífen), não staging.app
+<VirtualHost *:443>
+    ServerName staging-app.marketchat.com.br
+
+    SSLEngine on
+  # SSLCertificateFile /etc/letsencrypt/live/staging-app.marketchat.com.br/fullchain.pem
+  # SSLCertificateKeyFile /etc/letsencrypt/live/staging-app.marketchat.com.br/privkey.pem
+
+    ProxyPreserveHost On
+    RequestHeader set X-Forwarded-Proto "https"
+    # SPA React (MarketChat) — serve -s no Docker :3000
+    ProxyPass / http://127.0.0.1:3000/
+    ProxyPassReverse / http://127.0.0.1:3000/
+    # Opcional: mesma origem para /api (senão o front usa staging-api.marketchat.com.br)
+    # ProxyPass /api/ http://127.0.0.1:8001/api/
+    # ProxyPassReverse /api/ http://127.0.0.1:8001/api/
+</VirtualHost>
+
+# Landing (opcional — mesmo front ou outro vhost)
+<VirtualHost *:443>
+    ServerName staging.marketchat.com.br
+
+    SSLEngine on
+
+    ProxyPreserveHost On
+    RequestHeader set X-Forwarded-Proto "https"
+    ProxyPass / http://127.0.0.1:3000/
+    ProxyPassReverse / http://127.0.0.1:3000/
+</VirtualHost>
+
+# API Django (host :8001 — Portainer costuma ocupar :8000)
+<VirtualHost *:443>
+    ServerName staging-api.marketchat.com.br
+
+    SSLEngine on
+
+    ProxyPreserveHost On
+    RequestHeader set X-Forwarded-Proto "https"
+    ProxyPass / http://127.0.0.1:8001/
+    ProxyPassReverse / http://127.0.0.1:8001/
+</VirtualHost>
+
+# Redirecionar HTTP -> HTTPS (opcional)
+<VirtualHost *:80>
+    ServerName staging-app.marketchat.com.br
+    ServerAlias staging.marketchat.com.br staging-api.marketchat.com.br
+    Redirect permanent / https://%{SERVER_NAME}%{REQUEST_URI}
+</VirtualHost>

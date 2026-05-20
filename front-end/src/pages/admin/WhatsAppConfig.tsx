@@ -133,14 +133,20 @@ export default function WhatsAppConfig({ embedded = false }: Props) {
     }
   }, [stopPolling]);
 
+  const shouldPollStatus =
+    Boolean(state?.has_instance) &&
+    !isConnected(state) &&
+    (state?.connection_status === "connecting" ||
+      state?.connection_status === "unknown" ||
+      state?.connection_status === "close");
+
   useEffect(() => {
     stopPolling();
-    if (!state?.has_instance || isConnected(state)) return;
-    if (state.connection_status !== "connecting" && state.connection_status !== "unknown") return;
+    if (!shouldPollStatus) return;
     void pollStatus();
     pollRef.current = setInterval(() => void pollStatus(), POLL_MS);
     return () => stopPolling();
-  }, [state?.has_instance, state?.connected, state?.connection_status, pollStatus, stopPolling]);
+  }, [shouldPollStatus, pollStatus, stopPolling]);
 
   async function handleConnect() {
     setBusy(true);
@@ -215,8 +221,19 @@ export default function WhatsAppConfig({ embedded = false }: Props) {
 
   const connected = state ? isConnected(state) : false;
   const showQr = state ? isQrFlow(state, qrcodeImage) : false;
+  const showStaleConnecting =
+    Boolean(
+      state?.has_instance &&
+        !connected &&
+        !showQr &&
+        state.connection_status === "connecting",
+    );
   const showDisconnected =
-    state && !connected && !showQr && (!state.has_instance || state.connection_status === "close");
+    state &&
+    !connected &&
+    !showQr &&
+    !showStaleConnecting &&
+    (!state.has_instance || state.connection_status === "close");
 
   return (
     <>
@@ -234,9 +251,11 @@ export default function WhatsAppConfig({ embedded = false }: Props) {
           <p className="text-sm text-gray-500 dark:text-gray-400">Não foi possível carregar o painel.</p>
         ) : (
           <div className="space-y-6">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Conecte o WhatsApp da sua empresa. Cada conta possui uma conexão isolada e segura.
-            </p>
+            {!connected && (
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Conecte o WhatsApp da sua empresa. Cada conta possui uma conexão isolada e segura.
+              </p>
+            )}
 
             {!canManage && accessHint && (
               <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
@@ -248,6 +267,27 @@ export default function WhatsAppConfig({ embedded = false }: Props) {
               <p className="rounded-lg border border-warning-200 bg-warning-50 px-3 py-2 text-sm text-warning-900 dark:border-warning-900/40 dark:bg-warning-950/30 dark:text-warning-100">
                 {state.disconnect_reason}
               </p>
+            )}
+
+            {showStaleConnecting && (
+              <div className="flex flex-col items-center gap-4 py-6 text-center">
+                <p className="max-w-md text-sm text-gray-600 dark:text-gray-400">
+                  A conexão anterior não foi encontrada. Gere um novo QR Code para vincular o
+                  WhatsApp.
+                </p>
+                {canManage && (
+                  <Button onClick={() => void handleConnect()} disabled={busy}>
+                    {busy ? (
+                      <span className="inline-flex items-center gap-2">
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+                        Conectando…
+                      </span>
+                    ) : (
+                      "Conectar WhatsApp"
+                    )}
+                  </Button>
+                )}
+              </div>
             )}
 
             {showDisconnected && (

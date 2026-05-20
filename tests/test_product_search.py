@@ -69,7 +69,7 @@ def test_quero_comprar_without_product_asks_instead_of_not_found():
     session = ChatSessionFactory(
         tenant=tenant,
         phone_number=resident.phone_number,
-        state=ChatSession.State.ACTIVE_BOT,
+        state=ChatSession.State.IDLE,
     )
 
     with (
@@ -94,7 +94,7 @@ def test_quero_comprar_without_product_asks_instead_of_not_found():
 
     assert handled is True
     session.refresh_from_db()
-    assert session.state == ChatSession.State.AWAITING_PRODUCT_SELECTION
+    assert session.state == ChatSession.State.PRODUCT_SEARCH
     assert session.active_cart_id is not None
     send_list.assert_not_called()
     reply = send_reply.call_args[0][2]
@@ -118,7 +118,7 @@ def test_product_search_after_none_finds_with_split_words():
     session = ChatSessionFactory(
         tenant=tenant,
         phone_number=resident.phone_number,
-        state=ChatSession.State.AWAITING_PRODUCT_SELECTION,
+        state=ChatSession.State.PRODUCT_SEARCH,
         temporary_name="",
     )
 

@@ -36,6 +36,12 @@ class MeView(APIView):
         user = request.user
         tenant_payload = None
         billing_blocked = False
+        subscription_status = Tenant.SubscriptionStatus.TRIAL
+        days_left_in_trial = 0
+        trial_expired = False
+        subscription_canceled = False
+        is_in_grace_period = False
+        days_overdue = 0
         if user.tenant_id:
             tenant = Tenant.objects.filter(pk=user.tenant_id).first()
             if tenant:
@@ -44,7 +50,17 @@ class MeView(APIView):
                     "name": tenant.name,
                     "slug": tenant.slug,
                 }
-                billing_blocked = not tenant.has_billing_access()
+                billing_blocked = tenant.billing_blocked_at is not None
+                subscription_status = tenant.subscription_status
+                days_left_in_trial = tenant.days_left_in_trial()
+                is_in_grace_period = tenant.is_in_grace_period()
+                days_overdue = tenant.days_overdue()
+                trial_expired = (
+                    not tenant.has_panel_access() and tenant.is_trial_period_over()
+                )
+                subscription_canceled = (
+                    subscription_status == Tenant.SubscriptionStatus.CANCELED
+                )
         return Response(
             {
                 "id": user.id,
@@ -53,6 +69,12 @@ class MeView(APIView):
                 "last_name": user.last_name,
                 "tenant": tenant_payload,
                 "billing_blocked": billing_blocked,
+                "subscription_status": subscription_status,
+                "days_left_in_trial": days_left_in_trial,
+                "trial_expired": trial_expired,
+                "subscription_canceled": subscription_canceled,
+                "is_in_grace_period": is_in_grace_period,
+                "days_overdue": days_overdue,
             }
         )
 

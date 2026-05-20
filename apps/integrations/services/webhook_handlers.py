@@ -16,7 +16,7 @@ from apps.residents.services.onboarding_flow import (
     process_inbound_message,
     resident_has_completed_onboarding,
 )
-from apps.residents.models import Resident
+from apps.residents.models import ChatSession, Resident
 from apps.sales.services.cart_escape import handle_global_escape
 from apps.sales.services.cart_flow import process_cart_flow
 from apps.sales.services.intent_gatekeeper import GENERAL, classify_user_intent
@@ -29,11 +29,16 @@ logger = logging.getLogger(__name__)
 def handle_evolution_webhook(event: EvolutionWebhookEvent, instance: WhatsappInstance) -> None:
     with tenant_scope(instance.tenant_id):
         event_name = event.event_type
-        if "CONNECTION" in event_name:
+        # CONNECTED ≠ substring de CONNECTION — tratar eventos explícitos do Evolution GO.
+        if event_name in ("CONNECTED", "PAIRSUCCESS"):
+            _handle_connected(event, instance)
+        elif event_name in ("DISCONNECTED", "LOGOUT"):
+            _handle_disconnected(instance)
+        elif "CONNECTION" in event_name or event.connection_state:
             _handle_connection(event, instance)
         elif "QRCODE" in event_name or "QR" in event_name:
             _handle_qrcode(instance)
-        elif "MESSAGE" in event_name:
+        elif "MESSAGE" in event_name or event_name.startswith("MESSAGES"):
             _handle_message(event, instance)
         else:
             logger.info(
@@ -41,6 +46,34 @@ def handle_evolution_webhook(event: EvolutionWebhookEvent, instance: WhatsappIns
                 event_name,
                 instance.instance_name,
             )
+
+
+def _handle_connected(event: EvolutionWebhookEvent, instance: WhatsappInstance) -> None:
+    """CONNECTED / PAIRSUCCESS: sessão ativa no Evolution GO."""
+    status = map_connection_state(event.connection_state) or WhatsappInstance.ConnectionStatus.OPEN
+    if instance.connection_status != status:
+        instance.connection_status = status
+        instance.save(update_fields=["connection_status", "updated_at"])
+    if status == WhatsappInstance.ConnectionStatus.OPEN:
+        sync_profile_avatar_from_evolution(instance)
+    logger.info(
+        "WhatsApp connected: tenant=%s instance=%s event=%s status=%s",
+        instance.tenant_id,
+        instance.instance_name,
+        event.event_type,
+        status,
+    )
+
+
+def _handle_disconnected(instance: WhatsappInstance) -> None:
+    if instance.connection_status != WhatsappInstance.ConnectionStatus.CLOSE:
+        instance.connection_status = WhatsappInstance.ConnectionStatus.CLOSE
+        instance.save(update_fields=["connection_status", "updated_at"])
+    logger.info(
+        "WhatsApp disconnected: tenant=%s instance=%s",
+        instance.tenant_id,
+        instance.instance_name,
+    )
 
 
 def _handle_connection(event: EvolutionWebhookEvent, instance: WhatsappInstance) -> None:
@@ -68,6 +101,23 @@ def _handle_qrcode(instance: WhatsappInstance) -> None:
 
 
 def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) -> None:
+    from apps.billing.services.tenant_suspension import tenant_has_messaging_access
+
+    logger.info(
+        "WhatsApp MESSAGE recebido: tenant=%s instance=%s jid=%s text_len=%s",
+        instance.tenant_id,
+        instance.instance_name,
+        event.remote_jid,
+        len((event.message_text or "").strip()),
+    )
+
+    if not tenant_has_messaging_access(instance.tenant_id):
+        logger.info(
+            "WhatsApp MESSAGE ignorado (tenant sem acesso): tenant=%s",
+            instance.tenant_id,
+        )
+        return
+
     if event.from_me or (event.remote_jid and event.remote_jid.endswith("@g.us")):
         return
 
@@ -81,7 +131,7 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
     onboarded = resident_has_completed_onboarding(instance.tenant_id, phone)
 
     intent_type = ""
-    if onboarded and text:
+    if onboarded and text and session.state == ChatSession.State.IDLE:
         intent_type = classify_user_intent(text)
     elif not onboarded:
         intent_type = GENERAL
@@ -136,6 +186,16 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
             return
 
     if process_cart_flow(instance.tenant_id, instance, phone, event):
+        return
+
+    session.refresh_from_db(fields=["state"])
+    if session.state != ChatSession.State.IDLE:
+        if not text and message_kind != ChatMessageLog.MessageKind.IMAGE:
+            logger.info(
+                "WhatsApp MESSAGE ignorada fora de IDLE: tenant=%s state=%s",
+                instance.tenant_id,
+                session.state,
+            )
         return
 
     if not text and message_kind != ChatMessageLog.MessageKind.IMAGE:

@@ -118,8 +118,30 @@ def test_onboarding_creates_resident_and_deletes_session():
     assert resident.name == "Carlos"
     assert resident.market_id == market.id
     session = ChatSession.objects.get(tenant=tenant, phone_number=phone)
-    assert session.state == ChatSession.State.ACTIVE_BOT
+    assert session.state == ChatSession.State.IDLE
     assert "cadastro foi concluído" in send.call_args[0][2].lower()
+
+
+@pytest.mark.django_db
+def test_onboarding_starts_when_session_was_active_bot_without_resident():
+    tenant = TenantFactory()
+    instance = WhatsappInstanceFactory(tenant=tenant)
+    phone = "5514997426163"
+    ChatSessionFactory(
+        tenant=tenant,
+        phone_number=phone,
+        state=ChatSession.State.IDLE,
+    )
+
+    with mock.patch("apps.residents.services.onboarding_flow.send_whatsapp_reply") as send:
+        with tenant_scope(tenant.id):
+            handled = process_inbound_message(tenant.id, instance, phone, "oi")
+
+    assert handled is True
+    send.assert_called_once()
+    assert "Nome Completo" in send.call_args[0][2]
+    session = ChatSession.objects.get(tenant=tenant, phone_number=phone)
+    assert session.state == ChatSession.State.AWAITING_NAME
 
 
 @pytest.mark.django_db

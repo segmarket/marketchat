@@ -70,7 +70,7 @@ def test_payment_received_completes_cart_and_unlocks_session(mock_send, cart_set
     cart.refresh_from_db()
     session.refresh_from_db()
     assert cart.status == Cart.Status.COMPLETED
-    assert session.state == ChatSession.State.ACTIVE_BOT
+    assert session.state == ChatSession.State.IDLE
     assert session.active_cart_id is None
 
     mock_send.assert_called_once()
@@ -109,7 +109,7 @@ def test_payment_overdue_expires_cart(mock_send, cart_setup):
     cart.refresh_from_db()
     session.refresh_from_db()
     assert cart.status == Cart.Status.EXPIRED
-    assert session.state == ChatSession.State.ACTIVE_BOT
+    assert session.state == ChatSession.State.IDLE
 
     mock_send.assert_called_once()
     text = mock_send.call_args[0][2]
@@ -131,7 +131,7 @@ def test_payment_deleted_cancels_cart(mock_send, cart_setup):
     cart.refresh_from_db()
     session.refresh_from_db()
     assert cart.status == Cart.Status.CANCELLED
-    assert session.state == ChatSession.State.ACTIVE_BOT
+    assert session.state == ChatSession.State.IDLE
     mock_send.assert_called_once()
 
 
@@ -266,5 +266,5 @@ def test_cleanup_expired_carts_command(cart_setup):
     cart.refresh_from_db()
     session.refresh_from_db()
     assert cart.status == Cart.Status.CANCELLED
-    assert session.state == ChatSession.State.ACTIVE_BOT
+    assert session.state == ChatSession.State.IDLE
     assert session.active_cart_id is None

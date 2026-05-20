@@ -58,6 +58,27 @@ def get_payment_method_summary(
     client = client or AsaasClient()
     sub_data = client.get_subscription(subscription.asaas_subscription_id)
     billing_type = (sub_data.get("billingType") or "").upper()
+    asaas_status = (sub_data.get("status") or "").upper()
+    tenant_status = tenant.subscription_status
+    local_canceled = tenant_status == Tenant.SubscriptionStatus.CANCELED
+    in_trial = not tenant.is_trial_period_over()
+
+    active_markets = tenant.active_markets_count()
+    unit_price = tenant.subscription_unit_value()
+    base: dict[str, Any] = {
+        "next_due_date": sub_data.get("nextDueDate"),
+        "asaas_status": asaas_status,
+        "subscription_status": tenant_status,
+        "subscription_canceled": local_canceled,
+        "can_cancel": not local_canceled and asaas_status == "ACTIVE",
+        "can_reactivate": local_canceled and active_markets > 0,
+        "in_trial_period": in_trial,
+        "trial_ends_at": tenant.trial_ends_at.date().isoformat(),
+        "active_markets_count": active_markets,
+        "monthly_total": round(active_markets * unit_price, 2),
+        "unit_price": unit_price,
+        "is_in_grace_period": tenant.is_in_grace_period(),
+    }
 
     if billing_type == "CREDIT_CARD":
         brand = sub_data.get("creditCardBrand") or ""
@@ -68,6 +89,7 @@ def get_payment_method_summary(
         else:
             display = brand_label
         return {
+            **base,
             "billing_type": billing_type,
             "card_brand": brand.upper() if brand else None,
             "card_last_four": last_four,
@@ -76,6 +98,7 @@ def get_payment_method_summary(
 
     label = _BILLING_TYPE_LABELS.get(billing_type, billing_type or "Cobrança")
     return {
+        **base,
         "billing_type": billing_type or "UNDEFINED",
         "card_brand": None,
         "card_last_four": None,

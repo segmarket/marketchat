@@ -6,6 +6,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 
 from apps.tenants.context import clear_current_tenant_id, set_current_tenant_id
 from apps.tenants.models import Tenant
+from apps.tenants.services.panel_access import get_panel_access_denial
 
 
 class TenantJWTContextMiddleware(MiddlewareMixin):
@@ -62,9 +63,11 @@ class TenantBillingBlockMiddleware(MiddlewareMixin):
             tenant = Tenant.objects.get(pk=tid)
         except Tenant.DoesNotExist:
             return JsonResponse({"detail": "Tenant inválido."}, status=403)
-        if not tenant.has_billing_access():
+        denial = get_panel_access_denial(tenant)
+        if denial is not None:
+            error_code, message = denial
             return JsonResponse(
-                {"detail": "Acesso suspenso. Regularize o pagamento para continuar."},
+                {"error": error_code, "message": message, "detail": message},
                 status=402,
             )
         return None

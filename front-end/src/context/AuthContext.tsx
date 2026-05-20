@@ -22,6 +22,12 @@ export type AuthUser = {
   last_name: string;
   tenant: TenantInfo | null;
   billing_blocked: boolean;
+  subscription_status: string;
+  days_left_in_trial: number;
+  trial_expired: boolean;
+  subscription_canceled?: boolean;
+  is_in_grace_period?: boolean;
+  days_overdue?: number;
 };
 
 type AuthContextValue = {

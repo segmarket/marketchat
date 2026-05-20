@@ -15,6 +15,12 @@ from apps.billing.services.payment_method import (
     get_payment_method_summary,
     update_subscription_card,
 )
+from apps.billing.services.subscription_cancel import cancel_tenant_subscription
+from apps.billing.services.subscription_reactivate import (
+    ReactivationCardError,
+    ReactivationError,
+    reactivate_tenant_subscription,
+)
 from apps.tenants.models import Tenant
 
 logger = logging.getLogger(__name__)
@@ -108,3 +114,85 @@ class PaymentMethodView(BillingSettingsBaseView):
             return Response({"detail": detail}, status=status.HTTP_502_BAD_GATEWAY)
 
         return Response(summary, status=status.HTTP_200_OK)
+
+
+class CancelSubscriptionView(BillingSettingsBaseView):
+    def post(self, request):
+        tenant = self._tenant_or_error(request)
+        if isinstance(tenant, Response):
+            return tenant
+
+        if tenant.subscription_status == Tenant.SubscriptionStatus.CANCELED:
+            return Response(
+                {"detail": "A assinatura já está cancelada."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            cancel_tenant_subscription(tenant)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+        except AsaasAPIError as exc:
+            logger.warning("Asaas cancel subscription: %s", exc.payload or exc)
+            detail = "Não foi possível cancelar a assinatura."
+            if exc.payload and isinstance(exc.payload, dict):
+                errors = exc.payload.get("errors")
+                if errors:
+                    detail = str(errors[0].get("description", detail))
+            return Response({"detail": detail}, status=status.HTTP_502_BAD_GATEWAY)
+
+        return Response(
+            {
+                "detail": "Assinatura cancelada. Você não será cobrado nas próximas faturas.",
+                "subscription_canceled": True,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class ReactivateSubscriptionView(BillingSettingsBaseView):
+    def post(self, request):
+        tenant = self._tenant_or_error(request)
+        if isinstance(tenant, Response):
+            return tenant
+
+        if tenant.subscription_status != Tenant.SubscriptionStatus.CANCELED:
+            return Response(
+                {"detail": "A assinatura não está cancelada."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        try:
+            reactivate_tenant_subscription(tenant)
+            summary = get_payment_method_summary(tenant)
+        except ReactivationError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except ReactivationCardError as exc:
+            return Response(
+                {
+                    "detail": (
+                        "Não foi possível reativar com o cartão atual. "
+                        "Por favor, insira um novo cartão de crédito para reativar seu plano."
+                    ),
+                    "code": "card_required",
+                },
+                status=status.HTTP_402_PAYMENT_REQUIRED,
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+        except AsaasAPIError as exc:
+            logger.warning("Asaas reactivate subscription: %s", exc.payload or exc)
+            detail = "Não foi possível reativar a assinatura."
+            if exc.payload and isinstance(exc.payload, dict):
+                errors = exc.payload.get("errors")
+                if errors:
+                    detail = str(errors[0].get("description", detail))
+            return Response({"detail": detail}, status=status.HTTP_502_BAD_GATEWAY)
+
+        return Response(
+            {
+                "detail": "Assinatura reativada com sucesso.",
+                **summary,
+            },
+            status=status.HTTP_200_OK,
+        )

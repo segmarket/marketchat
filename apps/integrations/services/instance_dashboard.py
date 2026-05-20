@@ -14,7 +14,10 @@ from apps.integrations.services.profile_sync import (
     apply_remote_row_to_instance,
     sync_profile_avatar_from_evolution,
 )
-from apps.integrations.services.provisioning import sync_connection_status
+from apps.integrations.services.provisioning import (
+    reconcile_whatsapp_with_evolution,
+    sync_connection_status,
+)
 
 
 WEBHOOK_OK_WINDOW = timedelta(minutes=10)
@@ -51,10 +54,8 @@ def sync_instance_from_evolution(
     refresh_avatar: bool = False,
 ) -> WhatsappInstance:
     client = client or EvolutionClient()
-    try:
-        sync_connection_status(instance, client=client)
-    except Exception:
-        pass
+    if reconcile_whatsapp_with_evolution(instance, client=client) is None:
+        return instance
     try:
         remote = client.fetch_remote_instance(instance_name=instance.instance_name)
         if remote:

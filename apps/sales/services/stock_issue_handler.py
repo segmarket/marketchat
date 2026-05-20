@@ -5,8 +5,10 @@ from __future__ import annotations
 import logging
 
 from apps.integrations.models import WhatsappInstance
-from apps.residents.models import Resident
+from apps.residents.models import ChatSession, Resident
 from apps.residents.services.whatsapp_reply import send_whatsapp_reply
+from apps.sales.services.chat_fsm import record_discussed_product
+from apps.sales.services.product_search import search_active_products
 from apps.sales.services.owner_alert import notify_owner_restock_issue
 from apps.sales.services.product_term_extractor import (
     ProductTermExtractorError,
@@ -45,8 +47,21 @@ def handle_stock_issue_report(
     resident: Resident,
     phone: str,
     message: str,
+    session: ChatSession | None = None,
 ) -> None:
     product_label = extract_stock_product_label(message)
+    if session is None:
+        session = (
+            ChatSession.objects.filter(
+                tenant_id=resident.tenant_id,
+                phone_number=phone,
+            )
+            .first()
+        )
+    if session and product_label != "o produto":
+        matches = search_active_products(resident.tenant_id, product_label)
+        if matches:
+            record_discussed_product(session, matches[0])
     reply = build_stock_issue_resident_message(
         resident=resident,
         product_label=product_label,

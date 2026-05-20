@@ -65,7 +65,7 @@ export default function ResetPasswordPage() {
         new_password: data.new_password,
       });
       toast.success("Senha atualizada. Você já pode entrar com a nova senha.");
-      navigate("/login", { replace: true });
+      navigate("/signin", { replace: true });
     } catch (e) {
       toast.error(getAxiosErrorMessage(e, errOpts));
     }
@@ -81,7 +81,7 @@ export default function ResetPasswordPage() {
         <div className="flex flex-col flex-1 w-full lg:w-1/2">
           <div className="w-full max-w-md pt-10 mx-auto">
             <Link
-              to="/login"
+              to="/signin"
               className="inline-flex items-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
             >
               <ChevronLeftIcon className="size-5" />

@@ -37,7 +37,7 @@ def test_stale_session_window_excludes_recent_and_very_old():
     tenant = TenantFactory()
     recent = ChatSessionFactory(
         tenant=tenant,
-        state=ChatSession.State.ACTIVE_BOT,
+        state=ChatSession.State.IDLE,
         inactivity_notified=False,
     )
     ChatSession.objects.filter(pk=recent.pk).update(
@@ -47,7 +47,7 @@ def test_stale_session_window_excludes_recent_and_very_old():
     in_window = ChatSessionFactory(
         tenant=tenant,
         phone_number="5511999000001",
-        state=ChatSession.State.ACTIVE_BOT,
+        state=ChatSession.State.IDLE,
         inactivity_notified=False,
     )
     ChatSession.objects.filter(pk=in_window.pk).update(
@@ -57,7 +57,7 @@ def test_stale_session_window_excludes_recent_and_very_old():
     too_old = ChatSessionFactory(
         tenant=tenant,
         phone_number="5511999000002",
-        state=ChatSession.State.ACTIVE_BOT,
+        state=ChatSession.State.IDLE,
         inactivity_notified=False,
     )
     ChatSession.objects.filter(pk=too_old.pk).update(
@@ -78,7 +78,7 @@ def test_inactivity_followup_sends_whatsapp_and_resets_session():
     session = ChatSessionFactory(
         tenant=tenant,
         phone_number=resident.phone_number,
-        state=ChatSession.State.ACTIVE_BOT,
+        state=ChatSession.State.IDLE,
         inactivity_notified=False,
     )
     cart = CartFactory(
@@ -104,11 +104,12 @@ def test_inactivity_followup_sends_whatsapp_and_resets_session():
     send_reply.assert_called_once()
     args, kwargs = send_reply.call_args
     assert resident.phone_number in args[1] or args[1] == resident.phone_number
-    assert "João Teste" in args[2]
+    assert "João" in args[2]
+    assert "João Teste" not in args[2]
     assert kwargs.get("session") == session
 
     session.refresh_from_db()
-    assert session.state == ChatSession.State.ACTIVE_BOT
+    assert session.state == ChatSession.State.IDLE
     assert session.active_cart_id is None
     assert session.pending_product_id is None
     assert session.inactivity_notified is False
@@ -130,7 +131,7 @@ def test_inactivity_skips_awaiting_payment_cart():
     session = ChatSessionFactory(
         tenant=tenant,
         phone_number=resident.phone_number,
-        state=ChatSession.State.ACTIVE_BOT,
+        state=ChatSession.State.IDLE,
         active_cart=cart,
         inactivity_notified=False,
     )
@@ -155,7 +156,7 @@ def test_management_command_logs_summary(capsys):
     session = ChatSessionFactory(
         tenant=tenant,
         phone_number=resident.phone_number,
-        state=ChatSession.State.ACTIVE_BOT,
+        state=ChatSession.State.IDLE,
     )
     ChatSession.objects.filter(pk=session.pk).update(
         last_activity_at=timezone.now() - timedelta(minutes=6),

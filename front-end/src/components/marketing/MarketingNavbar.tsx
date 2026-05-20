@@ -1,9 +1,8 @@
-import { appUrl } from "../../utils/host";
+import { getAppUrl } from "../../utils/host";
 
 const NAV_LINKS = [
-  { label: "Funcionalidades", href: "#funcionalidades" },
+  { label: "Diferenciais", href: "#diferenciais" },
   { label: "Como Funciona", href: "#como-funciona" },
-  { label: "Segurança", href: "#seguranca" },
   { label: "Preços", href: "#precos" },
 ] as const;
 
@@ -31,8 +30,8 @@ export default function MarketingNavbar() {
         </nav>
 
         <a
-          href={appUrl("/login")}
-          className="rounded-md border border-brand-500 px-4 py-2 text-sm font-semibold text-brand-600 transition-colors hover:bg-brand-50"
+          href={getAppUrl()}
+          className="rounded-md bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
         >
           Acessar Sistema
         </a>

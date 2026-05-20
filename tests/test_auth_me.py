@@ -17,3 +17,6 @@ def test_auth_me_returns_user_and_tenant(api_client):
     assert data["email"] == "me@test.com"
     assert data["tenant"]["name"] == "Acme"
     assert data["billing_blocked"] is False
+    assert data["subscription_status"] == "TRIAL"
+    assert data["days_left_in_trial"] >= 1
+    assert data["trial_expired"] is False

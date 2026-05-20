@@ -1,4 +1,4 @@
-import { appUrl } from "../../utils/host";
+import { getAppUrl } from "../../utils/host";
 import ChatMockup from "./ChatMockup";
 import DashboardMockup from "./DashboardMockup";
 
@@ -19,10 +19,10 @@ export default function MarketingHero() {
             em menos de 5 segundos.
           </p>
           <a
-            href={appUrl("/register")}
+            href={getAppUrl("/register")}
             className="mt-8 inline-flex animate-pulse items-center justify-center rounded-md bg-green-500 px-8 py-4 text-lg font-semibold text-white shadow-md transition-all hover:bg-green-600"
           >
-            🚀 Criar Meu Mercado Inteligente
+            Experimente 7 Dias Grátis
           </a>
         </div>
 

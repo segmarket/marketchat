@@ -1,3 +1,4 @@
+import urllib.error
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
@@ -10,8 +11,9 @@ from apps.integrations.models import WhatsappInstance
 from apps.integrations.services.provisioning import (
     WhatsappAlreadyProvisionedError,
     provision_whatsapp_instance,
+    remote_instance_exists,
 )
-from tests.factories import TenantFactory, UserFactory, WhatsappInstanceFactory
+from tests.factories import ResidentFactory, TenantFactory, UserFactory, WhatsappInstanceFactory
 
 
 @pytest.mark.django_db
@@ -28,13 +30,23 @@ def test_whatsapp_get_no_instance(api_client):
     assert data["webhook_status"] == "unknown"
 
 
+def _mock_evolution_client() -> MagicMock:
+    mock_client = MagicMock()
+    mock_client.connection_state.return_value = {"data": {"state": "connecting"}}
+    mock_client.fetch_remote_instance.return_value = {"connected": False}
+    mock_client.check_evolution_health.return_value = "ok"
+    return mock_client
+
+
 @pytest.mark.django_db
+@patch("apps.integrations.services.instance_dashboard.EvolutionClient")
 @patch("apps.integrations.services.provisioning.EvolutionClient")
-def test_whatsapp_provision_success(mock_client_cls, api_client):
+def test_whatsapp_provision_success(mock_prov_cls, mock_dash_cls, api_client):
     tenant = TenantFactory(slug="acme-corp")
     user = UserFactory(tenant=tenant, email="wa-admin@example.com")
-    mock_client = MagicMock()
-    mock_client_cls.return_value = mock_client
+    mock_client = _mock_evolution_client()
+    mock_prov_cls.return_value = mock_client
+    mock_dash_cls.return_value = mock_client
     mock_client.create_instance_safe.return_value = {"ok": True}
     mock_client.connect_instance.return_value = {"ok": True}
     mock_client.fetch_qrcode.return_value = {
@@ -71,8 +83,9 @@ def test_whatsapp_provision_rollback_on_connect_failure(mock_client_cls, api_cli
 
 
 @pytest.mark.django_db
+@patch("apps.integrations.services.instance_dashboard.EvolutionClient")
 @patch("apps.integrations.services.provisioning.EvolutionClient")
-def test_whatsapp_provision_after_disconnect_reuses_row(mock_client_cls, api_client):
+def test_whatsapp_provision_after_disconnect_reuses_row(mock_prov_cls, mock_dash_cls, api_client):
     tenant = TenantFactory(slug="reconnect-co")
     user = UserFactory(tenant=tenant, email="wa-reconnect@example.com")
     WhatsappInstanceFactory(
@@ -81,8 +94,9 @@ def test_whatsapp_provision_after_disconnect_reuses_row(mock_client_cls, api_cli
         instance_id="old-evolution-id",
         instance_name="mc-old",
     )
-    mock_client = MagicMock()
-    mock_client_cls.return_value = mock_client
+    mock_client = _mock_evolution_client()
+    mock_prov_cls.return_value = mock_client
+    mock_dash_cls.return_value = mock_client
     mock_client.create_instance_safe.return_value = {"ok": True}
     mock_client.connect_instance.return_value = {"ok": True}
     mock_client.fetch_qrcode.return_value = {"data": {"Qrcode": f"data:image/png;base64,{'B' * 120}"}}
@@ -111,6 +125,171 @@ def test_whatsapp_provision_conflict_when_active(api_client):
     api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(user).access_token}")
     response = api_client.post(url, {}, format="json")
     assert response.status_code == 409
+
+
+@pytest.mark.django_db
+def test_remote_instance_exists_treats_503_as_still_present():
+    tenant = TenantFactory()
+    inst = WhatsappInstanceFactory(tenant=tenant, is_active=True, instance_name="mc-503-unit")
+    mock_client = MagicMock()
+    mock_client.fetch_remote_instance.side_effect = urllib.error.HTTPError(
+        "http://localhost:8080/instance/all",
+        503,
+        "Service Unavailable",
+        {},
+        None,
+    )
+    assert remote_instance_exists(inst, client=mock_client) is True
+
+
+@pytest.mark.django_db
+@patch(
+    "apps.integrations.services.provisioning.remote_instance_exists",
+    return_value=True,
+)
+@patch("apps.integrations.services.instance_dashboard.EvolutionClient")
+def test_whatsapp_get_survives_evolution_http_503(
+    mock_dash_cls,
+    _mock_exists,
+    api_client,
+):
+    tenant = TenantFactory()
+    user = UserFactory(tenant=tenant, email="wa-evo-503@example.com")
+    WhatsappInstanceFactory(
+        tenant=tenant,
+        is_active=True,
+        instance_name="mc-evo-503",
+        connection_status=WhatsappInstance.ConnectionStatus.OPEN,
+    )
+    mock_client = MagicMock()
+    mock_dash_cls.return_value = mock_client
+    mock_client.check_evolution_health.return_value = "error"
+
+    url = reverse("integrations-whatsapp")
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(user).access_token}")
+    response = api_client.get(url)
+
+    assert response.status_code == 200
+    assert response.json()["has_instance"] is True
+    assert response.json()["evolution_api_status"] == "error"
+
+
+@pytest.mark.django_db
+@patch("apps.integrations.services.instance_dashboard.EvolutionClient")
+@patch("apps.integrations.services.provisioning.EvolutionClient")
+def test_whatsapp_get_survives_evolution_unreachable(
+    mock_prov_cls,
+    mock_dash_cls,
+    api_client,
+):
+    tenant = TenantFactory()
+    user = UserFactory(tenant=tenant, email="wa-evo-down@example.com")
+    WhatsappInstanceFactory(
+        tenant=tenant,
+        is_active=True,
+        instance_name="mc-evo-down",
+        connection_status=WhatsappInstance.ConnectionStatus.OPEN,
+    )
+    mock_client = MagicMock()
+    mock_prov_cls.return_value = mock_client
+    mock_dash_cls.return_value = mock_client
+    mock_client.fetch_remote_instance.side_effect = urllib.error.URLError(
+        "Connection refused",
+    )
+    mock_client.check_evolution_health.return_value = "error"
+
+    url = reverse("integrations-whatsapp")
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(user).access_token}")
+    response = api_client.get(url)
+
+    assert response.status_code == 200
+    assert response.json()["has_instance"] is True
+    assert response.json()["evolution_api_status"] == "error"
+
+
+@pytest.mark.django_db
+@patch("apps.integrations.services.provisioning.EvolutionClient")
+def test_whatsapp_get_reconciles_missing_remote(mock_client_cls, api_client):
+    tenant = TenantFactory()
+    user = UserFactory(tenant=tenant, email="wa-orphan@example.com")
+    inst = WhatsappInstanceFactory(
+        tenant=tenant,
+        is_active=True,
+        connection_status=WhatsappInstance.ConnectionStatus.CONNECTING,
+    )
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+    mock_client.fetch_remote_instance.return_value = None
+
+    url = reverse("integrations-whatsapp")
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(user).access_token}")
+    response = api_client.get(url)
+
+    assert response.status_code == 200
+    assert response.json()["has_instance"] is False
+    inst.refresh_from_db()
+    assert inst.is_active is False
+    assert inst.connection_status == WhatsappInstance.ConnectionStatus.CLOSE
+
+
+@pytest.mark.django_db
+@patch("apps.integrations.services.provisioning.EvolutionClient")
+def test_whatsapp_status_no_502_when_remote_missing(mock_client_cls, api_client):
+    tenant = TenantFactory()
+    user = UserFactory(tenant=tenant, email="wa-status-orphan@example.com")
+    WhatsappInstanceFactory(
+        tenant=tenant,
+        is_active=True,
+        connection_status=WhatsappInstance.ConnectionStatus.CONNECTING,
+    )
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+    mock_client.fetch_remote_instance.return_value = None
+
+    url = reverse("integrations-whatsapp-status")
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(user).access_token}")
+    response = api_client.get(url)
+
+    assert response.status_code == 200
+    assert response.json()["has_instance"] is False
+
+
+@pytest.mark.django_db
+@patch("apps.integrations.services.instance_dashboard.EvolutionClient")
+@patch("apps.integrations.services.provisioning.EvolutionClient")
+def test_whatsapp_provision_after_remote_deleted(
+    mock_prov_cls,
+    mock_dash_cls,
+    api_client,
+):
+    tenant = TenantFactory(slug="ghost-co")
+    user = UserFactory(tenant=tenant, email="wa-ghost@example.com")
+    WhatsappInstanceFactory(
+        tenant=tenant,
+        is_active=True,
+        instance_name="mc-ghost-co",
+        connection_status=WhatsappInstance.ConnectionStatus.CONNECTING,
+    )
+    mock_client = MagicMock()
+    mock_prov_cls.return_value = mock_client
+    mock_dash_cls.return_value = mock_client
+    mock_client.check_evolution_health.return_value = "ok"
+    mock_client.fetch_remote_instance.side_effect = [
+        None,
+        {"instanceName": "mc-ghost-co"},
+    ]
+    mock_client.create_instance_safe.return_value = {"ok": True}
+    mock_client.connect_instance.return_value = {"ok": True}
+    mock_client.fetch_qrcode.return_value = {
+        "data": {"Qrcode": f"data:image/png;base64,{'C' * 120}"},
+    }
+
+    url = reverse("integrations-whatsapp-provision")
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(user).access_token}")
+    response = api_client.post(url, {}, format="json")
+
+    assert response.status_code == 201
+    assert response.json()["has_instance"] is True
 
 
 @pytest.mark.django_db
@@ -232,6 +411,45 @@ def test_evolution_webhook_inactive_instance_by_secret(api_client, settings):
 
 
 @pytest.mark.django_db
+@patch("django.conf.settings.DEBUG", False)
+@patch("apps.sales.services.cart_flow.route_idle_message", return_value=True)
+def test_evolution_webhook_allowed_by_apikey_header(
+    mock_route,
+    api_client,
+    settings,
+):
+    settings.DEBUG = False
+    tenant = TenantFactory()
+    resident = ResidentFactory(tenant=tenant, phone_number="5511999001122")
+    inst = WhatsappInstanceFactory(
+        tenant=tenant,
+        webhook_secret="only-in-url",
+        api_key="instance-api-key-xyz",
+        is_active=True,
+    )
+    url = reverse("webhook-evolution")
+    response = api_client.post(
+        url,
+        {
+            "event": "MESSAGE",
+            "instance": inst.instance_name,
+            "data": {
+                "key": {
+                    "remoteJid": f"{resident.phone_number}@s.whatsapp.net",
+                    "id": "msg-apikey-1",
+                    "fromMe": False,
+                },
+                "message": {"conversation": "oi"},
+            },
+        },
+        format="json",
+        HTTP_APIKEY="instance-api-key-xyz",
+    )
+    assert response.status_code == 200
+    mock_route.assert_called_once()
+
+
+@pytest.mark.django_db
 def test_evolution_webhook_unknown_instance(api_client):
     url = reverse("webhook-evolution")
     response = api_client.post(
@@ -293,12 +511,14 @@ def test_sync_profile_avatar_from_evolution(mock_client_cls):
 
 @pytest.mark.django_db
 @patch("apps.integrations.services.instance_dashboard.EvolutionClient")
-def test_whatsapp_dashboard_webhook_status(mock_client_cls, api_client):
+@patch("apps.integrations.services.provisioning.EvolutionClient")
+def test_whatsapp_dashboard_webhook_status(mock_prov_cls, mock_dash_cls, api_client):
     tenant = TenantFactory()
     user = UserFactory(tenant=tenant, email="wa-dash@example.com")
-    mock_client = MagicMock()
-    mock_client_cls.return_value = mock_client
-    mock_client.check_evolution_health.return_value = "ok"
+    mock_client = _mock_evolution_client()
+    mock_client.connection_state.return_value = {"data": {"state": "open"}}
+    mock_prov_cls.return_value = mock_client
+    mock_dash_cls.return_value = mock_client
     mock_client.fetch_remote_instance.return_value = None
     mock_client.extract_avatar_image.return_value = ""
 
@@ -321,12 +541,14 @@ def test_whatsapp_dashboard_webhook_status(mock_client_cls, api_client):
 
 @pytest.mark.django_db
 @patch("apps.integrations.services.instance_dashboard.EvolutionClient")
-def test_whatsapp_dashboard_webhook_stale(mock_client_cls, api_client):
+@patch("apps.integrations.services.provisioning.EvolutionClient")
+def test_whatsapp_dashboard_webhook_stale(mock_prov_cls, mock_dash_cls, api_client):
     tenant = TenantFactory()
     user = UserFactory(tenant=tenant, email="wa-stale@example.com")
-    mock_client = MagicMock()
-    mock_client_cls.return_value = mock_client
-    mock_client.check_evolution_health.return_value = "ok"
+    mock_client = _mock_evolution_client()
+    mock_client.connection_state.return_value = {"data": {"state": "open"}}
+    mock_prov_cls.return_value = mock_client
+    mock_dash_cls.return_value = mock_client
     mock_client.fetch_remote_instance.return_value = None
     mock_client.extract_avatar_image.return_value = ""
 

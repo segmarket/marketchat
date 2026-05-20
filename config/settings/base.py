@@ -11,6 +11,22 @@ import environ
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
+
+def _resolve_database_url() -> str:
+    """DATABASE_URL explícita ou montagem a partir de DB_* (Docker/staging)."""
+    explicit = (os.environ.get("DATABASE_URL") or "").strip()
+    if explicit:
+        return explicit
+    host = (os.environ.get("DB_HOST") or "").strip()
+    if not host:
+        return f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
+    user = (os.environ.get("DB_USER") or "postgres").strip()
+    password = (os.environ.get("DB_PASSWORD") or "postgres").strip()
+    port = (os.environ.get("DB_PORT") or "5432").strip()
+    name = (os.environ.get("DB_NAME") or "postgres").strip()
+    return f"postgres://{user}:{password}@{host}:{port}/{name}"
+
+
 env = environ.Env(
     DEBUG=(bool, False),
 )
@@ -76,10 +92,7 @@ TEMPLATES = [
 ]
 
 DATABASES = {
-    "default": env.db(
-        "DATABASE_URL",
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-    )
+    "default": env.db_url_config(_resolve_database_url()),
 }
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -125,6 +138,9 @@ SIMPLE_JWT = {
 CORS_ALLOW_ALL_ORIGINS = env.bool("CORS_ALLOW_ALL_ORIGINS", default=False)
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
 
+# Admin/login e formulários Django atrás de proxy (staging-app, etc.)
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+
 EMAIL_BACKEND = env(
     "EMAIL_BACKEND",
     default="django.core.mail.backends.console.EmailBackend",
@@ -154,6 +170,8 @@ ASAAS_WEBHOOK_VERIFY = env.bool("ASAAS_WEBHOOK_VERIFY", default=True)
 
 TRIAL_DAYS = env.int("TRIAL_DAYS", default=7)
 DEFAULT_SUBSCRIPTION_VALUE = env.float("DEFAULT_SUBSCRIPTION_VALUE", default=29.9)
+MARKET_MONTHLY_PRICE = env.float("MARKET_MONTHLY_PRICE", default=59.90)
+BILLING_GRACE_DAYS = env.int("BILLING_GRACE_DAYS", default=3)
 ASAAS_SUBACCOUNT_INCOME_VALUE = env.float("ASAAS_SUBACCOUNT_INCOME_VALUE", default=5000.0)
 # CPF usado ao criar cliente Asaas do morador (sandbox); use um CPF válido de teste.
 ASAAS_RESIDENT_DEFAULT_CPF = env("ASAAS_RESIDENT_DEFAULT_CPF", default="11144477735")
@@ -166,8 +184,17 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_MODEL = env("OPENAI_MODEL", default="gpt-4o-mini")
 OPENAI_HISTORY_WINDOW = env.int("OPENAI_HISTORY_WINDOW", default=6)
 
-EVOLUTION_API_BASE_URL = env("EVOLUTION_API_BASE_URL", default="http://127.0.0.1:8080")
-EVOLUTION_GLOBAL_API_KEY = env("EVOLUTION_GLOBAL_API_KEY", default="")
+EVOLUTION_API_BASE_URL = (
+    os.environ.get("EVOLUTION_API_BASE_URL")
+    or os.environ.get("EVOLUTION_API_URL")
+    or "http://127.0.0.1:8080"
+)
+EVOLUTION_GLOBAL_API_KEY = (
+    os.environ.get("EVOLUTION_GLOBAL_API_KEY")
+    or os.environ.get("EVOLUTION_DEFAULT_API_KEY")
+    or os.environ.get("EVOLUTION_API_TOKEN")
+    or ""
+)
 PUBLIC_WEBHOOK_BASE_URL = env(
     "PUBLIC_WEBHOOK_BASE_URL",
     default="http://host.docker.internal:8001",

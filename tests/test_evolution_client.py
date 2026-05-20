@@ -183,3 +183,18 @@ def test_fetch_remote_instance():
     row = {"instanceName": "mc-acme", "connected": True}
     with patch.object(client, "fetch_instances", return_value=[row]):
         assert client.fetch_remote_instance(instance_name="mc-acme") == row
+
+
+def test_fetch_instances_does_not_fallback_on_503():
+    client = EvolutionClient(base_url="http://evo.test", global_api_key="global")
+    err = urllib.error.HTTPError(
+        "http://evo.test/instance/all",
+        503,
+        "Service Unavailable",
+        {},
+        None,
+    )
+    with patch.object(client, "_request", side_effect=err):
+        with pytest.raises(urllib.error.HTTPError) as raised:
+            client.fetch_instances()
+    assert raised.value.code == 503

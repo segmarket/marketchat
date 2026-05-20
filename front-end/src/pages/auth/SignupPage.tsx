@@ -187,7 +187,7 @@ export default function SignupPage() {
     try {
       await api.post("/api/auth/register/", payload);
       toast.success("Conta criada! Faça login para continuar.");
-      navigate("/login", { replace: true });
+      navigate("/signin", { replace: true });
     } catch (e: unknown) {
       toast.error(getAxiosErrorMessage(e));
     } finally {
@@ -205,7 +205,7 @@ export default function SignupPage() {
         <div className="flex flex-col flex-1 w-full overflow-y-auto lg:w-1/2 no-scrollbar">
           <div className="w-full max-w-xl mx-auto mb-5 sm:pt-6">
             <Link
-              to="/login"
+              to="/signin"
               className="inline-flex items-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
             >
               <ChevronLeftIcon className="size-5" />
@@ -575,7 +575,7 @@ export default function SignupPage() {
 
             <p className="mt-6 text-sm text-center text-gray-500 dark:text-gray-400">
               Já tem conta?{" "}
-              <Link to="/login" className="text-brand-500 hover:text-brand-600 dark:text-brand-400">
+              <Link to="/signin" className="text-brand-500 hover:text-brand-600 dark:text-brand-400">
                 Entrar
               </Link>
             </p>

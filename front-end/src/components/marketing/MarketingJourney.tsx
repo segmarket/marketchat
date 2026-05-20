@@ -5,7 +5,7 @@ const STEPS = [
     icon: Handshake,
     title: "Saudação Humana",
     description:
-      'O morador diz "Oi" e a IA responde na hora pelo nome dele e o contexto do condomínio correspondente.',
+      'O morador diz "Oi" e a IA responde pelo nome dele e o contexto do condomínio.',
   },
   {
     icon: ShoppingBag,
@@ -23,7 +23,7 @@ const STEPS = [
     icon: CreditCard,
     title: "Liquidação Instantânea",
     description:
-      "O Pix do Asaas é gerado com expiração de 15 minutos. Se pago, o robô celebra e libera a saída. Se inativo, reseta o chat automaticamente.",
+      "O Pix é gerado com expiração controlada. Pago o Pix, o robô celebra e libera a saída.",
   },
 ] as const;
 
@@ -35,7 +35,7 @@ export default function MarketingJourney() {
     >
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold text-gray-900 sm:text-4xl">The Seamless Journey</h2>
+          <h2 className="text-3xl font-bold text-gray-900 sm:text-4xl">A Jornada Sem Atrito</h2>
           <p className="mt-4 text-lg text-gray-600">
             Do primeiro &quot;Oi&quot; ao Pix confirmado — sem aplicativo, sem fila, sem atrito.
           </p>

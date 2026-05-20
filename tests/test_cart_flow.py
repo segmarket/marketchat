@@ -94,7 +94,7 @@ def test_flow_product_search_to_selection():
     session = ChatSessionFactory(
         tenant=tenant,
         phone_number=resident.phone_number,
-        state=ChatSession.State.ACTIVE_BOT,
+        state=ChatSession.State.IDLE,
     )
 
     with (
@@ -118,7 +118,7 @@ def test_flow_product_search_to_selection():
 
     assert handled is True
     session.refresh_from_db()
-    assert session.state == ChatSession.State.AWAITING_PRODUCT_SELECTION
+    assert session.state == ChatSession.State.PRODUCT_SEARCH
     assert session.active_cart_id is not None
     send_list.assert_called_once()
 
@@ -133,7 +133,7 @@ def test_flow_select_product_asks_quantity():
     session = ChatSessionFactory(
         tenant=tenant,
         phone_number=resident.phone_number,
-        state=ChatSession.State.AWAITING_PRODUCT_SELECTION,
+        state=ChatSession.State.PRODUCT_SEARCH,
         active_cart=cart,
         temporary_name="COCA-01",
     )
@@ -149,7 +149,7 @@ def test_flow_select_product_asks_quantity():
 
     assert handled is True
     session.refresh_from_db()
-    assert session.state == ChatSession.State.AWAITING_QUANTITY
+    assert session.state == ChatSession.State.QUANTITY_SELECTION
     assert session.pending_product_id == product.id
     assert CartItem.objects.filter(cart=cart, product=product, quantity=0).exists()
     assert "Quantas unidades" in send.call_args[0][2]
@@ -166,7 +166,7 @@ def test_flow_quantity_and_loop_buttons():
     session = ChatSessionFactory(
         tenant=tenant,
         phone_number=resident.phone_number,
-        state=ChatSession.State.AWAITING_QUANTITY,
+        state=ChatSession.State.QUANTITY_SELECTION,
         active_cart=cart,
         pending_product=product,
     )
@@ -182,7 +182,7 @@ def test_flow_quantity_and_loop_buttons():
 
     assert handled is True
     session.refresh_from_db()
-    assert session.state == ChatSession.State.AWAITING_LOOP_DECISION
+    assert session.state == ChatSession.State.CART_REVIEW
     item = CartItem.objects.get(cart=cart, product=product)
     assert item.quantity == 2
     cart.refresh_from_db()
@@ -199,7 +199,7 @@ def test_flow_add_more_returns_active_bot():
     session = ChatSessionFactory(
         tenant=tenant,
         phone_number=resident.phone_number,
-        state=ChatSession.State.AWAITING_LOOP_DECISION,
+        state=ChatSession.State.CART_REVIEW,
         active_cart=cart,
     )
 
@@ -214,7 +214,7 @@ def test_flow_add_more_returns_active_bot():
 
     assert handled is True
     session.refresh_from_db()
-    assert session.state == ChatSession.State.ACTIVE_BOT
+    assert session.state == ChatSession.State.IDLE
     assert "O que mais" in send.call_args[0][2]
 
 
@@ -234,7 +234,7 @@ def test_flow_checkout_requests_photo():
     session = ChatSessionFactory(
         tenant=tenant,
         phone_number=resident.phone_number,
-        state=ChatSession.State.AWAITING_LOOP_DECISION,
+        state=ChatSession.State.CART_REVIEW,
         active_cart=cart,
     )
 
@@ -252,7 +252,8 @@ def test_flow_checkout_requests_photo():
     assert session.state == ChatSession.State.AWAITING_PHOTO
     cart.refresh_from_db()
     assert cart.status == Cart.Status.AWAITING_PHOTO
-    assert "foto nítida" in send.call_args[0][2].lower()
+    assert "foto" in send.call_args[0][2].lower()
+    assert "gôndola" in send.call_args[0][2].lower()
 
 
 @pytest.mark.django_db
@@ -340,7 +341,7 @@ def test_general_greeting_injects_resident_context():
     ChatSessionFactory(
         tenant=tenant,
         phone_number=resident.phone_number,
-        state=ChatSession.State.ACTIVE_BOT,
+        state=ChatSession.State.IDLE,
     )
 
     with (
@@ -365,9 +366,10 @@ def test_general_greeting_injects_resident_context():
     assert handled is True
     assert openai_chat.call_args.kwargs["user_content"] == "Oi"
     dynamic_tail = openai_chat.call_args.kwargs["dynamic_system_tail"]
-    assert "Maria Silva" in dynamic_tail
+    assert "Maria" in dynamic_tail
+    assert "Maria Silva" not in dynamic_tail
     assert resident.market.name.strip() in dynamic_tail
-    assert "Nunca seja genérico" in dynamic_tail
+    assert "primeiro nome" in dynamic_tail.lower()
 
 
 @pytest.mark.django_db
@@ -378,7 +380,7 @@ def test_payment_machine_offers_pix_and_enters_sales_funnel():
     session = ChatSessionFactory(
         tenant=tenant,
         phone_number=resident.phone_number,
-        state=ChatSession.State.ACTIVE_BOT,
+        state=ChatSession.State.IDLE,
     )
     message = "A máquina de pagar está com problemas"
 
@@ -416,7 +418,7 @@ def test_payment_machine_offers_pix_and_enters_sales_funnel():
     resident_msgs = [c[0][2] for c in send_resident.call_args_list]
     assert len(resident_msgs) == 1
     recovery = resident_msgs[0]
-    assert resident.name in recovery
+    assert "Morador" in recovery
     assert "Pix" in recovery
     assert "maquininha" in recovery.lower()
     assert "qual produto" in recovery.lower()
@@ -430,5 +432,5 @@ def test_payment_machine_offers_pix_and_enters_sales_funnel():
     assert "Pagamento" in owner_body
 
     session.refresh_from_db()
-    assert session.state == ChatSession.State.AWAITING_PRODUCT_SELECTION
+    assert session.state == ChatSession.State.PRODUCT_SEARCH
     assert session.active_cart_id is not None

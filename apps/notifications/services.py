@@ -15,6 +15,26 @@ DEDUP_WINDOW = timedelta(minutes=2)
 
 CRITICAL_INTENTS = frozenset({MAINTENANCE_ISSUE, PAYMENT_ERROR})
 
+OCCURRENCE_TAG_SEVERITY: dict[str, str] = {
+    "ALERTA_QUALIDADE": Notification.Severity.CRITICAL,
+    "ALERTA_INFRA": Notification.Severity.CRITICAL,
+    "ALERTA_MAQUININHA": Notification.Severity.CRITICAL,
+    "ALERTA_ESTOQUE": Notification.Severity.WARNING,
+    "ALERTA_CATALOGO": Notification.Severity.WARNING,
+    "FEEDBACK_PRECO": Notification.Severity.INFO,
+    "AJUDA_LEITURA": Notification.Severity.INFO,
+}
+
+OCCURRENCE_TAG_TITLES: dict[str, str] = {
+    "ALERTA_QUALIDADE": "Alerta de qualidade alimentar",
+    "ALERTA_INFRA": "Alerta de infraestrutura",
+    "ALERTA_ESTOQUE": "Ruptura de estoque",
+    "ALERTA_CATALOGO": "Problema no catálogo",
+    "FEEDBACK_PRECO": "Feedback de preço",
+    "ALERTA_MAQUININHA": "Problema na maquininha",
+    "AJUDA_LEITURA": "Ajuda na leitura de código",
+}
+
 
 def _truncate_message(text: str, limit: int = 200) -> str:
     cleaned = (text or "").strip()
@@ -95,4 +115,51 @@ def create_critical_panel_notification(
         severity=Notification.Severity.CRITICAL,
         is_read=False,
         intent_type=intent_type,
+    )
+
+
+def create_occurrence_notification(
+    *,
+    tenant_id: int,
+    resident: Resident,
+    tag: str,
+    original_message: str,
+) -> Notification | None:
+    """
+    Persiste alerta no painel a partir de tag de ocorrência da IA.
+    SOLICITACAO_PIX não gera notificação (fluxo comercial normal).
+    """
+    severity = OCCURRENCE_TAG_SEVERITY.get(tag)
+    if severity is None:
+        return None
+
+    market = resident.market if resident.market_id else None
+    since = timezone.now() - DEDUP_WINDOW
+    duplicate = Notification.all_objects.filter(
+        tenant_id=tenant_id,
+        is_read=False,
+        intent_type=tag,
+        market_id=resident.market_id,
+        created_at__gte=since,
+    ).exists()
+    if duplicate:
+        return None
+
+    name = resident_display_name(resident)
+    market_name = resident_market_name(resident)
+    excerpt = _truncate_message(original_message)
+    title = OCCURRENCE_TAG_TITLES.get(tag, "Ocorrência no mercado")
+    message = (
+        f"{name} reportou no mercado {market_name}: {title.lower()}."
+        + (f' Mensagem: "{excerpt}"' if excerpt else "")
+    )
+
+    return Notification.all_objects.create(
+        tenant_id=tenant_id,
+        market=market,
+        title=title,
+        message=message,
+        severity=severity,
+        is_read=False,
+        intent_type=tag,
     )

@@ -25,7 +25,7 @@ export default function UserDropdown() {
   function handleSignOut() {
     closeDropdown();
     logout();
-    navigate("/login", { replace: true });
+    navigate("/signin", { replace: true });
   }
 
   return (

@@ -34,7 +34,8 @@ def test_create_critical_panel_notification_payment_error():
     assert note.intent_type == PAYMENT_ERROR
     assert note.market_id == market.id
     assert "pagamento" in note.title.lower()
-    assert "Maria Silva" in note.message
+    assert "Maria" in note.message
+    assert "Maria Silva" not in note.message
     assert "Pamplona" in note.message
 
 

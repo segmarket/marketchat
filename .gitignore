@@ -5,10 +5,12 @@ db.sqlite3
 .env
 .env.development
 .env.production
+.env.staging
 .env.test
 !.env.example
 !.env.development.example
 !.env.production.example
+!.env.staging.example
 front-end/.env
 .venv/
 venv/

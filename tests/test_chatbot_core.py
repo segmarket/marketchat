@@ -5,6 +5,7 @@ import pytest
 from apps.chatbot.services.chat_history import append_message, get_sliding_history
 from apps.chatbot.services.chatbot_core import (
     GATEKEEPER_TAGS,
+    STATIC_GENERAL_ASSISTANT,
     classify_gatekeeper_intent,
     complete_with_session_history,
     parse_gatekeeper_tag,
@@ -25,6 +26,25 @@ from tests.factories import ChatSessionFactory, TenantFactory
 )
 def test_parse_gatekeeper_tag(raw, expected):
     assert parse_gatekeeper_tag(raw) == expected
+
+
+def test_static_general_assistant_tone_calibration():
+    assert "ANTI-ABUSO" in STATIC_GENERAL_ASSISTANT
+    assert "exclusivamente para processar compras" in STATIC_GENERAL_ASSISTANT
+    assert "E ae" in STATIC_GENERAL_ASSISTANT
+    assert "como mando o pix" in STATIC_GENERAL_ASSISTANT.lower()
+    assert "ESCOPO DO MARKETCHAT" in STATIC_GENERAL_ASSISTANT
+    assert "MATRIZ DE RESOLUÇÃO" in STATIC_GENERAL_ASSISTANT
+    assert "ALERTA_QUALIDADE" in STATIC_GENERAL_ASSISTANT
+    assert "gírias provocativas" not in STATIC_GENERAL_ASSISTANT
+    assert "corte o assunto imediatamente" not in STATIC_GENERAL_ASSISTANT
+
+
+def test_gatekeeper_static_system_includes_casual_pix_purchase_examples():
+    from apps.chatbot.services.chatbot_core import GATEKEEPER_STATIC_SYSTEM
+
+    assert "como mando o pix" in GATEKEEPER_STATIC_SYSTEM.lower()
+    assert "pagar no pix" in GATEKEEPER_STATIC_SYSTEM.lower()
 
 
 @pytest.mark.django_db

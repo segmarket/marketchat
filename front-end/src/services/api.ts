@@ -1,8 +1,28 @@
 import axios, { type InternalAxiosRequestConfig } from "axios";
 
-const envUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
-/** Em dev, URL vazia + proxy no Vite (vite.config.ts) encaminha /api para o Django. */
-const baseURL = envUrl || (import.meta.env.DEV ? "" : "");
+/**
+ * Base da API. Em staging, prioriza mesma origem (Apache faz ProxyPass /api → :8001).
+ * Evita CORS e staging-api sem DNS.
+ */
+function resolveApiBaseUrl(): string {
+  if (import.meta.env.DEV) return "";
+
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname.toLowerCase();
+    if (
+      host === "staging-app.marketchat.com.br" ||
+      host === "staging.marketchat.com.br"
+    ) {
+      return `${window.location.protocol}//${window.location.host}`;
+    }
+  }
+
+  const fromEnv = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+  return "";
+}
+
+const baseURL = resolveApiBaseUrl();
 
 export const api = axios.create({
   baseURL,
@@ -58,16 +78,29 @@ api.interceptors.response.use(
       clearTokens();
       const path = window.location.pathname;
       if (
+        !path.startsWith("/signin") &&
         !path.startsWith("/login") &&
         !path.startsWith("/auth/") &&
         !path.startsWith("/reset-password")
       ) {
-        window.location.assign("/login");
+        window.location.assign("/signin");
       }
     }
 
     if (status === 402) {
-      if (!window.location.pathname.startsWith("/admin/settings")) {
+      const errorCode = error.response?.data?.error as string | undefined;
+      const path = window.location.pathname;
+      if (errorCode === "trial_expired") {
+        if (!path.startsWith("/admin/trial-expired") && !path.startsWith("/admin/settings")) {
+          window.location.assign("/admin/trial-expired");
+        }
+      } else if (
+        errorCode === "billing_suspended" &&
+        !path.startsWith("/admin/billing-blocked") &&
+        !path.startsWith("/admin/settings")
+      ) {
+        window.location.assign("/admin/billing-blocked");
+      } else if (!path.startsWith("/admin/settings")) {
         window.location.assign("/admin/settings?tab=plan");
       }
     }

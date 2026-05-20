@@ -57,7 +57,7 @@ def get_or_create_chat_session(tenant_id: int, phone: str) -> ChatSession:
     session, _ = ChatSession.objects.get_or_create(
         tenant_id=tenant_id,
         phone_number=phone,
-        defaults={"state": ChatSession.State.ACTIVE_BOT},
+        defaults={"state": ChatSession.State.IDLE},
     )
     return session
 

@@ -12,5 +12,5 @@ export default function AppRootRedirect() {
     );
   }
 
-  return <Navigate to={isAuthenticated ? "/admin" : "/login"} replace />;
+  return <Navigate to={isAuthenticated ? "/admin" : "/signin"} replace />;
 }

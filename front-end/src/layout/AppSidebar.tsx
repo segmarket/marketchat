@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
   LayoutDashboard,
+  GitBranch,
   MessagesSquare,
   Package,
   Settings,
@@ -37,6 +38,11 @@ const mainNavItems: NavItem[] = [
     name: "Histórico de Chamados",
     path: "/admin/chat-logs",
     icon: <MessagesSquare className="size-5" strokeWidth={2} />,
+  },
+  {
+    name: "Fluxos do Bot",
+    path: "/admin/chatbot-flows",
+    icon: <GitBranch className="size-5" strokeWidth={2} />,
   },
   {
     name: "Painel de Vendas",

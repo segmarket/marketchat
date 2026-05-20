@@ -40,6 +40,19 @@ class EvolutionWebhookView(APIView):
             return Response({"error": "unknown instance"}, status=404)
 
         if not self._allowed(request, instance):
+            logger.warning(
+                "Webhook Evolution forbidden: instance=%s event=%s "
+                "query_secret=%s header_secret=%s apikey=%s",
+                instance.instance_name,
+                event.event_type,
+                bool(request.query_params.get("secret")),
+                bool(request.headers.get("X-Webhook-Secret")),
+                bool(
+                    request.headers.get("apikey")
+                    or request.headers.get("Apikey")
+                    or request.headers.get("APIKEY")
+                ),
+            )
             return Response({"error": "forbidden"}, status=403)
 
         try:
@@ -59,6 +72,11 @@ class EvolutionWebhookView(APIView):
             inst = qs.filter(webhook_secret=secret).order_by("-is_active", "-id").first()
             if inst:
                 return inst
+        apikey = self._request_apikey(request)
+        if apikey:
+            inst = qs.filter(api_key=apikey).order_by("-is_active", "-id").first()
+            if inst:
+                return inst
         active_qs = qs.filter(is_active=True)
         if not instance_key:
             return None
@@ -72,13 +90,31 @@ class EvolutionWebhookView(APIView):
             instance_id=instance_key
         ).order_by("-id").first()
 
+    @staticmethod
+    def _request_apikey(request: Request) -> str:
+        return (
+            request.headers.get("apikey")
+            or request.headers.get("Apikey")
+            or request.headers.get("APIKEY")
+            or ""
+        ).strip()
+
     def _allowed(self, request: Request, instance: WhatsappInstance) -> bool:
         secret = (
             request.headers.get("X-Webhook-Secret")
             or request.query_params.get("secret")
-        )
-        if instance.webhook_secret:
-            return bool(secret) and secret == instance.webhook_secret
+            or ""
+        ).strip()
+        apikey = self._request_apikey(request)
+
+        if instance.webhook_secret and secret == instance.webhook_secret:
+            return True
+        if instance.api_key and apikey and apikey == instance.api_key:
+            return True
+
+        if instance.webhook_secret or instance.api_key:
+            return False
+
         global_secret = getattr(settings, "WEBHOOK_SHARED_SECRET", "") or ""
         if global_secret:
             return bool(secret) and secret == global_secret
