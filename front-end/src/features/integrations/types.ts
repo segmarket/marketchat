@@ -21,6 +21,8 @@ export type WhatsappIntegrationState = {
   platform: WhatsappPlatform;
   disconnect_reason: string;
   session_expired: boolean;
+  was_connected: boolean;
+  needs_reconnect: boolean;
   evolution_api_status: HealthStatus;
   webhook_status: HealthStatus;
   can_manage_integrations?: boolean;

@@ -120,13 +120,38 @@ def test_check_evolution_health_error():
         assert client.check_evolution_health() == "error"
 
 
-def test_restart_instance_put():
+def test_restart_instance_uses_evolution_go_reconnect():
     client = EvolutionClient(base_url="http://evo.test", global_api_key="global")
-    with patch.object(client, "_request", return_value={"ok": True}) as mock_req:
-        result = client.restart_instance(instance_name="mc-acme", instance_api_key="tok")
+    with patch.object(client, "reconnect_instance", return_value={"ok": True}) as mock_reconnect:
+        result = client.restart_instance(
+            instance_api_key="tok",
+            webhook_url="https://app.example/webhook",
+        )
     assert result == {"ok": True}
-    assert "/instance/restart/mc-acme" in mock_req.call_args[0][1]
-    assert mock_req.call_args[1]["apikey"] == "tok"
+    mock_reconnect.assert_called_once_with(
+        instance_api_key="tok",
+        webhook_url="https://app.example/webhook",
+        events=None,
+        phone="",
+        reset_session=False,
+    )
+
+
+def test_reconnect_instance_calls_connect_and_qr():
+    client = EvolutionClient(base_url="http://evo.test", global_api_key="global")
+    with patch.object(client, "connect_instance", return_value={"message": "success"}) as mock_connect:
+        with patch.object(
+            client,
+            "fetch_qrcode",
+            return_value={"data": {"Qrcode": f"data:image/png;base64,{'A' * 120}"}},
+        ) as mock_qr:
+            result = client.reconnect_instance(
+                instance_api_key="tok",
+                webhook_url="https://app.example/webhook",
+            )
+    assert result["connect"] == {"message": "success"}
+    mock_connect.assert_called_once()
+    mock_qr.assert_called_once()
 
 
 def test_extract_avatar_image_url():

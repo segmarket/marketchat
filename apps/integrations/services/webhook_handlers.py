@@ -7,9 +7,14 @@ import logging
 from apps.chatbot.models import ChatMessageLog
 from apps.chatbot.services.chat_logging import get_or_create_chat_session, log_inbound
 from apps.residents.services.session_activity import touch_chat_session_activity
+from apps.residents.services.session_lazy_expiration import maybe_reset_stale_chat_session
 from apps.integrations.models import WhatsappInstance
 from apps.integrations.services.message_interactive import event_has_image
 from apps.integrations.services.profile_sync import sync_profile_avatar_from_evolution
+from apps.integrations.services.provisioning import (
+    SESSION_DISCONNECTED_REASON,
+    mark_whatsapp_session_disconnected,
+)
 from apps.integrations.services.webhook_parser import EvolutionWebhookEvent, map_connection_state
 from apps.chatbot.services.flow_engine import run_chatbot_flow
 from apps.residents.services.onboarding_flow import (
@@ -66,9 +71,10 @@ def _handle_connected(event: EvolutionWebhookEvent, instance: WhatsappInstance) 
 
 
 def _handle_disconnected(instance: WhatsappInstance) -> None:
-    if instance.connection_status != WhatsappInstance.ConnectionStatus.CLOSE:
-        instance.connection_status = WhatsappInstance.ConnectionStatus.CLOSE
-        instance.save(update_fields=["connection_status", "updated_at"])
+    mark_whatsapp_session_disconnected(
+        instance,
+        reason="WhatsApp desconectado no aparelho.",
+    )
     logger.info(
         "WhatsApp disconnected: tenant=%s instance=%s",
         instance.tenant_id,
@@ -127,6 +133,18 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
 
     text = (event.message_text or "").strip()
     session = get_or_create_chat_session(instance.tenant_id, phone)
+
+    resident_for_lazy = (
+        Resident.objects.filter(
+            tenant_id=instance.tenant_id,
+            phone_number=phone,
+        )
+        .select_related("market")
+        .first()
+    )
+    if maybe_reset_stale_chat_session(session, resident=resident_for_lazy):
+        session.refresh_from_db()
+
     touch_chat_session_activity(session)
     onboarded = resident_has_completed_onboarding(instance.tenant_id, phone)
 
@@ -170,13 +188,19 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
 
     if text:
         resident = (
-            Resident.objects.filter(
-                tenant_id=instance.tenant_id,
-                phone_number=phone,
-                market__isnull=False,
-            )
-            .first()
+            resident_for_lazy
+            if resident_for_lazy and resident_for_lazy.market_id
+            else None
         )
+        if resident is None:
+            resident = (
+                Resident.objects.filter(
+                    tenant_id=instance.tenant_id,
+                    phone_number=phone,
+                    market__isnull=False,
+                )
+                .first()
+            )
         if resident and handle_global_escape(
             instance=instance,
             phone=phone,

@@ -8,6 +8,10 @@ from rest_framework.views import APIView
 from apps.accounts.permissions import IsTenantAdmin
 from apps.integrations.models import WhatsappInstance
 from apps.integrations.serializers import WhatsappProvisionSerializer
+from apps.integrations.services.instance_lookup import (
+    get_active_whatsapp_instance,
+    get_tenant_whatsapp_instance,
+)
 from apps.integrations.services.instance_dashboard import build_dashboard_payload
 from apps.integrations.services.provisioning import (
     EvolutionProvisionError,
@@ -22,21 +26,20 @@ from apps.integrations.services.restart import EvolutionRestartError, restart_wh
 
 
 def _get_active_instance(request: Request) -> WhatsappInstance | None:
-    return (
-        WhatsappInstance.objects.filter(
-            tenant_id=request.user.tenant_id,
-            is_active=True,
-        )
-        .order_by("-id")
-        .first()
-    )
+    return get_active_whatsapp_instance(request.user.tenant_id)
 
 
-def _get_reconciled_active_instance(request: Request) -> WhatsappInstance | None:
-    instance = _get_active_instance(request)
-    if not instance:
-        return None
-    return reconcile_whatsapp_with_evolution(instance)
+def _get_tenant_instance(request: Request) -> WhatsappInstance | None:
+    return get_tenant_whatsapp_instance(request.user.tenant_id)
+
+
+def _resolve_dashboard_instance(request: Request) -> WhatsappInstance | None:
+    """Instância para leitura no painel; reconcilia apenas se ainda estiver ativa."""
+    instance = _get_tenant_instance(request)
+    if not instance or not instance.is_active:
+        return instance
+    reconciled = reconcile_whatsapp_with_evolution(instance)
+    return reconciled if reconciled is not None else instance
 
 
 class WhatsappInstanceView(APIView):
@@ -45,7 +48,7 @@ class WhatsappInstanceView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request: Request) -> Response:
-        instance = _get_reconciled_active_instance(request)
+        instance = _resolve_dashboard_instance(request)
         return Response(
             build_dashboard_payload(
                 instance,
@@ -121,22 +124,21 @@ class WhatsappStatusView(APIView):
     permission_classes = [IsAuthenticated, IsTenantAdmin]
 
     def get(self, request: Request) -> Response:
-        instance = _get_reconciled_active_instance(request)
+        instance = _resolve_dashboard_instance(request)
         if not instance:
             return Response(build_dashboard_payload(None, request_user=request.user))
-        try:
-            sync_connection_status(instance)
-        except EvolutionProvisionError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
-        instance.refresh_from_db()
-        if not instance.is_active:
-            return Response(build_dashboard_payload(None, request_user=request.user))
+        if instance.is_active:
+            try:
+                sync_connection_status(instance)
+            except EvolutionProvisionError as exc:
+                return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+            instance.refresh_from_db()
 
         return Response(
             build_dashboard_payload(
                 instance,
                 request_user=request.user,
-                sync_evolution=True,
+                sync_evolution=bool(instance.is_active),
             )
         )
 
@@ -149,7 +151,7 @@ class WhatsappRestartView(APIView):
         if not instance:
             return Response({"detail": "Nenhuma instância WhatsApp ativa."}, status=404)
         try:
-            restart_whatsapp_instance(instance)
+            instance, qrcode_image = restart_whatsapp_instance(instance)
         except EvolutionRestartError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
@@ -157,6 +159,7 @@ class WhatsappRestartView(APIView):
             build_dashboard_payload(
                 instance,
                 request_user=request.user,
+                qrcode_image=qrcode_image,
                 sync_evolution=True,
                 refresh_avatar=True,
             )

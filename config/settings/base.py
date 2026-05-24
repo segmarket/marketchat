@@ -184,6 +184,9 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_MODEL = env("OPENAI_MODEL", default="gpt-4o-mini")
 OPENAI_HISTORY_WINDOW = env.int("OPENAI_HISTORY_WINDOW", default=6)
 
+# Inatividade: ao receber mensagem após este intervalo, carrinho e FSM são resetados.
+CHAT_SESSION_LAZY_EXPIRY_MINUTES = env.int("CHAT_SESSION_LAZY_EXPIRY_MINUTES", default=30)
+
 EVOLUTION_API_BASE_URL = (
     os.environ.get("EVOLUTION_API_BASE_URL")
     or os.environ.get("EVOLUTION_API_URL")

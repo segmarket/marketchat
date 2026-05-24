@@ -23,6 +23,7 @@ import { useModal } from "../../hooks/useModal";
 import { getAxiosErrorMessage } from "../../utils/apiError";
 
 const POLL_MS = 3000;
+const RECONNECT_POLL_MS = 15000;
 const QR_FAIL_MSG = "Não foi possível gerar o QR Code no momento, tente novamente.";
 
 function isConnected(state: WhatsappDashboard): boolean {
@@ -133,20 +134,57 @@ export default function WhatsAppConfig({ embedded = false }: Props) {
     }
   }, [stopPolling]);
 
-  const shouldPollStatus =
-    Boolean(state?.has_instance) &&
-    !isConnected(state) &&
-    (state?.connection_status === "connecting" ||
-      state?.connection_status === "unknown" ||
-      state?.connection_status === "close");
+  const shouldPollQr =
+    Boolean(state?.has_instance && state.is_active) &&
+    !isConnected(state!) &&
+    (state?.connection_status === "connecting" || Boolean(qrcodeImage));
+
+  const shouldPollReconnect =
+    Boolean(state?.needs_reconnect && state.is_active) &&
+    !isConnected(state!) &&
+    state?.connection_status === "close" &&
+    !qrcodeImage;
 
   useEffect(() => {
     stopPolling();
-    if (!shouldPollStatus) return;
+    if (!shouldPollQr) return;
     void pollStatus();
     pollRef.current = setInterval(() => void pollStatus(), POLL_MS);
     return () => stopPolling();
-  }, [shouldPollStatus, pollStatus, stopPolling]);
+  }, [shouldPollQr, pollStatus, stopPolling]);
+
+  useEffect(() => {
+    stopPolling();
+    if (!shouldPollReconnect) return;
+    void pollStatus();
+    pollRef.current = setInterval(() => void pollStatus(), RECONNECT_POLL_MS);
+    return () => stopPolling();
+  }, [shouldPollReconnect, pollStatus, stopPolling]);
+
+  async function handleReconnect() {
+    setBusy(true);
+    try {
+      if (state?.is_active) {
+        const restarted = await restartWhatsapp();
+        setState(restarted);
+        if (restarted.qrcode_image) {
+          setQrcodeImage(restarted.qrcode_image);
+        } else if (!isConnected(restarted)) {
+          const qr = await fetchWhatsappQrcode();
+          setState(qr);
+          if (qr.qrcode_image) setQrcodeImage(qr.qrcode_image);
+          else toast.error(QR_FAIL_MSG);
+        }
+        toast.success("Escaneie o novo QR Code para reconectar o WhatsApp.");
+      } else {
+        await handleConnect();
+      }
+    } catch (err) {
+      toast.error(getAxiosErrorMessage(err, { notAxiosMessage: QR_FAIL_MSG }));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function handleConnect() {
     setBusy(true);
@@ -228,12 +266,11 @@ export default function WhatsAppConfig({ embedded = false }: Props) {
         !showQr &&
         state.connection_status === "connecting",
     );
-  const showDisconnected =
-    state &&
-    !connected &&
-    !showQr &&
-    !showStaleConnecting &&
-    (!state.has_instance || state.connection_status === "close");
+  const showReconnect =
+    Boolean(state?.needs_reconnect && !connected && !showQr && !showStaleConnecting);
+
+  const showFirstConnect =
+    Boolean(state && !connected && !showQr && !showStaleConnecting && !showReconnect);
 
   return (
     <>
@@ -251,21 +288,22 @@ export default function WhatsAppConfig({ embedded = false }: Props) {
           <p className="text-sm text-gray-500 dark:text-gray-400">Não foi possível carregar o painel.</p>
         ) : (
           <div className="space-y-6">
-            {!connected && (
+            {showFirstConnect && (
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Conecte o WhatsApp da sua empresa. Cada conta possui uma conexão isolada e segura.
+              </p>
+            )}
+
+            {showReconnect && (
+              <p className="rounded-lg border border-warning-200 bg-warning-50 px-3 py-2 text-sm text-warning-900 dark:border-warning-900/40 dark:bg-warning-950/30 dark:text-warning-100">
+                {state.disconnect_reason ||
+                  "Seu WhatsApp foi desconectado. Reconecte para voltar a receber mensagens."}
               </p>
             )}
 
             {!canManage && accessHint && (
               <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
                 {accessHint}
-              </p>
-            )}
-
-            {state.session_expired && state.disconnect_reason && (
-              <p className="rounded-lg border border-warning-200 bg-warning-50 px-3 py-2 text-sm text-warning-900 dark:border-warning-900/40 dark:bg-warning-950/30 dark:text-warning-100">
-                {state.disconnect_reason}
               </p>
             )}
 
@@ -290,7 +328,32 @@ export default function WhatsAppConfig({ embedded = false }: Props) {
               </div>
             )}
 
-            {showDisconnected && (
+            {showReconnect && (
+              <div className="flex flex-col items-center gap-4 py-6 text-center">
+                <WhatsappStatusBadge state={state} />
+                {state.was_connected && (state.profile_name || state.phone_number) && (
+                  <WhatsappDeviceCard state={state} />
+                )}
+                <p className="max-w-md text-sm text-gray-600 dark:text-gray-400">
+                  Reconecte o WhatsApp para retomar o envio e recebimento de mensagens pelo
+                  MarketChat.
+                </p>
+                {canManage && (
+                  <Button onClick={() => void handleReconnect()} disabled={busy}>
+                    {busy ? (
+                      <span className="inline-flex items-center gap-2">
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+                        Reconectando…
+                      </span>
+                    ) : (
+                      "Reconectar WhatsApp"
+                    )}
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {showFirstConnect && (
               <div className="flex flex-col items-center gap-4 py-6 text-center">
                 <p className="max-w-md text-sm text-gray-600 dark:text-gray-400">
                   Vincule o número da empresa para enviar e receber mensagens pelo MarketChat.

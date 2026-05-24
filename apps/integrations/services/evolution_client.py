@@ -179,6 +179,92 @@ class EvolutionClient:
             body=body,
         )
 
+    def logout_instance(self, *, instance_api_key: str) -> dict[str, Any]:
+        """Evolution GO: encerra sessão WhatsApp (reseta contador de QR quando esgotado)."""
+        try:
+            return self._request(
+                "DELETE",
+                "/instance/logout",
+                apikey=instance_api_key,
+            )
+        except urllib.error.HTTPError as exc:
+            if self._http_error_is_not_found(exc):
+                return {}
+            raise
+
+    def disconnect_remote_session(self, *, instance_api_key: str) -> dict[str, Any]:
+        """Evolution GO: desconecta sessão sem apagar o registro da instância."""
+        try:
+            return self._request(
+                "POST",
+                "/instance/disconnect",
+                apikey=instance_api_key,
+                body={},
+            )
+        except urllib.error.HTTPError as exc:
+            if self._http_error_is_not_found(exc):
+                return {}
+            raise
+
+    @staticmethod
+    def _http_error_is_qr_limit(exc: urllib.error.HTTPError) -> bool:
+        preview = (getattr(exc, "_body_preview", b"") or b"").lower()
+        return b"qr code limit" in preview or b"qrcode limit" in preview
+
+    def reconnect_instance(
+        self,
+        *,
+        instance_api_key: str,
+        webhook_url: str,
+        events: Iterable[str] | None = None,
+        phone: str = "",
+        reset_session: bool = False,
+    ) -> dict[str, Any]:
+        """
+        Evolution GO não possui /instance/restart — reconexão via logout (opcional),
+        connect e leitura do QR.
+        """
+        if reset_session:
+            try:
+                self.logout_instance(instance_api_key=instance_api_key)
+            except Exception:
+                logger.warning(
+                    "Evolution logout antes de reconectar falhou (ignorado)",
+                    exc_info=True,
+                )
+            try:
+                self.disconnect_remote_session(instance_api_key=instance_api_key)
+            except Exception:
+                logger.warning(
+                    "Evolution disconnect antes de reconectar falhou (ignorado)",
+                    exc_info=True,
+                )
+
+        connect_payload = self.connect_instance(
+            instance_api_key=instance_api_key,
+            webhook_url=webhook_url,
+            events=events,
+            phone=phone,
+        )
+        try:
+            qrcode_payload = self.fetch_qrcode(instance_api_key=instance_api_key)
+        except urllib.error.HTTPError as exc:
+            if reset_session or not self._http_error_is_qr_limit(exc):
+                raise
+            logger.info(
+                "Evolution QR limit; tentando logout e novo connect",
+            )
+            self.logout_instance(instance_api_key=instance_api_key)
+            connect_payload = self.connect_instance(
+                instance_api_key=instance_api_key,
+                webhook_url=webhook_url,
+                events=events,
+                phone=phone,
+            )
+            qrcode_payload = self.fetch_qrcode(instance_api_key=instance_api_key)
+
+        return {"connect": connect_payload, "qrcode": qrcode_payload}
+
     @staticmethod
     def _http_error_is_not_found(exc: urllib.error.HTTPError) -> bool:
         preview = (getattr(exc, "_body_preview", b"") or b"").lower()
@@ -188,6 +274,16 @@ class EvolutionClient:
             b"not found" in preview
             or b"does not exist" in preview
             or b"record not found" in preview
+        )
+
+    @staticmethod
+    def _http_error_is_client_disconnected(exc: urllib.error.HTTPError) -> bool:
+        """Sessão WhatsApp desconectada no Evolution (não é instância inexistente)."""
+        preview = (getattr(exc, "_body_preview", b"") or b"").lower()
+        return exc.code == 400 and (
+            b"client disconnected" in preview
+            or b"disconnected" in preview
+            or b"not connected" in preview
         )
 
     @staticmethod
@@ -621,24 +717,23 @@ class EvolutionClient:
             return search(payload.get("data", payload) if isinstance(payload.get("data"), dict) else payload)
         return ""
 
-    def restart_instance(self, *, instance_name: str, instance_api_key: str = "") -> dict[str, Any]:
-        encoded = urllib.parse.quote(instance_name, safe="")
-        apikey = instance_api_key or self.global_api_key
-        try:
-            return self._request(
-                "PUT",
-                f"/instance/restart/{encoded}",
-                apikey=apikey,
-            )
-        except urllib.error.HTTPError as exc:
-            if self._http_error_is_not_found(exc):
-                return self._request(
-                    "POST",
-                    f"/instance/restart/{encoded}",
-                    apikey=apikey,
-                    body={},
-                )
-            raise
+    def restart_instance(
+        self,
+        *,
+        instance_api_key: str,
+        webhook_url: str,
+        events: Iterable[str] | None = None,
+        phone: str = "",
+        reset_session: bool = False,
+    ) -> dict[str, Any]:
+        """Alias de reconnect_instance (Evolution GO não tem /instance/restart)."""
+        return self.reconnect_instance(
+            instance_api_key=instance_api_key,
+            webhook_url=webhook_url,
+            events=events,
+            phone=phone,
+            reset_session=reset_session,
+        )
 
     @staticmethod
     def extract_qrcode_image(payload: Any) -> str:

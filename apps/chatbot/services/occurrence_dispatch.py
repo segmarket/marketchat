@@ -80,8 +80,13 @@ def dispatch_occurrence_tag(
         _record_discussed_product_safe(session, user_message)
         return
 
-    if tag in ("ALERTA_MAQUININHA", "SOLICITACAO_PIX", "AJUDA_LEITURA"):
+    if tag in ("ALERTA_MAQUININHA", "AJUDA_LEITURA"):
         _start_product_search_flow(session, resident)
+    elif tag == "SOLICITACAO_PIX":
+        _start_product_search_flow(session, resident)
+        from apps.sales.services.pix_hurry_cart import apply_pix_hurry_from_message
+
+        apply_pix_hurry_from_message(session, resident, user_message)
 
     if tag == "FEEDBACK_PRECO":
         return

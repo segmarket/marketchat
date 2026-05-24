@@ -10,8 +10,10 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from apps.integrations.models import WhatsappInstance
 from apps.integrations.services.provisioning import (
     WhatsappAlreadyProvisionedError,
+    mark_whatsapp_session_disconnected,
     provision_whatsapp_instance,
     remote_instance_exists,
+    sync_connection_status,
 )
 from tests.factories import ResidentFactory, TenantFactory, UserFactory, WhatsappInstanceFactory
 
@@ -116,10 +118,18 @@ def test_whatsapp_provision_after_disconnect_reuses_row(mock_prov_cls, mock_dash
 
 
 @pytest.mark.django_db
-def test_whatsapp_provision_conflict_when_active(api_client):
+@patch("apps.integrations.services.provisioning.EvolutionClient")
+def test_whatsapp_provision_conflict_when_active(mock_client_cls, api_client):
     tenant = TenantFactory()
     user = UserFactory(tenant=tenant, email="wa-dup@example.com")
-    WhatsappInstanceFactory(tenant=tenant, is_active=True)
+    WhatsappInstanceFactory(
+        tenant=tenant,
+        is_active=True,
+        connection_status=WhatsappInstance.ConnectionStatus.OPEN,
+    )
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+    mock_client.fetch_remote_instance.return_value = {"instanceName": "mc-test-1"}
 
     url = reverse("integrations-whatsapp-provision")
     api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(user).access_token}")
@@ -226,7 +236,7 @@ def test_whatsapp_get_reconciles_missing_remote(mock_client_cls, api_client):
     response = api_client.get(url)
 
     assert response.status_code == 200
-    assert response.json()["has_instance"] is False
+    assert response.json()["has_instance"] is True
     inst.refresh_from_db()
     assert inst.is_active is False
     assert inst.connection_status == WhatsappInstance.ConnectionStatus.CLOSE
@@ -251,7 +261,8 @@ def test_whatsapp_status_no_502_when_remote_missing(mock_client_cls, api_client)
     response = api_client.get(url)
 
     assert response.status_code == 200
-    assert response.json()["has_instance"] is False
+    assert response.json()["has_instance"] is True
+    assert response.json()["needs_reconnect"] is True
 
 
 @pytest.mark.django_db
@@ -565,31 +576,137 @@ def test_whatsapp_dashboard_webhook_stale(mock_prov_cls, mock_dash_cls, api_clie
 
 
 @pytest.mark.django_db
+@patch("apps.integrations.services.restart.refresh_qrcode")
 @patch("apps.integrations.services.restart.EvolutionClient")
-def test_whatsapp_restart(mock_client_cls, api_client):
+def test_whatsapp_restart(mock_client_cls, mock_refresh_qr, api_client):
     tenant = TenantFactory()
     user = UserFactory(tenant=tenant, email="wa-restart@example.com")
     inst = WhatsappInstanceFactory(
         tenant=tenant,
         is_active=True,
-        connection_status=WhatsappInstance.ConnectionStatus.OPEN,
+        connection_status=WhatsappInstance.ConnectionStatus.CLOSE,
+        webhook_url="http://localhost/api/integrations/webhooks/evolution/?secret=test",
     )
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
-    mock_client.restart_instance.return_value = {"ok": True}
-    mock_client.fetch_remote_instance.return_value = {
-        "jid": "5511999999999@s.whatsapp.net",
-        "connected": True,
-        "os_name": "android",
+    mock_client.reconnect_instance.return_value = {"connect": {}, "qrcode": {}}
+    mock_refresh_qr.return_value = {
+        "connected": False,
+        "qrcode_image": f"data:image/png;base64,{'R' * 120}",
     }
-    mock_client.check_evolution_health.return_value = "ok"
-    mock_client.extract_avatar_image.return_value = ""
 
     url = reverse("integrations-whatsapp-restart")
     api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(user).access_token}")
     response = api_client.post(url, {}, format="json")
     assert response.status_code == 200
-    mock_client.restart_instance.assert_called_once()
+    mock_client.reconnect_instance.assert_called_once()
     data = response.json()
     assert data["has_instance"] is True
+    assert data["qrcode_image"].startswith("data:image")
     assert inst.instance_name == data["instance_name"]
+
+
+def _http_error(code: int, body: str) -> urllib.error.HTTPError:
+    exc = urllib.error.HTTPError(
+        "http://localhost:8080/instance/status",
+        code,
+        "Bad Request" if code == 400 else "Error",
+        {},
+        None,
+    )
+    exc._body_preview = body.encode()
+    return exc
+
+
+@pytest.mark.django_db
+@patch("apps.integrations.services.provisioning.EvolutionClient")
+def test_sync_connection_status_client_disconnected_keeps_instance_active(mock_client_cls):
+    inst = WhatsappInstanceFactory(
+        is_active=True,
+        connection_status=WhatsappInstance.ConnectionStatus.OPEN,
+        phone_number="5511999887766",
+    )
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+    mock_client.connection_state.side_effect = _http_error(
+        400,
+        '{"error":"client disconnected"}',
+    )
+
+    status = sync_connection_status(inst, client=mock_client)
+
+    assert status == WhatsappInstance.ConnectionStatus.CLOSE
+    inst.refresh_from_db()
+    assert inst.is_active is True
+    assert inst.disconnect_reason
+
+
+@pytest.mark.django_db
+@patch("apps.integrations.services.instance_dashboard.EvolutionClient")
+@patch("apps.integrations.services.provisioning.EvolutionClient")
+def test_whatsapp_dashboard_needs_reconnect_after_session_drop(
+    mock_prov_cls,
+    mock_dash_cls,
+    api_client,
+):
+    tenant = TenantFactory()
+    user = UserFactory(tenant=tenant, email="wa-reconnect-dash@example.com")
+    WhatsappInstanceFactory(
+        tenant=tenant,
+        is_active=True,
+        connection_status=WhatsappInstance.ConnectionStatus.CLOSE,
+        phone_number="5511999887766",
+        profile_name="Mercado Central",
+        disconnect_reason="WhatsApp desconectado no celular.",
+    )
+    mock_client = _mock_evolution_client()
+    mock_prov_cls.return_value = mock_client
+    mock_dash_cls.return_value = mock_client
+    mock_client.connection_state.return_value = {"data": {"state": "close"}}
+
+    url = reverse("integrations-whatsapp")
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(user).access_token}")
+    response = api_client.get(url)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["has_instance"] is True
+    assert data["needs_reconnect"] is True
+    assert data["was_connected"] is True
+    assert data["connected"] is False
+    assert data["phone_number"] == "5511999887766"
+
+
+@pytest.mark.django_db
+@patch("apps.integrations.services.provisioning.EvolutionClient")
+def test_reconcile_close_with_phone_does_not_deactivate(mock_client_cls):
+    from apps.integrations.services.provisioning import reconcile_whatsapp_with_evolution
+
+    inst = WhatsappInstanceFactory(
+        is_active=True,
+        connection_status=WhatsappInstance.ConnectionStatus.CLOSE,
+        phone_number="5511999887766",
+    )
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+    mock_client.connection_state.return_value = {"data": {"state": "close"}}
+    mock_client.fetch_remote_instance.return_value = None
+
+    result = reconcile_whatsapp_with_evolution(inst, client=mock_client)
+
+    assert result is not None
+    inst.refresh_from_db()
+    assert inst.is_active is True
+
+
+@pytest.mark.django_db
+def test_mark_whatsapp_session_disconnected():
+    inst = WhatsappInstanceFactory(
+        is_active=True,
+        connection_status=WhatsappInstance.ConnectionStatus.OPEN,
+    )
+    mark_whatsapp_session_disconnected(inst, reason="Sessão expirou.")
+    inst.refresh_from_db()
+    assert inst.is_active is True
+    assert inst.connection_status == WhatsappInstance.ConnectionStatus.CLOSE
+    assert inst.disconnect_reason == "Sessão expirou."

@@ -24,6 +24,22 @@ WEBHOOK_OK_WINDOW = timedelta(minutes=10)
 SESSION_EXPIRED_HINTS = ("expired", "qr code limit", "logout", "session")
 
 
+def humanize_disconnect_reason(reason: str) -> str:
+    """Traduz mensagens técnicas do Evolution para o painel."""
+    text = (reason or "").strip()
+    if not text:
+        return ""
+    lower = text.lower()
+    if "qr code limit" in lower or "qrcode limit" in lower:
+        return (
+            "Limite de QR Code atingido (5 tentativas). Use Reconectar — se persistir, "
+            "desconecte e conecte de novo para criar uma sessão limpa."
+        )
+    if "client disconnected" in lower:
+        return "WhatsApp desconectado no celular. Gere um novo QR Code para reconectar."
+    return text
+
+
 def _is_session_expired(instance: WhatsappInstance) -> bool:
     reason = (instance.disconnect_reason or "").lower()
     if any(hint in reason for hint in SESSION_EXPIRED_HINTS):
@@ -37,8 +53,29 @@ def _is_session_expired(instance: WhatsappInstance) -> bool:
     return False
 
 
+def _was_connected(instance: WhatsappInstance | None) -> bool:
+    if not instance:
+        return False
+    return bool((instance.phone_number or "").strip() or (instance.profile_name or "").strip())
+
+
+def _needs_reconnect(instance: WhatsappInstance | None) -> bool:
+    if not instance:
+        return False
+    if instance.connection_status == WhatsappInstance.ConnectionStatus.OPEN:
+        return False
+    if not instance.is_active:
+        return True
+    return (
+        _is_session_expired(instance)
+        or instance.connection_status == WhatsappInstance.ConnectionStatus.CLOSE
+    )
+
+
 def _webhook_status(instance: WhatsappInstance | None) -> str:
-    if not instance or not instance.is_active:
+    if not instance:
+        return "unknown"
+    if not instance.is_active:
         return "unknown"
     if not instance.last_webhook_at:
         return "error"
@@ -114,20 +151,24 @@ def build_dashboard_payload(
     )
 
     data: dict[str, Any] = {
-        "has_instance": bool(instance and instance.is_active),
+        "has_instance": bool(instance),
         "instance_name": instance.instance_name if instance else "",
         "connection_status": (
             instance.connection_status if instance else WhatsappInstance.ConnectionStatus.UNKNOWN
         ),
         "connected": connected,
         "is_active": bool(instance and instance.is_active),
+        "was_connected": _was_connected(instance),
+        "needs_reconnect": _needs_reconnect(instance),
         "pair_phone": instance.pair_phone if instance else "",
         "updated_at": instance.updated_at.isoformat() if instance else None,
         "profile_name": instance.profile_name if instance else "",
         "profile_picture_url": instance.profile_picture_url if instance else "",
         "phone_number": instance.phone_number if instance else "",
         "platform": instance.platform if instance else WhatsappInstance.Platform.UNKNOWN,
-        "disconnect_reason": instance.disconnect_reason if instance else "",
+        "disconnect_reason": humanize_disconnect_reason(
+            instance.disconnect_reason if instance else ""
+        ),
         "session_expired": _is_session_expired(instance) if instance else False,
         "evolution_api_status": evo_status,
         "webhook_status": _webhook_status(instance),

@@ -37,6 +37,10 @@ STALE_EVOLUTION_REASON = (
     "A instância foi removida no Evolution. Clique em Conectar para vincular novamente."
 )
 
+SESSION_DISCONNECTED_REASON = (
+    "WhatsApp desconectado no celular. Gere um novo QR Code para reconectar."
+)
+
 WEBHOOK_TRUST_WINDOW = timedelta(minutes=30)
 
 
@@ -108,6 +112,25 @@ def _trust_local_open_connection(instance: WhatsappInstance) -> bool:
     return timezone.now() - instance.last_webhook_at <= WEBHOOK_TRUST_WINDOW
 
 
+def mark_whatsapp_session_disconnected(
+    instance: WhatsappInstance,
+    *,
+    reason: str = SESSION_DISCONNECTED_REASON,
+) -> None:
+    """Sessão WhatsApp caiu no Evolution; mantém registro ativo para reconexão no painel."""
+    instance.is_active = True
+    instance.connection_status = WhatsappInstance.ConnectionStatus.CLOSE
+    instance.disconnect_reason = reason
+    instance.save(
+        update_fields=[
+            "is_active",
+            "connection_status",
+            "disconnect_reason",
+            "updated_at",
+        ]
+    )
+
+
 def deactivate_stale_whatsapp_instance(
     instance: WhatsappInstance,
     *,
@@ -147,6 +170,11 @@ def reconcile_whatsapp_with_evolution(
             WhatsappInstance.ConnectionStatus.CONNECTING,
         ):
             return instance
+        if status == WhatsappInstance.ConnectionStatus.CLOSE:
+            if remote_instance_exists(instance, client=client):
+                return instance
+            if instance.phone_number or instance.profile_name:
+                return instance
     except EvolutionProvisionError:
         pass
 
@@ -191,9 +219,13 @@ def provision_whatsapp_instance(
     client = client or EvolutionClient()
     existing = WhatsappInstance.all_objects.filter(tenant=tenant).first()
     if existing and existing.is_active:
-        if remote_instance_exists(existing, client=client):
+        if (
+            existing.connection_status == WhatsappInstance.ConnectionStatus.OPEN
+            and remote_instance_exists(existing, client=client)
+        ):
             raise WhatsappAlreadyProvisionedError("Este tenant já possui WhatsApp conectado.")
-        deactivate_stale_whatsapp_instance(existing)
+        if not remote_instance_exists(existing, client=client):
+            deactivate_stale_whatsapp_instance(existing)
 
     instance_name = build_instance_name(tenant)
     instance_id = str(uuid.uuid4())
@@ -348,6 +380,13 @@ def sync_connection_status(
     try:
         payload = client.connection_state(instance_api_key=instance.api_key)
     except urllib.error.HTTPError as exc:
+        if evolution_client_module.EvolutionClient._http_error_is_client_disconnected(exc):
+            mark_whatsapp_session_disconnected(instance)
+            logger.info(
+                "WhatsApp sessão desconectada no Evolution: %s",
+                instance.instance_name,
+            )
+            return WhatsappInstance.ConnectionStatus.CLOSE
         if _evolution_http_error_is_stale(exc, client=client):
             deactivate_stale_whatsapp_instance(instance)
             return WhatsappInstance.ConnectionStatus.CLOSE
@@ -369,5 +408,9 @@ def sync_connection_status(
     status = evolution_client_module.EvolutionClient.extract_connection_status(payload)
     if status in WhatsappInstance.ConnectionStatus.values:
         instance.connection_status = status
-        instance.save(update_fields=["connection_status", "updated_at"])
+        update_fields = ["connection_status", "updated_at"]
+        if status == WhatsappInstance.ConnectionStatus.OPEN:
+            instance.disconnect_reason = ""
+            update_fields.append("disconnect_reason")
+        instance.save(update_fields=update_fields)
     return instance.connection_status
