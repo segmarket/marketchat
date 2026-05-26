@@ -21,12 +21,13 @@ export default function AuthLayout({
                 <img
                   width={231}
                   height={48}
-                  src="/images/logo/auth-logo.svg"
-                  alt="Logo"
+                  src="/images/brand/logo_marketchat.png"
+                  alt="MarketChat"
+                  className="h-12 w-auto max-w-[231px]"
                 />
               </Link>
               <p className="text-center text-gray-400 dark:text-white/60">
-                Free and Open-Source Tailwind CSS Admin Dashboard Template
+                Gerente virtual para mercados autônomos — vendas, alertas e operação 24h.
               </p>
             </div>
           </div>

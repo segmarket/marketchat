@@ -21,9 +21,19 @@ function normalizePath(path: string): string {
   return path.startsWith("/") ? path : `/${path}`;
 }
 
+function devAppOrigin(port: string): string {
+  const fromEnv = import.meta.env.VITE_APP_ORIGIN?.trim();
+  if (fromEnv) {
+    return normalizeAppOrigin(fromEnv);
+  }
+  const safePort = port || "5173";
+  return `http://app.localhost:${safePort}`;
+}
+
 /**
  * Origem do painel (app) conforme o hostname da landing/marketing.
- * Ignora VITE_APP_ORIGIN em staging para evitar staging.app.* (SSL Cloudflare).
+ * Em `npm run dev`, usa VITE_APP_ORIGIN (ou app.localhost) — evita mandar para produção
+ * quando a landing abre por IP da LAN (Vite com host: true).
  */
 export function resolveAppOrigin(hostname = window.location.hostname): string {
   const host = hostname.toLowerCase();
@@ -35,6 +45,11 @@ export function resolveAppOrigin(hostname = window.location.hostname): string {
 
   if (host.includes("staging")) {
     return STAGING_APP_ORIGIN;
+  }
+
+  if (import.meta.env.DEV) {
+    const port = typeof window !== "undefined" && window.location.port ? window.location.port : "5173";
+    return devAppOrigin(port);
   }
 
   if (host === "localhost" || host === "127.0.0.1") {

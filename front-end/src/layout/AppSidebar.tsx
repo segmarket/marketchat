@@ -154,26 +154,16 @@ const AppSidebar: React.FC = () => {
         className={`flex py-8 ${!showExpanded ? "lg:justify-center" : "justify-start"}`}
       >
         <Link to="/admin">
-          {showExpanded ? (
-            <>
-              <img
-                className="dark:hidden"
-                src="/images/logo/logo.svg"
-                alt="MarketChat"
-                width={150}
-                height={40}
-              />
-              <img
-                className="hidden dark:block"
-                src="/images/logo/logo-dark.svg"
-                alt="MarketChat"
-                width={150}
-                height={40}
-              />
-            </>
-          ) : (
-            <img src="/images/logo/logo-icon.svg" alt="MarketChat" width={32} height={32} />
-          )}
+          <img
+            src="/images/brand/logo_marketchat.png"
+            alt="MarketChat"
+            className={
+              showExpanded
+                ? "h-9 w-auto max-h-9 object-contain object-left"
+                : "h-8 w-auto max-h-8 object-contain object-left"
+            }
+            decoding="async"
+          />
         </Link>
       </div>
 

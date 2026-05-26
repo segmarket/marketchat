@@ -3,25 +3,25 @@
  * (/signin, staging-app.marketchat.com.br, sem staging.app.*).
  */
 import PageMeta from "../../components/common/PageMeta";
-import MarketingAdvantageGrid from "../../components/marketing/MarketingAdvantageGrid";
 import MarketingFooter from "../../components/marketing/MarketingFooter";
 import MarketingHero from "../../components/marketing/MarketingHero";
-import MarketingJourney from "../../components/marketing/MarketingJourney";
 import MarketingNavbar from "../../components/marketing/MarketingNavbar";
+import MarketingOwnerFlow from "../../components/marketing/MarketingOwnerFlow";
+import MarketingPillarsGrid from "../../components/marketing/MarketingPillarsGrid";
 import MarketingPricing from "../../components/marketing/MarketingPricing";
 
 export default function LandingPage() {
   return (
     <div className="scroll-smooth font-outfit min-h-screen bg-white text-gray-900 antialiased">
       <PageMeta
-        title="MarketChat | Mercado autônomo no WhatsApp do condomínio"
-        description="Automatize vendas no mercado autônomo com IA no WhatsApp. Photo-Lock, Pix e painel operacional em um só lugar."
+        title="MarketChat | Gerente virtual para mercados autônomos"
+        description="Ecossistema completo: vendas no WhatsApp, alertas de estoque e infraestrutura, Photo-Lock e painel operacional em tempo real para o dono do mercado."
       />
       <MarketingNavbar />
       <main>
         <MarketingHero />
-        <MarketingAdvantageGrid />
-        <MarketingJourney />
+        <MarketingPillarsGrid />
+        <MarketingOwnerFlow />
         <MarketingPricing />
       </main>
       <MarketingFooter />
