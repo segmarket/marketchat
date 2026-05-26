@@ -19,11 +19,10 @@ export default function AuthLayout({
             <div className="flex flex-col items-center max-w-xs">
               <Link to="/" className="block mb-4">
                 <img
-                  width={231}
-                  height={48}
-                  src="/images/brand/logo_marketchat.png"
+                  src="/images/brand/logotipo_marketchat_completo_BRANCO.gif"
                   alt="MarketChat"
-                  className="h-12 w-auto max-w-[231px]"
+                  className="h-12 w-auto"
+                  decoding="async"
                 />
               </Link>
               <p className="text-center text-gray-400 dark:text-white/60">

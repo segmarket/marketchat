@@ -110,29 +110,31 @@ export default function MarketingOwnerFlow() {
             </ol>
           </div>
 
-          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-lg ring-1 ring-gray-100">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
-              <div>
-                <p className="text-sm font-semibold text-gray-900">Central de alertas</p>
-                <p className="text-xs text-gray-500">Tempo real · todos os mercados</p>
+          <div className="flex justify-center lg:justify-center">
+            <div className="w-full max-w-xl rounded-xl border border-gray-200 bg-white p-6 shadow-lg ring-1 ring-gray-100">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Central de alertas</p>
+                  <p className="text-xs text-gray-500">Tempo real · todos os mercados</p>
+                </div>
+                <Bell className="h-5 w-5 text-brand-600" aria-hidden />
               </div>
-              <Bell className="h-5 w-5 text-brand-600" aria-hidden />
+              <ul className="mt-4 space-y-3">
+                {SAMPLE_ALERTS.map((alert) => (
+                  <li
+                    key={alert.title}
+                    className={`rounded-lg border px-3 py-3 ${alertStyles(alert.tone)}`}
+                  >
+                    <p className="font-mono text-xs font-semibold text-gray-800">{alert.tag}</p>
+                    <p className="mt-1 text-sm font-medium text-gray-900">{alert.title}</p>
+                    <p className="text-xs text-gray-600">{alert.body}</p>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-4 text-center text-xs text-gray-500">
+                Simulação do painel — tags reais geradas pela IA em produção
+              </p>
             </div>
-            <ul className="mt-4 space-y-3">
-              {SAMPLE_ALERTS.map((alert) => (
-                <li
-                  key={alert.title}
-                  className={`rounded-lg border px-3 py-3 ${alertStyles(alert.tone)}`}
-                >
-                  <p className="font-mono text-xs font-semibold text-gray-800">{alert.tag}</p>
-                  <p className="mt-1 text-sm font-medium text-gray-900">{alert.title}</p>
-                  <p className="text-xs text-gray-600">{alert.body}</p>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-4 text-center text-xs text-gray-500">
-              Simulação do painel — tags reais geradas pela IA em produção
-            </p>
           </div>
         </div>
       </div>

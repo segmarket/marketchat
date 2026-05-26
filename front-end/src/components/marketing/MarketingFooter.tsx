@@ -1,15 +1,11 @@
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import { getAppUrl } from "../../utils/host";
-import MarketingBrandLogo, { MARKETING_LOGO_FOOTER_CLASS } from "./MarketingBrandLogo";
-import {
-  FacebookIcon,
-  InstagramIcon,
-  LinkedInIcon,
-  WhatsAppIcon,
-  YouTubeIcon,
-} from "./MarketingSocialIcons";
+import { MARKETING_LOGO_FOOTER_CLASS } from "./MarketingBrandLogo";
+import { InstagramIcon, WhatsAppIcon } from "./MarketingSocialIcons";
 
 const WHATSAPP_SUPPORT_URL = "https://wa.me/5514991683639";
+const INSTAGRAM_URL =
+  "https://www.instagram.com/app.marketchat?igsh=NWo5NHEwc3dzaWdt";
 
 type SocialIcon = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -19,34 +15,9 @@ type SocialLink = {
   icon: SocialIcon;
 };
 
-function envSocialUrl(key: string): string | undefined {
-  const value = import.meta.env[key]?.trim();
-  return value || undefined;
-}
-
-/** URLs das redes — configure no .env; sem URL, o ícone abre o WhatsApp de suporte. */
 const SOCIAL_LINKS: SocialLink[] = [
   { label: "WhatsApp", href: WHATSAPP_SUPPORT_URL, icon: WhatsAppIcon },
-  {
-    label: "Instagram",
-    href: envSocialUrl("VITE_SOCIAL_INSTAGRAM") ?? WHATSAPP_SUPPORT_URL,
-    icon: InstagramIcon,
-  },
-  {
-    label: "Facebook",
-    href: envSocialUrl("VITE_SOCIAL_FACEBOOK") ?? WHATSAPP_SUPPORT_URL,
-    icon: FacebookIcon,
-  },
-  {
-    label: "LinkedIn",
-    href: envSocialUrl("VITE_SOCIAL_LINKEDIN") ?? WHATSAPP_SUPPORT_URL,
-    icon: LinkedInIcon,
-  },
-  {
-    label: "YouTube",
-    href: envSocialUrl("VITE_SOCIAL_YOUTUBE") ?? WHATSAPP_SUPPORT_URL,
-    icon: YouTubeIcon,
-  },
+  { label: "Instagram", href: INSTAGRAM_URL, icon: InstagramIcon },
 ];
 
 const NAV_LINKS = [
@@ -97,12 +68,12 @@ export default function MarketingFooter() {
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-12 lg:gap-8">
           {/* Marca + redes */}
           <div className="sm:col-span-2 lg:col-span-5">
-            <div className="inline-block rounded-xl bg-white px-4 py-3">
-              <MarketingBrandLogo
-                showWordmark={false}
-                imageClassName={`${MARKETING_LOGO_FOOTER_CLASS} max-h-10`}
-              />
-            </div>
+            <img
+              src="/images/brand/logotipo_marketchat_completo_BRANCO.gif"
+              alt="MarketChat"
+              className={`${MARKETING_LOGO_FOOTER_CLASS} max-h-10`}
+              decoding="async"
+            />
             <p className="mt-5 max-w-md text-sm leading-relaxed text-gray-400">
               Ecossistema completo para mercados autônomos: vendas no WhatsApp, alertas de
               estoque e infraestrutura, Photo-Lock e painel operacional em tempo real para o
