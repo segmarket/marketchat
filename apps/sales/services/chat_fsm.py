@@ -68,6 +68,26 @@ def transition(
     )
 
 
+def clear_product_search_context(
+    session: ChatSession,
+    *,
+    clear_discussed: bool = False,
+    clear_pending: bool = True,
+    save: bool = True,
+) -> None:
+    """Remove SKUs da lista numerada e contexto de busca anterior."""
+    session.temporary_name = ""
+    update_fields = ["temporary_name", "updated_at"]
+    if clear_discussed:
+        session.last_discussed_product = None
+        update_fields.append("last_discussed_product")
+    if clear_pending:
+        session.pending_product = None
+        update_fields.append("pending_product")
+    if save:
+        session.save(update_fields=update_fields)
+
+
 def record_discussed_product(session: ChatSession, product: Product | None) -> None:
     if product is None:
         return

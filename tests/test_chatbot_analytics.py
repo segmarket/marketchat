@@ -173,6 +173,8 @@ def test_analytics_api_authenticated(api_client):
     assert "hourly_distribution" in data
     assert len(data["hourly_distribution"]) == 4
     assert len(data["stability_series"]) == 30
+    assert data["stability_market_names"] == [market.name]
+    assert market.name in data["stability_series"][0]
     assert data["cards"]["total_interactions"] == 1
 
 
@@ -216,4 +218,42 @@ def test_analytics_api_market_filter(api_client):
         {"market_id": market_a.id},
     )
     assert resp.status_code == 200
-    assert resp.json()["cards"]["total_interactions"] == 1
+    data = resp.json()
+    assert data["cards"]["total_interactions"] == 1
+    assert data["stability_market_names"] == ["A"]
+
+
+@pytest.mark.django_db
+def test_stability_series_groups_by_market():
+    tenant = TenantFactory()
+    market_a = MarketFactory(tenant=tenant, name="Mercado Vila Ricca")
+    market_b = MarketFactory(tenant=tenant, name="Mercado Pamplona")
+    resident_a = ResidentFactory(tenant=tenant, market=market_a)
+    resident_b = ResidentFactory(tenant=tenant, market=market_b)
+    today = timezone.localdate()
+
+    for resident, market in ((resident_a, market_a), (resident_b, market_b)):
+        session = ChatSessionFactory(
+            tenant=tenant,
+            phone_number=resident.phone_number,
+        )
+        _create_log(
+            tenant=tenant,
+            session=session,
+            resident=resident,
+            market=market,
+            intent_type=ChatMessageLog.IntentType.GENERAL,
+            created_at=timezone.make_aware(
+                datetime.combine(today, datetime.min.time()),
+            ),
+        )
+
+    payload = compute_chatbot_analytics(AnalyticsFilters(tenant_id=tenant.id))
+    assert len(payload.stability_series) == 30
+    assert payload.stability_market_names == [
+        "Mercado Pamplona",
+        "Mercado Vila Ricca",
+    ]
+    last_point = payload.stability_series[-1]
+    assert last_point.counts_by_market["Mercado Vila Ricca"] == 1
+    assert last_point.counts_by_market["Mercado Pamplona"] == 1

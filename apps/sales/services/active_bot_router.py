@@ -18,7 +18,9 @@ from apps.residents.services.whatsapp_reply import send_whatsapp_reply
 from apps.sales.services.cart_repository import get_or_create_open_cart
 from apps.sales.services.intent_gatekeeper import (
     COMPLAINT,
+    COURTESY_FAREWELL,
     GENERAL,
+    GREETING,
     MAINTENANCE_ISSUE,
     PAYMENT_ERROR,
     PURCHASE,
@@ -31,6 +33,7 @@ from apps.sales.services.owner_alert import (
     notify_owner_support_issue,
 )
 from apps.sales.services.stock_issue_handler import handle_stock_issue_report
+from apps.sales.services.main_menu import build_main_menu_message, show_main_menu
 from apps.sales.services.resident_ai_context import (
     build_complaint_dynamic_context,
     build_payment_error_recovery_message,
@@ -48,6 +51,54 @@ def _tenant_display_name(tenant_id: int) -> str:
         return (Tenant.objects.get(pk=tenant_id).name or "").strip() or "seu mercado"
     except Tenant.DoesNotExist:
         return "seu mercado"
+
+
+def build_greeting_reply(*, resident: Resident) -> str:
+    name = resident_display_name(resident)
+    return (
+        f"Olá, {name}! Tudo bem? O que você precisa hoje aqui no mercado?"
+    )
+
+
+def handle_greeting(
+    *,
+    instance: WhatsappInstance,
+    phone: str,
+    resident: Resident,
+    session: ChatSession,
+) -> bool:
+    menu_text = build_main_menu_message(resident=resident)
+    show_main_menu(
+        instance=instance,
+        phone=phone,
+        resident=resident,
+        session=session,
+    )
+    append_assistant_message(session, menu_text)
+    return True
+
+
+def handle_courtesy_farewell(
+    *,
+    instance: WhatsappInstance,
+    phone: str,
+    resident: Resident,
+    session: ChatSession,
+) -> bool:
+    name = resident_display_name(resident)
+    reply = (
+        f"Por nada, {name}! Qualquer coisa que precisar aqui no mercado, "
+        "é só me chamar. Até mais! 👋"
+    )
+    send_whatsapp_reply(
+        instance,
+        phone,
+        reply,
+        intent_type=COURTESY_FAREWELL,
+        session=session,
+    )
+    append_assistant_message(session, reply)
+    return True
 
 
 def handle_maintenance_issue(
@@ -313,7 +364,27 @@ def route_idle_message(
     ):
         return on_purchase()
 
-    intent = classify_user_intent(message)
+    intent = classify_user_intent(
+        message,
+        tenant_id=tenant_id,
+        phone=phone,
+    )
+
+    if intent == GREETING:
+        return handle_greeting(
+            instance=instance,
+            phone=phone,
+            resident=resident,
+            session=session,
+        )
+
+    if intent == COURTESY_FAREWELL:
+        return handle_courtesy_farewell(
+            instance=instance,
+            phone=phone,
+            resident=resident,
+            session=session,
+        )
 
     if intent == PURCHASE:
         return on_purchase()

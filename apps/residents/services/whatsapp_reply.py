@@ -22,6 +22,7 @@ def send_whatsapp_reply(
     session: ChatSession | None = None,
     cart: Cart | None = None,
     log_message: bool = True,
+    record_context: bool = True,
 ) -> None:
     """Envia mensagem de texto via Evolution GO e registra no log de atendimento."""
     digits = "".join(c for c in phone if c.isdigit())
@@ -52,6 +53,16 @@ def send_whatsapp_reply(
             intent_type=intent_type,
             session=session,
             cart=cart,
+        )
+
+    if record_context and text.strip():
+        from apps.chatbot.services.chat_context_cache import append_message
+
+        append_message(
+            instance.tenant_id,
+            phone,
+            role="assistant",
+            content=text.strip(),
         )
 
     if session is not None:

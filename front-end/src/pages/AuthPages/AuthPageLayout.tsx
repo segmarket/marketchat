@@ -1,6 +1,7 @@
 import React from "react";
 import GridShape from "../../components/common/GridShape";
 import { Link } from "react-router";
+import MarketchatLogo from "../../components/brand/MarketchatLogo";
 import ThemeTogglerTwo from "../../components/common/ThemeTogglerTwo";
 
 export default function AuthLayout({
@@ -18,12 +19,7 @@ export default function AuthLayout({
             <GridShape />
             <div className="flex flex-col items-center max-w-xs">
               <Link to="/" className="block mb-4">
-                <img
-                  src="/images/brand/logotipo_marketchat_completo_BRANCO.gif"
-                  alt="MarketChat"
-                  className="h-12 w-auto"
-                  decoding="async"
-                />
+                <MarketchatLogo variant="onDarkBackground" className="h-12 w-auto max-h-12 object-contain" />
               </Link>
               <p className="text-center text-gray-400 dark:text-white/60">
                 Gerente virtual para mercados autônomos — vendas, alertas e operação 24h.

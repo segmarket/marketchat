@@ -44,6 +44,8 @@ class ChatMessageLog(TenantAwareModel):
         COMPLAINT = "COMPLAINT", "Reclamação"
         PAYMENT_ERROR = "PAYMENT_ERROR", "Erro de pagamento"
         STOCK_ISSUE = "STOCK_ISSUE", "Falta de estoque"
+        GREETING = "GREETING", "Saudação"
+        COURTESY_FAREWELL = "COURTESY_FAREWELL", "Cortesia / despedida"
         GENERAL = "GENERAL", "Geral"
 
     class MessageKind(models.TextChoices):

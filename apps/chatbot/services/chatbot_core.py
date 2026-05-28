@@ -163,12 +163,30 @@ STATIC_PRODUCT_EXTRACTOR = (
 GATEKEEPER_STATIC_SYSTEM = (
     "Você é um classificador de intenções estrito para um chatbot de mercado autônomo em condomínio.\n"
     "Sua única tarefa é responder com uma das seguintes tags: PURCHASE, MAINTENANCE_ISSUE, "
-    "COMPLAINT, PAYMENT_ERROR, STOCK_ISSUE, ou GENERAL.\n\n"
+    "COMPLAINT, PAYMENT_ERROR, STOCK_ISSUE, GREETING, COURTESY_FAREWELL, ou GENERAL.\n\n"
+    "REGRA DE ABERTURA (GREETING):\n"
+    "Se o usuário estiver iniciando a conversa ou enviando apenas saudações casuais "
+    "(Ex: 'Bom dia', 'Boa tarde', 'Oi', 'Olá', 'Opa', 'Eae'), classifique estritamente como GREETING.\n"
+    "Com histórico vazio ou após longo silêncio, 'Bom dia' à manhã é GREETING, não encerramento.\n\n"
+    "REGRA DE ENCERRAMENTO (COURTESY_FAREWELL):\n"
+    "Se o usuário estiver agradecendo por uma ação já concluída ou se despedindo para sair do chat "
+    "(Ex: 'Obrigado', 'Valeu', 'Tchau', 'Fui', 'Certo, obrigado'), classifique estritamente como "
+    "COURTESY_FAREWELL.\n"
+    "ATENÇÃO: 'Bom dia' ou 'Boa noite' como primeira mensagem do dia são GREETING, não COURTESY_FAREWELL.\n"
+    "Use o histórico recente: após manutenção resolvida, 'Certo, obrigado' é COURTESY_FAREWELL.\n\n"
     "⚠️ REGRA DE PRIORIDADE MÁXIMA:\n"
     "Se o usuário mencionar que um produto ACABOU, ESTÁ EM FALTA, NÃO TEM na gôndola/geladeira "
     "ou que ele QUERIA COMPRAR MAS NÃO ACHOU, a intenção OBRIGATORIAMENTE é STOCK_ISSUE. "
     "O relato de falta de produto anula a intenção de compra.\n\n"
+    "REGRA DE CLASSIFICAÇÃO DE PRODUTOS SOLTOS:\n"
+    "Se o usuário enviar apenas o nome de um produto (Ex: 'Cocada', 'Doritos', 'Água', 'Cerveja') "
+    "ou perguntar sobre ele ('Tem cocada?'), a intenção é ESTRITAMENTE PURCHASE (compra/busca).\n"
+    "NUNCA classifique como STOCK_ISSUE a menos que o usuário use explicitamente palavras de "
+    "ausência, como: 'acabou', 'faltando', 'não tem', 'prateleira vazia', 'zerou'.\n\n"
     "Exemplos de Treinamento:\n"
+    "- 'Cocada' -> PURCHASE\n"
+    "- 'Doritos' -> PURCHASE\n"
+    "- 'Tem água?' -> PURCHASE\n"
     "- 'Quero comprar uma coca cola e um ruffles' -> PURCHASE\n"
     "- 'Vou levar um chocolate' -> PURCHASE\n"
     "- 'E ae, peguei coisas, como mando o pix?' -> PURCHASE\n"
@@ -183,7 +201,12 @@ GATEKEEPER_STATIC_SYSTEM = (
     "- 'Estou insatisfeito com a compra de ontem' -> COMPLAINT\n"
     "- 'Comprei iogurte vencido' -> COMPLAINT\n"
     "- 'A geladeira não está gelando' -> MAINTENANCE_ISSUE\n"
-    "- 'Oi, boa noite' -> GENERAL\n\n"
+    "- 'Bom dia' -> GREETING\n"
+    "- 'Boa tarde' -> GREETING\n"
+    "- 'Oi' -> GREETING\n"
+    "- 'Certo, obrigado' -> COURTESY_FAREWELL\n"
+    "- 'Ok valeu' -> COURTESY_FAREWELL\n"
+    "- 'Tchau' -> COURTESY_FAREWELL\n\n"
     "Responda APENAS E STRICTAMENTE com a palavra-chave da tag em letras maiúsculas, "
     "sem pontuação, justificativas ou saudações."
 )
@@ -195,6 +218,8 @@ GATEKEEPER_TAGS = frozenset(
         "COMPLAINT",
         "PAYMENT_ERROR",
         "STOCK_ISSUE",
+        "GREETING",
+        "COURTESY_FAREWELL",
         "GENERAL",
     },
 )
@@ -232,7 +257,8 @@ def commerce_state_system_prefix(state: str) -> str:
         return (
             "O usuário está revisando o carrinho de compras. As únicas opções válidas agora são "
             "adicionar mais itens ou finalizar o pagamento. Se ele disser 'finalizar', responda "
-            "estritamente com a palavra [FINALIZAR_PEDIDO] para que o sistema capture o gatilho."
+            "estritamente com a palavra [FINALIZAR_PEDIDO] para que o sistema capture o gatilho. "
+            "Lembre que ele pode digitar Cancelar para limpar o carrinho e recomeçar."
         )
     if state == "PRODUCT_SEARCH":
         return (
@@ -366,8 +392,24 @@ def parse_gatekeeper_tag(raw: str) -> str:
     return "GENERAL"
 
 
-def classify_gatekeeper_intent(message: str) -> str:
-    """Triagem sem JSON e sem histórico (mínimo de tokens)."""
+def classify_gatekeeper_intent(
+    message: str,
+    *,
+    tenant_id: int | None = None,
+    phone: str | None = None,
+) -> str:
+    """Triagem de intenção (delega para intent_classifier quando há contexto)."""
+    from apps.chatbot.services.intent_classifier import (
+        classify_gatekeeper_intent as classify_with_context,
+    )
+
+    if tenant_id is not None and phone:
+        return classify_with_context(
+            message=message,
+            tenant_id=tenant_id,
+            phone=phone,
+        )
+
     stripped = (message or "").strip()
     if not stripped:
         return "GENERAL"

@@ -7,6 +7,8 @@ from apps.sales.models import Cart
 from apps.sales.services.cart_flow import process_cart_flow
 from apps.sales.services.intent_gatekeeper import (
     COMPLAINT,
+    COURTESY_FAREWELL,
+    GREETING,
     PURCHASE,
     STOCK_ISSUE,
     classify_user_intent,
@@ -32,6 +34,28 @@ def test_heuristic_classifies_complaint_without_openai():
     assert classify_user_intent("Estou muito insatisfeito com a compra de ontem") == COMPLAINT
 
 
+def test_heuristic_classifies_bare_product_name_as_purchase():
+    assert classify_user_intent("Cocada") == PURCHASE
+    assert classify_user_intent("Tem cocada?") == PURCHASE
+    assert classify_user_intent("Doritos") == PURCHASE
+
+
+def test_heuristic_classifies_greeting():
+    assert classify_user_intent("Oi") == GREETING
+    assert classify_user_intent("Bom dia") == GREETING
+    assert classify_user_intent("BOm dia") == GREETING
+    assert classify_user_intent("Boa tarde") == GREETING
+    assert classify_user_intent("Boa noite") == GREETING
+    assert classify_user_intent("Opa") == GREETING
+
+
+def test_heuristic_classifies_courtesy_farewell():
+    assert classify_user_intent("Certo, obrigado!") == COURTESY_FAREWELL
+    assert classify_user_intent("Ok valeu") == COURTESY_FAREWELL
+    assert classify_user_intent("obrigado") == COURTESY_FAREWELL
+    assert classify_user_intent("Tchau") == COURTESY_FAREWELL
+
+
 @pytest.mark.django_db
 def test_openai_gatekeeper_prompt_includes_few_shot_examples(settings):
     settings.OPENAI_API_KEY = "test-key"
@@ -51,6 +75,9 @@ def test_openai_gatekeeper_prompt_includes_few_shot_examples(settings):
     kwargs = complete.call_args.kwargs
     assert kwargs.get("apply_conciseness_rule") is False
     assert "REGRA DE PRIORIDADE MÁXIMA" in kwargs["static_system"]
+    assert "REGRA DE CLASSIFICAÇÃO DE PRODUTOS SOLTOS" in kwargs["static_system"]
+    assert "COURTESY_FAREWELL" in kwargs["static_system"]
+    assert "GREETING" in kwargs["static_system"]
     assert "Magnum" in kwargs["static_system"]
 
 

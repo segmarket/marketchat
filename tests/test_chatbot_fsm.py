@@ -13,9 +13,14 @@ from django.utils import timezone
 from apps.notifications.models import Notification
 from apps.residents.models import ChatMessage, ChatSession
 from apps.sales.models import Cart, CartItem
+from apps.integrations.services.webhook_parser import EvolutionWebhookEvent
 from apps.sales.services.active_bot_router import route_idle_message
-from apps.sales.services.intent_gatekeeper import COMPLAINT, GENERAL
+from apps.sales.services.cart_flow import process_cart_flow
+from apps.sales.services.intent_gatekeeper import COMPLAINT, COURTESY_FAREWELL, GENERAL
+from apps.sales.services.owner_alert import SUPPORT_RESIDENT_MESSAGE
+from apps.sales.services.product_search import ASK_PRODUCT_MESSAGE
 from apps.sales.services.pix_hurry_cart import parse_hurry_line_items
+from apps.tenants.context import tenant_scope
 from tests.factories import (
     ChatSessionFactory,
     MarketFactory,
@@ -165,6 +170,195 @@ def test_parse_hurry_line_items_extracts_quantities():
 
 
 # --- Infraestrutura e maquininha ---
+
+
+@pytest.mark.django_db
+def test_infra_issue_escapes_product_search(
+    fsm_tenant,
+    fsm_resident,
+    fsm_instance,
+):
+    phrase = "A Luz de entrada esta queimada"
+    session = ChatSessionFactory(
+        tenant=fsm_tenant,
+        phone_number=fsm_resident.phone_number,
+        state=ChatSession.State.PRODUCT_SEARCH,
+    )
+    event = EvolutionWebhookEvent(
+        event_type="MESSAGE",
+        instance_key="inst",
+        connection_state="",
+        remote_jid=f"{fsm_resident.phone_number}@s.whatsapp.net",
+        message_id="msg-infra-escape",
+        from_me=False,
+        message_text=phrase,
+        message_kind="text",
+    )
+
+    owner_patch = mock.patch(
+        "apps.chatbot.services.occurrence_dispatch.notify_owner_support_issue",
+    )
+
+    with ExitStack() as stack:
+        classify_mock = stack.enter_context(
+            mock.patch(
+                "apps.sales.services.active_bot_router.classify_user_intent",
+                return_value=GENERAL,
+            )
+        )
+        stack.enter_context(
+            mock.patch(
+                "apps.sales.services.active_bot_router.complete_with_session_history",
+                return_value="[ALERTA_INFRA] Obrigado por avisar, João! Já acionei a manutenção.",
+            )
+        )
+        send_mock = stack.enter_context(
+            mock.patch(
+                "apps.sales.services.active_bot_router.send_whatsapp_reply",
+                mock.Mock(),
+            )
+        )
+        extract_mock = stack.enter_context(
+            mock.patch("apps.sales.services.cart_flow.extract_product_term"),
+        )
+        stack.enter_context(owner_patch)
+
+        with tenant_scope(fsm_tenant.id):
+            handled = process_cart_flow(
+                fsm_tenant.id,
+                fsm_instance,
+                fsm_resident.phone_number,
+                event,
+            )
+
+    assert handled is True
+    classify_mock.assert_called_once_with(
+        phrase,
+        tenant_id=fsm_tenant.id,
+        phone=fsm_resident.phone_number,
+    )
+    extract_mock.assert_not_called()
+
+    session.refresh_from_db()
+    assert session.state == ChatSession.State.IDLE
+
+    note = Notification.all_objects.filter(
+        tenant=fsm_tenant,
+        intent_type="ALERTA_INFRA",
+    ).first()
+    assert note is not None
+    assert note.severity == Notification.Severity.CRITICAL
+
+    _assert_no_tags_in_outbound(send_mock)
+    _assert_assistant_history_clean(session)
+
+
+@pytest.mark.django_db
+def test_courtesy_intent_after_incident(
+    fsm_tenant,
+    fsm_resident,
+    fsm_instance,
+    fsm_session,
+):
+    from apps.chatbot.services.chat_context_cache import append_message, clear_context
+
+    clear_context(fsm_tenant.id, fsm_resident.phone_number)
+    append_message(
+        fsm_tenant.id,
+        fsm_resident.phone_number,
+        role="user",
+        content="A luz de entrada esta queimada",
+    )
+    append_message(
+        fsm_tenant.id,
+        fsm_resident.phone_number,
+        role="assistant",
+        content=SUPPORT_RESIDENT_MESSAGE,
+    )
+
+    send_mock = mock.Mock()
+    purchase_mock = mock.Mock(return_value=False)
+
+    with (
+        mock.patch(
+            "apps.sales.services.active_bot_router.send_whatsapp_reply",
+            send_mock,
+        ),
+        mock.patch(
+            "apps.sales.services.cart_flow.extract_product_term",
+        ) as extract_mock,
+        mock.patch(
+            "apps.sales.services.cart_flow.send_product_list",
+        ) as send_list,
+    ):
+        route_idle_message(
+            tenant_id=fsm_tenant.id,
+            instance=fsm_instance,
+            phone=fsm_resident.phone_number,
+            resident=fsm_resident,
+            session=fsm_session,
+            message="Certo, obrigado!",
+            on_purchase=purchase_mock,
+        )
+
+    purchase_mock.assert_not_called()
+    extract_mock.assert_not_called()
+    send_list.assert_not_called()
+
+    fsm_session.refresh_from_db()
+    assert fsm_session.state == ChatSession.State.IDLE
+
+    body = _whatsapp_body(send_mock)
+    assert "Por nada" in body
+    assert ASK_PRODUCT_MESSAGE not in body
+    assert "O que você deseja comprar" not in body
+
+    clear_context(fsm_tenant.id, fsm_resident.phone_number)
+
+
+@pytest.mark.django_db
+def test_greeting_idle_welcome_message(
+    fsm_tenant,
+    fsm_resident,
+    fsm_instance,
+    fsm_session,
+):
+    from apps.chatbot.services.chat_context_cache import clear_context
+
+    clear_context(fsm_tenant.id, fsm_resident.phone_number)
+
+    send_mock = mock.Mock()
+    purchase_mock = mock.Mock(return_value=False)
+
+    with (
+        mock.patch(
+            "apps.sales.services.main_menu.send_whatsapp_reply",
+            send_mock,
+        ),
+        mock.patch(
+            "apps.sales.services.cart_flow.extract_product_term",
+        ) as extract_mock,
+    ):
+        route_idle_message(
+            tenant_id=fsm_tenant.id,
+            instance=fsm_instance,
+            phone=fsm_resident.phone_number,
+            resident=fsm_resident,
+            session=fsm_session,
+            message="Bom dia",
+            on_purchase=purchase_mock,
+        )
+
+    purchase_mock.assert_not_called()
+    extract_mock.assert_not_called()
+    fsm_session.refresh_from_db()
+    assert fsm_session.state == ChatSession.State.AWAITING_MAIN_MENU
+
+    body = _whatsapp_body(send_mock)
+    assert "Olá" in body
+    assert "Fazer uma compra" in body
+    assert "O que você precisa" not in body
+    assert "Por nada" not in body
 
 
 @pytest.mark.django_db

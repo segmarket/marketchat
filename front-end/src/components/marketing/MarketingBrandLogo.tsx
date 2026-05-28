@@ -1,31 +1,27 @@
+import MarketchatLogo, {
+  MARKETCHAT_LOGO_CLASS,
+  MARKETCHAT_LOGO_FOOTER_CLASS,
+} from "../brand/MarketchatLogo";
+
+export { MARKETCHAT_LOGO_CLASS as MARKETING_LOGO_CLASS };
+export { MARKETCHAT_LOGO_FOOTER_CLASS as MARKETING_LOGO_FOOTER_CLASS };
+
 type MarketingBrandLogoProps = {
   className?: string;
   imageClassName?: string;
   showWordmark?: boolean;
 };
 
-export const MARKETING_LOGO_SRC = "/images/brand/logo_marketchat.png";
-
-/** Altura padrão do logo na landing — só altura fixa; largura segue a proporção original. */
-export const MARKETING_LOGO_CLASS = "h-9 w-auto max-h-9 object-contain object-left";
-
-export const MARKETING_LOGO_FOOTER_CLASS = "h-8 w-auto max-h-8 object-contain object-left";
-
 export default function MarketingBrandLogo({
   className = "",
-  imageClassName = MARKETING_LOGO_CLASS,
+  imageClassName = MARKETCHAT_LOGO_CLASS,
   showWordmark = true,
 }: MarketingBrandLogoProps) {
   return (
     <span className={`inline-flex items-center gap-2 ${className}`.trim()}>
-      <img
-        src={MARKETING_LOGO_SRC}
-        alt="MarketChat"
-        className={imageClassName}
-        decoding="async"
-      />
+      <MarketchatLogo className={imageClassName} variant="theme" />
       {showWordmark ? (
-        <span className="text-lg font-semibold text-gray-900">MarketChat</span>
+        <span className="text-lg font-semibold text-gray-900 dark:text-white">MarketChat</span>
       ) : null}
     </span>
   );

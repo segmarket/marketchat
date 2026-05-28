@@ -5,8 +5,10 @@ import {
   GroupIcon,
 } from "../../icons";
 import Badge from "../ui/badge/Badge";
+import MetricHelpTooltip from "../ui/help-tooltip/MetricHelpTooltip";
 import type { ChatbotAnalyticsCards } from "../../features/chatbotAnalytics/types";
 import { formatCount, formatPercentChange } from "../../features/chatbotAnalytics/format";
+import { METRIC_HELP_TEXTS } from "../../features/chatbotAnalytics/metricHelpTexts";
 
 type Props = {
   cards: ChatbotAnalyticsCards | null;
@@ -38,9 +40,10 @@ export default function EcommerceMetrics({ cards, loading = false }: Props) {
 
         <div className="mt-5 flex items-end justify-between">
           <div>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              Interações no mês
-            </span>
+            <MetricHelpTooltip
+              label="Interações no mês"
+              helpText={METRIC_HELP_TEXTS.interactions}
+            />
             <h4 className="mt-2 text-title-sm font-bold text-gray-800 dark:text-white/90">
               {loading ? "—" : formatCount(interactions)}
             </h4>
@@ -57,9 +60,10 @@ export default function EcommerceMetrics({ cards, loading = false }: Props) {
         </div>
         <div className="mt-5 flex items-end justify-between">
           <div>
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              Incidentes críticos
-            </span>
+            <MetricHelpTooltip
+              label="Incidentes críticos"
+              helpText={METRIC_HELP_TEXTS.criticalIncidents}
+            />
             <h4 className="mt-2 text-title-sm font-bold text-gray-800 dark:text-white/90">
               {loading ? "—" : formatCount(incidents)}
             </h4>

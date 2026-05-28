@@ -15,8 +15,8 @@ from apps.accounts.serializers import (
     PasswordResetRequestSerializer,
     RegisterSerializer,
     TenantTokenObtainPairSerializer,
-    send_password_reset_email,
 )
+from apps.core.emails import send_password_reset_email_safe
 from apps.tenants.models import Tenant
 
 User = get_user_model()
@@ -123,7 +123,7 @@ class PasswordResetRequestView(APIView):
         email = serializer.validated_data["email"]
         user = User.objects.filter(email__iexact=email).first()
         if user:
-            send_password_reset_email(user)
+            send_password_reset_email_safe(user)
         return Response(
             {"detail": "Se o e-mail existir em nossa base, você receberá instruções em instantes."},
             status=status.HTTP_200_OK,

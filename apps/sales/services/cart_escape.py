@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import re
+import unicodedata
 
 from apps.integrations.models import WhatsappInstance
 from apps.residents.models import Resident
@@ -21,9 +23,13 @@ logger = logging.getLogger(__name__)
 
 GLOBAL_ESCAPE_EXACT = frozenset(
     {
+        "cancela",
         "cancelar",
         "resetar",
         "sair",
+        "nada",
+        "esquece",
+        "pare",
         "cancelar compra",
         "cancelar atendimento",
         "reiniciar",
@@ -37,19 +43,29 @@ GLOBAL_ESCAPE_CONTAINS = (
     "cancele essa compra ou esse atendimento",
     "cancelar essa compra",
     "cancelar esse atendimento",
+    "nao quero nada",
+    "nao quero",
+    "deixa quieto",
+    "deixa pra la",
+    "esquece isso",
+)
+
+GLOBAL_ESCAPE_ACK_MESSAGE = (
+    "Tudo bem! Atendimento encerrado. Se precisar, é só chamar! 👋"
 )
 
 FINALIZE_TEXT_KEYWORDS = ("finalizar", "pagar", "concluir", "fechar")
 ADD_MORE_TEXT_KEYWORDS = ("adicionar", "mais", "continuar", "comprar mais")
 
 RESTART_MESSAGE = (
-    "🔄 Atendimento reiniciado! Entendido, cancelei o fluxo anterior e limpei o "
-    "seu carrinho. Como posso te ajudar do zero agora? 😉"
+    "Atendimento reiniciado e carrinho limpo! 🔄 O que você deseja buscar agora?"
 )
 
 LOOP_DECISION_FALLBACK = (
-    "Por favor, clique em um dos botões abaixo ou digite 'Finalizar' para pagar, "
-    "ou 'Cancelar' para desistir da compra."
+    "Por favor, responda:\n"
+    "1 — Adicionar mais itens\n"
+    "2 — Finalizar e pagar\n"
+    "(Para limpar o carrinho e recomeçar, digite Cancelar)"
 )
 
 CANCELLABLE_CART_STATUSES = (
@@ -63,9 +79,109 @@ CHECKOUT_PHOTO_MESSAGE = (
 )
 
 
+PRODUCT_SEARCH_MIN_WORDS_FOR_CONVERSATIONAL_ESCAPE = 5
+
+PRODUCT_SEARCH_INCIDENT_ROOTS = (
+    "quebrad",
+    "queimad",
+    "problem",
+    "defeit",
+    "ruim",
+    "não",
+    "nao",
+    "sujo",
+    "vazand",
+    "desligad",
+    "parou",
+    "caiu",
+    "fechad",
+    "travad",
+    "cancel",
+    "deixa",
+    "esquec",
+    "err",
+    "frio",
+    "quent",
+)
+
+PRODUCT_SEARCH_CONVERSATIONAL_TERMS = (
+    "esta",
+    "estao",
+    "está",
+    "estão",
+    "tem",
+    "foi",
+    "aqui",
+    "ali",
+    "muito",
+    "preciso",
+    "quero",
+    "ser",
+    "tinha",
+    "era",
+    "ainda",
+    "agora",
+)
+
+
+def _normalize_incident_text(text: str) -> str:
+    lowered = (text or "").strip().lower()
+    decomposed = unicodedata.normalize("NFD", lowered)
+    return "".join(char for char in decomposed if unicodedata.category(char) != "Mn")
+
+
+def _incident_tokens(normalized: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", normalized)
+
+
+def _token_matches_incident_root(token: str, root: str) -> bool:
+    if len(root) >= 4:
+        return root in token
+    return token == root or (token.startswith(root) and len(token) - len(root) <= 2)
+
+
+def _has_incident_root(normalized: str) -> bool:
+    tokens = _incident_tokens(normalized)
+    if not tokens:
+        return False
+    blob = " ".join(tokens)
+    for root in PRODUCT_SEARCH_INCIDENT_ROOTS:
+        if len(root) >= 4 and root in blob:
+            return True
+    return any(
+        _token_matches_incident_root(token, root)
+        for token in tokens
+        for root in PRODUCT_SEARCH_INCIDENT_ROOTS
+        if len(root) < 4
+    )
+
+
+def _has_conversational_escape_signal(normalized: str, word_count: int) -> bool:
+    if word_count < PRODUCT_SEARCH_MIN_WORDS_FOR_CONVERSATIONAL_ESCAPE:
+        return False
+    return any(term in normalized for term in PRODUCT_SEARCH_CONVERSATIONAL_TERMS)
+
+
+def should_escape_product_search_for_intent(text: str) -> bool:
+    """
+    Detecta relatos de problema/manutenção antes da busca no catálogo (PRODUCT_SEARCH).
+    """
+    stripped = (text or "").strip()
+    if not stripped:
+        return False
+
+    normalized = _normalize_incident_text(stripped)
+    word_count = len(stripped.split())
+
+    if _has_incident_root(normalized):
+        return True
+
+    return _has_conversational_escape_signal(normalized, word_count)
+
+
 def is_global_escape_message(text: str) -> bool:
     """True se o morador pediu reinício/cancelamento global."""
-    normalized = (text or "").lower().strip()
+    normalized = _normalize_incident_text(text)
     if not normalized:
         return False
     if normalized in GLOBAL_ESCAPE_EXACT:
@@ -75,7 +191,7 @@ def is_global_escape_message(text: str) -> bool:
             return True
     if normalized in {"cancelar", "resetar", "sair", "reiniciar"}:
         return True
-    if any(w in normalized for w in ("cancelar", "cancele", "resetar", "reiniciar")):
+    if any(w in normalized for w in ("cancelar", "cancela", "cancele", "resetar", "reiniciar")):
         if any(w in normalized for w in ("compra", "atendimento", "carrinho")):
             return True
     return False
@@ -127,7 +243,7 @@ def handle_global_escape(
         )
     else:
         unlock_resident_chat_session(resident=resident, clear_cart_link=True)
-    send_whatsapp_reply(instance, phone, RESTART_MESSAGE)
+    send_whatsapp_reply(instance, phone, GLOBAL_ESCAPE_ACK_MESSAGE)
     logger.info(
         "Escape global: tenant=%s phone=%s texto=%r",
         instance.tenant_id,

@@ -22,6 +22,25 @@ from tests.factories import (
 
 
 @pytest.mark.django_db
+def test_fuzzy_product_search():
+    tenant = TenantFactory()
+    chocolate = ProductFactory(
+        tenant=tenant,
+        sku="CHOC-01",
+        name="Chocolate ao Leite 90g",
+        search_aliases="chocolate, barrinha",
+    )
+    ProductFactory(tenant=tenant, sku="COOK", name="Biscoito Recheado")
+
+    for typo in ("chocolete", "chocolati", "cocholati"):
+        results = search_active_products(tenant.id, typo)
+        assert chocolate in results, f"typo {typo!r} should match chocolate"
+
+    unrelated = search_active_products(tenant.id, "xyzqwerty")
+    assert unrelated == []
+
+
+@pytest.mark.django_db
 def test_split_word_search_coca_zero_finds_product():
     tenant = TenantFactory()
     product = ProductFactory(

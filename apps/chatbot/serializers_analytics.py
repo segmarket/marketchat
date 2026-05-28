@@ -23,12 +23,9 @@ def serialize_chatbot_analytics(payload: ChatbotAnalyticsPayload) -> dict[str, A
             {"label": bucket.label, "count": bucket.count}
             for bucket in payload.hourly_distribution
         ],
+        "stability_market_names": list(payload.stability_market_names),
         "stability_series": [
-            {
-                "date": point.date,
-                "line_total_sessions": point.line_total_sessions,
-                "line_friction_points": point.line_friction_points,
-            }
+            {"date": point.date, **point.counts_by_market}
             for point in payload.stability_series
         ],
     }

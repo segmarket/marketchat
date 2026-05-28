@@ -8,7 +8,7 @@ from apps.billing.models import AsaasSubaccount
 from apps.residents.models import ChatSession
 from apps.sales.models import Cart, CartItem
 from apps.sales.services.cart_flow import process_cart_flow
-from apps.sales.services.intent_gatekeeper import PAYMENT_ERROR, PURCHASE
+from apps.sales.services.intent_gatekeeper import MAINTENANCE_ISSUE, PAYMENT_ERROR, PURCHASE
 from apps.sales.services.product_term_extractor import extract_product_term
 from apps.sales.services.intent_gatekeeper import GENERAL
 from apps.sales.services.owner_alert import SUPPORT_RESIDENT_MESSAGE
@@ -214,8 +214,9 @@ def test_flow_add_more_returns_active_bot():
 
     assert handled is True
     session.refresh_from_db()
-    assert session.state == ChatSession.State.IDLE
-    assert "O que mais" in send.call_args[0][2]
+    assert session.state == ChatSession.State.PRODUCT_SEARCH
+    assert session.temporary_name == ""
+    assert "nome do produto" in send.call_args[0][2].lower()
 
 
 @pytest.mark.django_db
@@ -411,7 +412,11 @@ def test_payment_machine_offers_pix_and_enters_sales_funnel():
             )
 
     assert handled is True
-    classify.assert_called_once_with(message)
+    classify.assert_called_once_with(
+        message,
+        tenant_id=tenant.id,
+        phone=resident.phone_number,
+    )
     extract_term.assert_not_called()
     send_list.assert_not_called()
 
@@ -434,3 +439,83 @@ def test_payment_machine_offers_pix_and_enters_sales_funnel():
     session.refresh_from_db()
     assert session.state == ChatSession.State.PRODUCT_SEARCH
     assert session.active_cart_id is not None
+
+
+@pytest.mark.django_db
+def test_product_search_escapes_long_problem_report_to_gatekeeper():
+    tenant = TenantFactory()
+    instance = WhatsappInstanceFactory(tenant=tenant)
+    resident = ResidentFactory(tenant=tenant, phone_number="5511999887766")
+    session = ChatSessionFactory(
+        tenant=tenant,
+        phone_number=resident.phone_number,
+        state=ChatSession.State.PRODUCT_SEARCH,
+    )
+
+    problem = (
+        "Não estou procurando produto, enviei uma imagem que a geladeira esta quebrada"
+    )
+
+    with (
+        mock.patch(
+            "apps.sales.services.active_bot_router.classify_user_intent",
+            return_value=MAINTENANCE_ISSUE,
+        ) as classify,
+        mock.patch("apps.sales.services.cart_flow.extract_product_term") as extract,
+        mock.patch("apps.sales.services.active_bot_router.send_whatsapp_reply"),
+        mock.patch("apps.sales.services.active_bot_router.notify_owner_support_issue"),
+        mock.patch(
+            "apps.sales.services.active_bot_router.create_critical_panel_notification",
+        ),
+    ):
+        with tenant_scope(tenant.id):
+            handled = process_cart_flow(
+                tenant.id,
+                instance,
+                resident.phone_number,
+                _event_text(problem, resident.phone_number),
+            )
+
+    assert handled is True
+    classify.assert_called_once_with(
+        problem,
+        tenant_id=tenant.id,
+        phone=resident.phone_number,
+    )
+    extract.assert_not_called()
+    session.refresh_from_db()
+    assert session.state == ChatSession.State.IDLE
+
+
+@pytest.mark.django_db
+def test_product_search_short_query_still_searches_catalog():
+    tenant = TenantFactory()
+    instance = WhatsappInstanceFactory(tenant=tenant)
+    resident = ResidentFactory(tenant=tenant, phone_number="5511999887766")
+    ChatSessionFactory(
+        tenant=tenant,
+        phone_number=resident.phone_number,
+        state=ChatSession.State.PRODUCT_SEARCH,
+    )
+
+    with (
+        mock.patch(
+            "apps.sales.services.cart_flow.extract_product_term",
+            return_value="cocada",
+        ),
+        mock.patch("apps.sales.services.cart_flow.send_product_list"),
+        mock.patch("apps.sales.services.cart_flow.send_whatsapp_reply"),
+        mock.patch(
+            "apps.sales.services.active_bot_router.classify_user_intent",
+        ) as classify,
+    ):
+        with tenant_scope(tenant.id):
+            handled = process_cart_flow(
+                tenant.id,
+                instance,
+                resident.phone_number,
+                _event_text("Cocada", resident.phone_number),
+            )
+
+    assert handled is True
+    classify.assert_not_called()

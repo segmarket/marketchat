@@ -48,19 +48,17 @@ def send_cart_decision_buttons(
     subtotal: Decimal,
 ) -> None:
     """Opções do carrinho em texto puro."""
-    description = (
-        f"{quantity}x {product_name}\n"
-        f"Subtotal: {_format_brl(subtotal)}\n\n"
-        "Deseja adicionar mais itens ou finalizar?"
-    )
     send_whatsapp_reply(
         instance,
         phone,
-        f"{description}\n\n"
-        "Responda:\n"
-        "*1* — Adicionar mais itens\n"
-        "*2* — Finalizar e pagar\n\n"
-        "Ou digite *Finalizar* / *Adicionar mais*.",
+        (
+            f"{quantity}x {product_name}\n"
+            f"Subtotal: {_format_brl(subtotal)}\n\n"
+            "Deseja adicionar mais itens ou finalizar?\n"
+            "1 — Adicionar mais itens\n"
+            "2 — Finalizar e pagar\n"
+            "(Para limpar o carrinho e recomeçar, digite Cancelar)"
+        ),
     )
 
 

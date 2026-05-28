@@ -1,7 +1,9 @@
 import Chart from "react-apexcharts";
 import { ApexOptions } from "apexcharts";
+import MetricHelpTooltip from "../ui/help-tooltip/MetricHelpTooltip";
 import type { ChatbotAnalyticsRetention } from "../../features/chatbotAnalytics/types";
 import { formatCount } from "../../features/chatbotAnalytics/format";
+import { METRIC_HELP_TEXTS } from "../../features/chatbotAnalytics/metricHelpTexts";
 
 type Props = {
   retention: ChatbotAnalyticsRetention | null;
@@ -83,9 +85,13 @@ export default function MonthlyTarget({ retention, loading = false }: Props) {
 
       <div className="flex items-center justify-center gap-5 px-6 py-3.5 sm:gap-8 sm:py-5">
         <div>
-          <p className="mb-1 text-center text-theme-xs text-gray-500 dark:text-gray-400 sm:text-sm">
-            Sessões automatizadas
-          </p>
+          <div className="mb-1 flex justify-center">
+            <MetricHelpTooltip
+              label="Sessões automatizadas"
+              helpText={METRIC_HELP_TEXTS.automatedSessions}
+              className="justify-center"
+            />
+          </div>
           <p className="text-center text-base font-semibold text-gray-800 dark:text-white/90 sm:text-lg">
             {loading ? "—" : formatCount(retention?.automated_sessions_count ?? 0)}
           </p>
@@ -94,9 +100,13 @@ export default function MonthlyTarget({ retention, loading = false }: Props) {
         <div className="h-7 w-px bg-gray-200 dark:bg-gray-800" />
 
         <div>
-          <p className="mb-1 text-center text-theme-xs text-gray-500 dark:text-gray-400 sm:text-sm">
-            Chamados de suporte
-          </p>
+          <div className="mb-1 flex justify-center">
+            <MetricHelpTooltip
+              label="Chamados de suporte"
+              helpText={METRIC_HELP_TEXTS.supportTickets}
+              className="justify-center"
+            />
+          </div>
           <p className="text-center text-base font-semibold text-gray-800 dark:text-white/90 sm:text-lg">
             {loading ? "—" : formatCount(retention?.support_tickets_count ?? 0)}
           </p>
@@ -105,9 +115,13 @@ export default function MonthlyTarget({ retention, loading = false }: Props) {
         <div className="h-7 w-px bg-gray-200 dark:bg-gray-800" />
 
         <div>
-          <p className="mb-1 text-center text-theme-xs text-gray-500 dark:text-gray-400 sm:text-sm">
-            Sessões canceladas
-          </p>
+          <div className="mb-1 flex justify-center">
+            <MetricHelpTooltip
+              label="Sessões canceladas"
+              helpText={METRIC_HELP_TEXTS.cancelledSessions}
+              className="justify-center"
+            />
+          </div>
           <p className="text-center text-base font-semibold text-gray-800 dark:text-white/90 sm:text-lg">
             {loading ? "—" : formatCount(retention?.cancelled_sessions_count ?? 0)}
           </p>

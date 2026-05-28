@@ -1,0 +1,22 @@
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 32px;">
+  <tr>
+    <td style="padding-top: 24px; border-top: 1px solid #E2E8F0; font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 1.5; color: #64748B; text-align: center;">
+      <p style="margin: 0 0 8px; font-weight: 600; color: #475569;">{{ company_legal_name }}</p>
+      <p style="margin: 0 0 4px;">CNPJ: {{ cnpj }}</p>
+      {% for line in address_lines %}
+      <p style="margin: 0 0 4px;">{{ line }}</p>
+      {% endfor %}
+      <p style="margin: 12px 0 4px;">
+        Suporte:
+        <a href="mailto:{{ support_email }}" style="color: #1E3A8A; text-decoration: underline;">{{ support_email }}</a>
+        · WhatsApp {{ support_phone }}
+      </p>
+      <p style="margin: 12px 0 0; font-size: 11px; color: #94A3B8;">
+        Este e-mail foi enviado automaticamente pelo MarketChat. Por favor, nao responda diretamente a esta mensagem.
+      </p>
+      <p style="margin: 8px 0 0; font-size: 11px; color: #94A3B8;">
+        {{ current_year }} | &copy; {{ company_legal_name }} | Todos os Direitos Reservados.
+      </p>
+    </td>
+  </tr>
+</table>

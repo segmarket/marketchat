@@ -24,3 +24,5 @@ ASAAS_WEBHOOK_TOKEN = "test-webhook-token"
 ASAAS_WEBHOOK_VERIFY = False
 
 MEDIA_ROOT = BASE_DIR / "test_media"  # noqa: F405
+
+REDIS_URL = env("REDIS_URL", default="redis://127.0.0.1:6379/15")  # noqa: F405

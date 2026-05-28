@@ -213,6 +213,7 @@ export default function Home() {
           <ChartsBlurGuard locked={chartsLocked}>
             <StatisticsChart
               stabilitySeries={analytics?.stability_series}
+              stabilityMarketNames={analytics?.stability_market_names}
               loading={loading}
             />
           </ChartsBlurGuard>

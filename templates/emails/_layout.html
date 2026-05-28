@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>MarketChat</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F8FAFC; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #F8FAFC; margin: 0; padding: 0;">
+    <tr>
+      <td align="center" style="padding: 32px 16px;">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; width: 100%; margin: 0 auto;">
+          <tr>
+            <td align="center" style="padding-bottom: 24px;">
+              <img src="{{ logo_url }}" alt="MarketChat" width="220" style="display: block; max-width: 220px; width: 100%; height: auto; border: 0; outline: none; text-decoration: none;">
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #FFFFFF; border-radius: 8px; padding: 40px 32px; font-family: Arial, Helvetica, sans-serif; font-size: 16px; line-height: 1.5; color: #334155;">
+              {% block email_body %}{% endblock %}
+              {% include "emails/_footer.html" %}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

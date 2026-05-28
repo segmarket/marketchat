@@ -10,6 +10,13 @@ from apps.residents.services.session_activity import touch_chat_session_activity
 from apps.residents.services.session_lazy_expiration import maybe_reset_stale_chat_session
 from apps.integrations.models import WhatsappInstance
 from apps.integrations.services.message_interactive import event_has_image
+from apps.integrations.services.message_media import (
+    EMPTY_TEXT_FALLBACK_REPLY,
+    OUT_OF_CONTEXT_IMAGE_REPLY,
+    UNSUPPORTED_MEDIA_REPLY,
+    event_is_unsupported_media,
+)
+from apps.residents.services.whatsapp_reply import send_whatsapp_reply
 from apps.integrations.services.profile_sync import sync_profile_avatar_from_evolution
 from apps.integrations.services.provisioning import (
     SESSION_DISCONNECTED_REASON,
@@ -131,7 +138,26 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
     if not phone:
         return
 
+    if event_is_unsupported_media(
+        message_kind=event.message_kind,
+        raw_message=event.raw_message,
+    ):
+        send_whatsapp_reply(
+            instance, phone, UNSUPPORTED_MEDIA_REPLY, record_context=False,
+        )
+        logger.info(
+            "WhatsApp MESSAGE mídia não suportada: tenant=%s phone=%s kind=%s",
+            instance.tenant_id,
+            phone,
+            event.message_kind,
+        )
+        return
+
     text = (event.message_text or "").strip()
+    has_image = event_has_image(
+        message_kind=event.message_kind,
+        raw_message=event.raw_message,
+    )
     session = get_or_create_chat_session(instance.tenant_id, phone)
 
     resident_for_lazy = (
@@ -148,19 +174,45 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
     touch_chat_session_activity(session)
     onboarded = resident_has_completed_onboarding(instance.tenant_id, phone)
 
+    if (
+        onboarded
+        and has_image
+        and session.state != ChatSession.State.AWAITING_PHOTO
+    ):
+        send_whatsapp_reply(
+            instance, phone, OUT_OF_CONTEXT_IMAGE_REPLY, record_context=False,
+        )
+        logger.info(
+            "WhatsApp MESSAGE imagem fora de AWAITING_PHOTO: tenant=%s state=%s",
+            instance.tenant_id,
+            session.state,
+        )
+        return
+
+    if onboarded and text:
+        from apps.chatbot.services.chat_context_cache import append_message
+
+        append_message(
+            instance.tenant_id,
+            phone,
+            role="user",
+            content=text,
+        )
+
     intent_type = ""
     if onboarded and text and session.state == ChatSession.State.IDLE:
-        intent_type = classify_user_intent(text)
+        intent_type = classify_user_intent(
+            text,
+            tenant_id=instance.tenant_id,
+            phone=phone,
+        )
     elif not onboarded:
         intent_type = GENERAL
 
     message_kind = ChatMessageLog.MessageKind.TEXT
     if event.message_kind == "interactive":
         message_kind = ChatMessageLog.MessageKind.INTERACTIVE
-    elif event_has_image(
-        message_kind=event.message_kind,
-        raw_message=event.raw_message,
-    ):
+    elif has_image:
         message_kind = ChatMessageLog.MessageKind.IMAGE
 
     # Fotos de carrinho são registradas em evolution_media com attachment.
@@ -214,20 +266,26 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
 
     session.refresh_from_db(fields=["state"])
     if session.state != ChatSession.State.IDLE:
-        if not text and message_kind != ChatMessageLog.MessageKind.IMAGE:
+        if not text and not (
+            has_image and session.state == ChatSession.State.AWAITING_PHOTO
+        ):
             logger.info(
-                "WhatsApp MESSAGE ignorada fora de IDLE: tenant=%s state=%s",
+                "WhatsApp MESSAGE ignorada fora de IDLE: tenant=%s state=%s kind=%s",
                 instance.tenant_id,
                 session.state,
+                event.message_kind,
             )
         return
 
-    if not text and message_kind != ChatMessageLog.MessageKind.IMAGE:
+    if not text:
         logger.info(
-            "WhatsApp MESSAGE sem texto (mídia/ignorada): tenant=%s jid=%s kind=%s",
+            "WhatsApp MESSAGE sem texto (fallback): tenant=%s jid=%s kind=%s",
             instance.tenant_id,
             event.remote_jid,
             event.message_kind,
+        )
+        send_whatsapp_reply(
+            instance, phone, EMPTY_TEXT_FALLBACK_REPLY, record_context=False,
         )
         return
 

@@ -1,0 +1,26 @@
+MarketChat — Bem-vindo
+
+Ola, {{ first_name }}!
+
+Sua conta foi ativada com sucesso. O periodo de teste gratuito de {{ trial_days }} dias ja esta ativo para {{ company_name }}.
+
+Seu gerente virtual esta pronto para operar o mercado autonomo 24 horas por dia.
+
+O que voce acabou de ativar:
+
+- Vendas automatizadas no WhatsApp — Photo-Lock, Pix e montagem de carrinho quando a maquininha falhar.
+- Alertas de estoque e ruptura — falta de produto e validade viram avisos no painel em tempo real.
+- Monitoramento de infraestrutura — geladeira, ar-condicionado e equipamentos criticos notificam voce na hora.
+
+Acessar Meu Painel Administrativo:
+{{ action_url }}
+
+---
+{{ company_legal_name }}
+CNPJ: {{ cnpj }}
+{% for line in address_lines %}{{ line }}
+{% endfor %}
+Suporte: {{ support_email }} | WhatsApp {{ support_phone }}
+
+Este e-mail foi enviado automaticamente pelo MarketChat.
+{{ current_year }} | (c) {{ company_legal_name }} | Todos os Direitos Reservados.

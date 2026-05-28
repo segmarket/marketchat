@@ -1,17 +1,15 @@
 from __future__ import annotations
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
-from django.core.mail import send_mail
-from django.utils.encoding import force_bytes, force_str
-from django.utils.html import escape
-from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from apps.accounts.services.registration import RegistrationError, register_tenant_with_admin
+from apps.core.emails import send_welcome_trial_email_safe
 
 User = get_user_model()
 
@@ -65,7 +63,7 @@ class RegisterSerializer(serializers.Serializer):
             holder.pop("cpfCnpj", None)
         slug = (validated_data.get("tenant_slug") or "").strip() or None
         try:
-            _tenant, user = register_tenant_with_admin(
+            tenant, user = register_tenant_with_admin(
                 company_name=validated_data["company_name"],
                 slug=slug,
                 admin_email=validated_data["admin_email"],
@@ -78,6 +76,7 @@ class RegisterSerializer(serializers.Serializer):
             )
         except RegistrationError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
+        send_welcome_trial_email_safe(user, tenant)
         return user
 
 
@@ -116,52 +115,3 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         user.set_password(self.validated_data["new_password"])
         user.save(update_fields=["password"])
         return user
-
-
-def send_password_reset_email(user: User) -> None:
-    uid = urlsafe_base64_encode(force_bytes(user.pk))
-    token = default_token_generator.make_token(user)
-    base = (settings.FRONTEND_PASSWORD_RESET_URL or "").strip().rstrip("/")
-    link = f"{base}?uid={uid}&token={token}"
-    safe_href = escape(link)
-    text_body = (
-        "Olá,\n\n"
-        "Recebemos um pedido para redefinir a senha da sua conta MarketChat.\n\n"
-        f"Acesse o link abaixo para escolher uma nova senha (válido por tempo limitado):\n{link}\n\n"
-        "Se você não solicitou isso, ignore este e-mail.\n\n"
-        "— MarketChat"
-    )
-    html_body = f"""\
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
-<body style="margin:0;padding:24px;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
-  font-size:16px;line-height:1.5;color:#1f2937;background:#f9fafb;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;margin:0 auto;">
-    <tr><td style="background:#fff;border-radius:12px;padding:32px;border:1px solid #e5e7eb;">
-      <p style="margin:0 0 16px;">Olá,</p>
-      <p style="margin:0 0 16px;">Recebemos um pedido para <strong>redefinir a senha</strong> da sua conta
-        MarketChat.</p>
-      <p style="margin:0 0 24px;">Clique no botão abaixo para escolher uma nova senha. O link expira após
-        algum tempo por segurança.</p>
-      <p style="margin:0 0 24px;text-align:center;">
-        <a href="{safe_href}" style="display:inline-block;padding:12px 24px;background:#465fff;
-          color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Redefinir senha</a>
-      </p>
-      <p style="margin:0 0 8px;font-size:14px;color:#6b7280;">Se o botão não funcionar, copie e cole no
-        navegador:</p>
-      <p style="margin:0 0 24px;font-size:13px;word-break:break-all;color:#4b5563;">{safe_href}</p>
-      <p style="margin:0;font-size:14px;color:#6b7280;">Se você não solicitou isso, pode ignorar este e-mail.</p>
-    </td></tr>
-    <tr><td style="padding:16px 8px;text-align:center;font-size:12px;color:#9ca3af;">MarketChat</td></tr>
-  </table>
-</body>
-</html>"""
-    send_mail(
-        "Recuperação de senha — MarketChat",
-        text_body,
-        settings.DEFAULT_FROM_EMAIL,
-        [user.email],
-        fail_silently=False,
-        html_message=html_body,
-    )

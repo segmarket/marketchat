@@ -17,14 +17,28 @@ from apps.sales.services.cart_escape import (
     CHECKOUT_PHOTO_MESSAGE,
     LOOP_DECISION_FALLBACK,
     handle_global_escape,
+    is_global_escape_message,
     resolve_loop_choice_from_text,
+    should_escape_product_search_for_intent,
     try_checkout_from_text,
 )
 from apps.sales.services.cart_repository import get_or_create_open_cart
-from apps.sales.services.chat_fsm import record_discussed_product, transition
+from apps.sales.services.chat_fsm import (
+    clear_product_search_context,
+    record_discussed_product,
+    transition,
+)
+from apps.sales.services.product_selection import (
+    PRODUCT_SELECTION_ESCAPE_REPLY,
+    PRODUCT_SELECTION_INVALID_REPLY,
+    is_likely_new_product_search_text,
+    is_product_selection_escape,
+)
 from apps.sales.services.evolution_media import save_cart_photo_from_webhook
+from apps.sales.services.main_menu import handle_main_menu_message
 from apps.sales.services.product_search import (
     ASK_PRODUCT_MESSAGE,
+    MAIN_MENU_PURCHASE_PROMPT,
     is_product_term_none,
     search_active_products,
 )
@@ -153,6 +167,15 @@ def process_cart_flow(
             interactive_id,
         )
 
+    if session.state == ChatSession.State.AWAITING_MAIN_MENU and text:
+        return handle_main_menu_message(
+            instance=instance,
+            phone=phone,
+            resident=resident,
+            session=session,
+            text=text,
+        )
+
     if session.state == ChatSession.State.IDLE:
         if event.message_kind == "interactive" or interactive_id:
             return _dispatch_cart_state(
@@ -179,6 +202,35 @@ def process_cart_flow(
             )
 
     return False
+
+
+def _route_product_search_intent_escape(
+    tenant_id: int,
+    instance: WhatsappInstance,
+    phone: str,
+    resident: Resident,
+    session: ChatSession,
+    text: str,
+) -> bool:
+    """Sai de PRODUCT_SEARCH e delega ao gatekeeper em IDLE."""
+    transition(session, ChatSession.State.IDLE, reason="product_search_intent_escape")
+    logger.info(
+        "PRODUCT_SEARCH escape para gatekeeper: tenant=%s phone=%s text_len=%s",
+        tenant_id,
+        phone,
+        len(text),
+    )
+    return route_idle_message(
+        tenant_id=tenant_id,
+        instance=instance,
+        phone=phone,
+        resident=resident,
+        session=session,
+        message=text,
+        on_purchase=lambda: _handle_idle_purchase(
+            tenant_id, instance, phone, resident, session, text,
+        ),
+    )
 
 
 def _handle_idle_purchase(
@@ -222,6 +274,25 @@ def _dispatch_cart_state(
                 tenant_id, instance, phone, resident, session, text, interactive_id,
             )
         if text.strip():
+            list_handled = _handle_active_product_list_input(
+                tenant_id,
+                instance,
+                phone,
+                resident,
+                session,
+                text.strip(),
+            )
+            if list_handled is True:
+                return True
+            if should_escape_product_search_for_intent(text):
+                return _route_product_search_intent_escape(
+                    tenant_id,
+                    instance,
+                    phone,
+                    resident,
+                    session,
+                    text.strip(),
+                )
             return _handle_product_search(
                 tenant_id, instance, phone, resident, session, text.strip(),
             )
@@ -245,6 +316,44 @@ def _dispatch_cart_state(
     return False
 
 
+def _handle_active_product_list_input(
+    tenant_id: int,
+    instance: WhatsappInstance,
+    phone: str,
+    resident: Resident,
+    session: ChatSession,
+    text: str,
+) -> bool | None:
+    """
+    Trata mensagem quando há lista numerada pendente (temporary_name com SKUs).
+    Retorna True se tratou, False se deve seguir para nova busca, None se não há lista.
+    """
+    products = _load_products_from_session(session, tenant_id)
+    if not products:
+        return None
+
+    if is_product_selection_escape(text):
+        clear_product_search_context(session, clear_discussed=True)
+        transition(session, ChatSession.State.PRODUCT_SEARCH, reason="product_list_escape")
+        send_whatsapp_reply(instance, phone, PRODUCT_SELECTION_ESCAPE_REPLY)
+        return True
+
+    stripped = text.strip()
+    if stripped.isdigit():
+        idx = int(stripped)
+        if 1 <= idx <= len(products):
+            return False
+        send_whatsapp_reply(instance, phone, PRODUCT_SELECTION_INVALID_REPLY)
+        return True
+
+    if is_likely_new_product_search_text(text):
+        clear_product_search_context(session, clear_discussed=True)
+        return False
+
+    send_whatsapp_reply(instance, phone, PRODUCT_SELECTION_INVALID_REPLY)
+    return True
+
+
 def _handle_product_search(
     tenant_id: int,
     instance: WhatsappInstance,
@@ -253,6 +362,14 @@ def _handle_product_search(
     session: ChatSession,
     text: str,
 ) -> bool:
+    if handle_global_escape(
+        instance=instance,
+        phone=phone,
+        resident=resident,
+        text=text,
+    ):
+        return True
+
     try:
         term = extract_product_term(text)
     except ProductTermExtractorError:
@@ -266,6 +383,13 @@ def _handle_product_search(
     if is_product_term_none(term):
         if session.last_discussed_product_id:
             term = session.last_discussed_product.name
+        elif is_global_escape_message(text):
+            return handle_global_escape(
+                instance=instance,
+                phone=phone,
+                resident=resident,
+                text=text,
+            )
         else:
             cart = get_or_create_open_cart(resident)
             session.active_cart = cart
@@ -286,6 +410,8 @@ def _handle_product_search(
             )
             send_whatsapp_reply(instance, phone, ASK_PRODUCT_MESSAGE)
             return True
+
+    clear_product_search_context(session, clear_discussed=False, clear_pending=True)
 
     products = search_active_products(tenant_id, term)
     if not products:
@@ -353,7 +479,8 @@ def _handle_product_selection(
     send_whatsapp_reply(
         instance,
         phone,
-        f"Perfeito! Quantas unidades de {product.name} você vai levar? (Digite apenas o número)",
+        f"Perfeito! Quantas unidades de {product.name} você vai levar? "
+        "(Digite apenas o número ou digite Cancelar para recomeçar).",
     )
     return True
 
@@ -428,9 +555,14 @@ def _handle_loop_decision(
         return True
 
     if choice == CART_ADD_MORE:
-        session.pending_product = None
-        transition(session, ChatSession.State.IDLE, reason="add_more_items")
-        send_whatsapp_reply(instance, phone, "O que mais deseja levar? Digite o nome do produto.")
+        clear_product_search_context(session, clear_discussed=True)
+        transition(
+            session,
+            ChatSession.State.PRODUCT_SEARCH,
+            reason="add_more_items",
+            clear_pending=True,
+        )
+        send_whatsapp_reply(instance, phone, MAIN_MENU_PURCHASE_PROMPT)
         return True
 
     if choice == CART_CHECKOUT:

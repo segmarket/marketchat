@@ -9,6 +9,7 @@ import {
   Users,
 } from "lucide-react";
 import { Link, useLocation } from "react-router";
+import MarketchatLogo, { MARKETCHAT_LOGO_CLASS } from "../components/brand/MarketchatLogo";
 import { HorizontaLDots } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
 
@@ -148,15 +149,13 @@ const AppSidebar: React.FC = () => {
         className={`flex py-8 ${!showExpanded ? "lg:justify-center" : "justify-start"}`}
       >
         <Link to="/admin">
-          <img
-            src="/images/brand/logo_marketchat.png"
-            alt="MarketChat"
+          <MarketchatLogo
+            variant="theme"
             className={
               showExpanded
-                ? "h-9 w-auto max-h-9 object-contain object-left"
+                ? MARKETCHAT_LOGO_CLASS
                 : "h-8 w-auto max-h-8 object-contain object-left"
             }
-            decoding="async"
           />
         </Link>
       </div>

@@ -41,6 +41,7 @@ class ChatSession(models.Model):
         AWAITING_NAME = "AWAITING_NAME", "Aguardando nome"
         AWAITING_CONDO = "AWAITING_CONDO", "Aguardando condomínio"
         IDLE = "IDLE", "Conversa livre / compra"
+        AWAITING_MAIN_MENU = "AWAITING_MAIN_MENU", "Menu principal"
         PRODUCT_SEARCH = "PRODUCT_SEARCH", "Busca de produto"
         QUANTITY_SELECTION = "QUANTITY_SELECTION", "Seleção de quantidade"
         CART_REVIEW = "CART_REVIEW", "Revisão do carrinho"

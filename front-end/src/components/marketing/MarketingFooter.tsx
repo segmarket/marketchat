@@ -1,6 +1,6 @@
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import { getAppUrl } from "../../utils/host";
-import { MARKETING_LOGO_FOOTER_CLASS } from "./MarketingBrandLogo";
+import MarketchatLogo, { MARKETCHAT_LOGO_FOOTER_CLASS } from "../brand/MarketchatLogo";
 import { InstagramIcon, WhatsAppIcon } from "./MarketingSocialIcons";
 
 const WHATSAPP_SUPPORT_URL = "https://wa.me/5514991683639";
@@ -68,11 +68,9 @@ export default function MarketingFooter() {
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-12 lg:gap-8">
           {/* Marca + redes */}
           <div className="sm:col-span-2 lg:col-span-5">
-            <img
-              src="/images/brand/logotipo_marketchat_completo_BRANCO.gif"
-              alt="MarketChat"
-              className={`${MARKETING_LOGO_FOOTER_CLASS} max-h-10`}
-              decoding="async"
+            <MarketchatLogo
+              variant="onDarkBackground"
+              className={`${MARKETCHAT_LOGO_FOOTER_CLASS} max-h-10`}
             />
             <p className="mt-5 max-w-md text-sm leading-relaxed text-gray-400">
               Ecossistema completo para mercados autônomos: vendas no WhatsApp, alertas de

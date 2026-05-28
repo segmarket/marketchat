@@ -10,6 +10,7 @@ from apps.integrations.services.message_interactive import (
     extract_raw_message_dict,
     is_image_message,
 )
+from apps.integrations.services.message_media import detect_media_kind
 from apps.integrations.services.message_text import extract_message_text
 
 
@@ -91,7 +92,10 @@ def parse_evolution_payload(body: dict[str, Any]) -> EvolutionWebhookEvent | Non
 
     message_kind = "text"
     if isinstance(data, dict):
-        if is_image_message(data):
+        media_kind = detect_media_kind(data)
+        if media_kind:
+            message_kind = media_kind
+        elif is_image_message(data):
             message_kind = "image"
         elif interactive_id:
             message_kind = "interactive"

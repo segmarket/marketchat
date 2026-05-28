@@ -19,8 +19,7 @@ export type HourlyDistributionBucket = {
 
 export type StabilitySeriesPoint = {
   date: string;
-  line_total_sessions: number;
-  line_friction_points: number;
+  [marketName: string]: string | number;
 };
 
 export type ChatbotAnalyticsResponse = {
@@ -28,4 +27,5 @@ export type ChatbotAnalyticsResponse = {
   retention: ChatbotAnalyticsRetention;
   hourly_distribution: HourlyDistributionBucket[];
   stability_series: StabilitySeriesPoint[];
+  stability_market_names: string[];
 };

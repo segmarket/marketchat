@@ -3,6 +3,15 @@
 # Copie .env.staging.example para .env.staging e preencha os segredos.
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: marketchat_redis_staging
+    restart: always
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - marketchat_redis_staging:/data
+
   backend:
     build:
       context: .
@@ -16,10 +25,13 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.production
       DEBUG: "False"
+      REDIS_URL: redis://redis:6379/0
       # DATABASE_URL, EVOLUTION_* etc. vêm só de .env.staging (env_file).
       # Não defina DATABASE_URL aqui: a seção environment sobrescreve env_file no Compose.
     volumes:
       - marketchat_media_staging:/app/media
+    depends_on:
+      - redis
 
   frontend:
     build:
@@ -40,3 +52,4 @@ services:
 
 volumes:
   marketchat_media_staging:
+  marketchat_redis_staging:

@@ -269,3 +269,32 @@ def test_classify_intent_requires_api_key(settings):
 
     with pytest.raises(IntentClassifierError, match="Serviço de IA"):
         classify_intent(message="teste", intents=["a"])
+
+
+@pytest.mark.django_db
+def test_classify_intent_empty_message_skips_openai(settings):
+    settings.OPENAI_API_KEY = "sk-test"
+    from apps.chatbot.services.intent_classifier import classify_intent
+
+    with mock.patch("openai.OpenAI") as openai_cls:
+        result = classify_intent(message="   ", intents=["compra", "duvida"])
+
+    assert result == "compra"
+    openai_cls.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_classify_intent_bad_request_returns_fallback(settings):
+    settings.OPENAI_API_KEY = "sk-test"
+    from openai import BadRequestError
+    from apps.chatbot.services.intent_classifier import classify_intent
+
+    with mock.patch("openai.OpenAI") as openai_cls:
+        openai_cls.return_value.chat.completions.create.side_effect = BadRequestError(
+            "json required",
+            response=mock.Mock(status_code=400),
+            body=None,
+        )
+        result = classify_intent(message="quero comprar", intents=["compra", "duvida"])
+
+    assert result == "compra"

@@ -32,13 +32,7 @@ AUTOMATED_INTENTS = frozenset(
     },
 )
 
-FRICTION_INTENTS = frozenset(
-    {
-        ChatMessageLog.IntentType.MAINTENANCE_ISSUE,
-        ChatMessageLog.IntentType.PAYMENT_ERROR,
-        ChatMessageLog.IntentType.STOCK_ISSUE,
-    },
-)
+STABILITY_UNASSIGNED_MARKET_LABEL = "Sem mercado"
 
 HOURLY_BUCKETS: tuple[tuple[str, range], ...] = (
     ("00h-06h", range(0, 6)),
@@ -79,8 +73,7 @@ class HourlyBucket:
 @dataclass
 class StabilityDayPoint:
     date: str
-    line_total_sessions: int
-    line_friction_points: int
+    counts_by_market: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
@@ -89,6 +82,7 @@ class ChatbotAnalyticsPayload:
     retention: AnalyticsRetention
     hourly_distribution: list[HourlyBucket] = field(default_factory=list)
     stability_series: list[StabilityDayPoint] = field(default_factory=list)
+    stability_market_names: list[str] = field(default_factory=list)
 
 
 def parse_market_id(query_params: Any) -> int | None:
@@ -269,27 +263,51 @@ def _hourly_distribution(
     return [HourlyBucket(label=label, count=counts[label]) for label, _ in HOURLY_BUCKETS]
 
 
-def _stability_series(
+def _market_label_from_row(market_name: str | None) -> str:
+    cleaned = (market_name or "").strip()
+    return cleaned or STABILITY_UNASSIGNED_MARKET_LABEL
+
+
+def _stability_series_by_market(
     qs,
     today: date,
-) -> list[StabilityDayPoint]:
+) -> tuple[list[StabilityDayPoint], list[str]]:
     start = today - timedelta(days=29)
-    points: list[StabilityDayPoint] = []
+    end = today
 
+    rows = (
+        qs.filter(created_at__date__gte=start, created_at__date__lte=end)
+        .annotate(day=TruncDate("created_at"))
+        .values("day", "market__name")
+        .annotate(count=Count("id"))
+    )
+
+    counts_by_day: dict[date, dict[str, int]] = {}
+    market_names: set[str] = set()
+    for row in rows:
+        day_value = row["day"]
+        if day_value is None:
+            continue
+        label = _market_label_from_row(row.get("market__name"))
+        market_names.add(label)
+        day_bucket = counts_by_day.setdefault(day_value, {})
+        day_bucket[label] = day_bucket.get(label, 0) + int(row["count"] or 0)
+
+    ordered_markets = sorted(market_names)
+    points: list[StabilityDayPoint] = []
     for offset in range(30):
         day = start + timedelta(days=offset)
-        day_qs = qs.filter(created_at__date=day)
-        total = day_qs.count()
-        friction = day_qs.filter(intent_type__in=FRICTION_INTENTS).count()
+        day_counts = counts_by_day.get(day, {})
         points.append(
             StabilityDayPoint(
                 date=day.isoformat(),
-                line_total_sessions=total,
-                line_friction_points=friction,
+                counts_by_market={
+                    name: day_counts.get(name, 0) for name in ordered_markets
+                },
             ),
         )
 
-    return points
+    return points, ordered_markets
 
 
 def compute_chatbot_analytics(filters: AnalyticsFilters) -> ChatbotAnalyticsPayload:
@@ -317,11 +335,12 @@ def compute_chatbot_analytics(filters: AnalyticsFilters) -> ChatbotAnalyticsPayl
 
     retention = _retention_from_groups(filters, groups_current)
     hourly = _hourly_distribution(filters, groups_current)
-    stability = _stability_series(base_qs, today)
+    stability, stability_markets = _stability_series_by_market(base_qs, today)
 
     return ChatbotAnalyticsPayload(
         cards=cards,
         retention=retention,
         hourly_distribution=hourly,
         stability_series=stability,
+        stability_market_names=stability_markets,
     )

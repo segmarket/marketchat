@@ -4,6 +4,7 @@ Variáveis de ambiente vêm de arquivos carregados em `local.py`, `production.py
 (ver `dotenv_loader.load_env`). Não chame `read_env` aqui para evitar ordem duplicada.
 """
 from datetime import timedelta
+import hashlib
 import os
 from pathlib import Path
 
@@ -33,6 +34,18 @@ env = environ.Env(
 
 SECRET_KEY = env("SECRET_KEY", default="unsafe-dev-key-change-in-production")
 DEBUG = env.bool("DEBUG", default=False)
+
+
+def _jwt_signing_key() -> str:
+    """
+    Chave dedicada para assinar JWT (evita reutilizar SECRET_KEY curta e alertas PyJWT).
+    Use JWT_SIGNING_KEY no .env em produção (mín. 32 bytes para HS256).
+    """
+    dedicated = (env("JWT_SIGNING_KEY", default="") or "").strip()
+    key = dedicated or SECRET_KEY
+    if len(key.encode("utf-8")) < 32:
+        return hashlib.sha256(key.encode("utf-8")).hexdigest()
+    return key
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 
 INSTALLED_APPS = [
@@ -56,6 +69,7 @@ INSTALLED_APPS = [
     "apps.sales",
     "apps.notifications",
     "apps.onboarding",
+    "apps.core",
 ]
 
 MIDDLEWARE = [
@@ -122,10 +136,18 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
 }
 
+REDIS_URL = env("REDIS_URL", default="redis://127.0.0.1:6379/0")
+CHAT_CONTEXT_TTL_SECONDS = env.int("CHAT_CONTEXT_TTL_SECONDS", default=1200)
+CHAT_CONTEXT_MAX_MESSAGES = env.int("CHAT_CONTEXT_MAX_MESSAGES", default=4)
+PRODUCT_FUZZY_MATCH_THRESHOLD = env.float("PRODUCT_FUZZY_MATCH_THRESHOLD", default=0.65)
+
 CACHES = {
     "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "marketchat",
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": REDIS_URL,
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
     }
 }
 
@@ -133,6 +155,8 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "AUTH_HEADER_TYPES": ("Bearer",),
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": _jwt_signing_key(),
 }
 
 CORS_ALLOW_ALL_ORIGINS = env.bool("CORS_ALLOW_ALL_ORIGINS", default=False)
@@ -154,11 +178,46 @@ EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=False)
 # e o certificado é emitido para outro nome (ex.: Mailhostbox).
 EMAIL_SMTP_TLS_SERVERNAME = env("EMAIL_SMTP_TLS_SERVERNAME", default="")
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@localhost")
+# Remetente dos e-mails transacionais. Deve ser um endereço autorizado no SMTP (mesmo domínio/conta
+# que EMAIL_HOST_USER). Se vazio, usa DEFAULT_FROM_EMAIL com nome "MarketChat".
+_transactional_from = env("TRANSACTIONAL_FROM_EMAIL", default="").strip()
+if _transactional_from:
+    TRANSACTIONAL_FROM_EMAIL = _transactional_from
+elif DEFAULT_FROM_EMAIL and "<" not in DEFAULT_FROM_EMAIL:
+    TRANSACTIONAL_FROM_EMAIL = f"MarketChat <{DEFAULT_FROM_EMAIL.strip()}>"
+else:
+    TRANSACTIONAL_FROM_EMAIL = DEFAULT_FROM_EMAIL
 
+MARKETING_PUBLIC_ORIGIN = env("MARKETING_PUBLIC_ORIGIN", default="http://localhost:5173").rstrip("/")
+# Painel React (rotas /signin, /reset-password). Em dev use app.localhost (mesma porta do Vite).
+FRONTEND_APP_ORIGIN = env("FRONTEND_APP_ORIGIN", default="http://app.localhost:5173").rstrip("/")
+FRONTEND_SIGNIN_URL = env(
+    "FRONTEND_SIGNIN_URL",
+    default=f"{FRONTEND_APP_ORIGIN}/signin",
+).rstrip("/")
 FRONTEND_PASSWORD_RESET_URL = env(
     "FRONTEND_PASSWORD_RESET_URL",
-    default="http://localhost:5173/reset-password",
+    default=f"{FRONTEND_APP_ORIGIN}/reset-password",
+).rstrip("/")
+
+# Logo nos e-mails: anexo inline (CID) se o arquivo existir; senão URL pública.
+EMAIL_BRAND_LOGO_CID = "marketchat-logo"
+EMAIL_BRAND_LOGO_PATH = env(
+    "EMAIL_BRAND_LOGO_PATH",
+    default=str(
+        BASE_DIR
+        / "front-end"
+        / "public"
+        / "images"
+        / "brand"
+        / "logotipo_marketchat_completo_PRETO.gif"
+    ),
 )
+EMAIL_BRAND_LOGO_URL = env("EMAIL_BRAND_LOGO_URL", default="").strip()
+if not EMAIL_BRAND_LOGO_URL:
+    EMAIL_BRAND_LOGO_URL = (
+        f"{MARKETING_PUBLIC_ORIGIN}/images/brand/logotipo_marketchat_completo_PRETO.gif"
+    )
 
 ASAAS_API_URL = env("ASAAS_API_URL", default="https://api-sandbox.asaas.com/v3")
 # Chaves Asaas começam com "$aact_...". O django-environ trata "$" no início como "proxy" para outra
