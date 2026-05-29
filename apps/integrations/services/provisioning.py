@@ -331,6 +331,42 @@ def provision_whatsapp_instance(
     }
 
 
+SUSPENSION_DISCONNECT_REASON = (
+    "Assinatura suspensa. Gere um novo QR Code no painel após regularizar o pagamento."
+)
+
+
+def logout_whatsapp_session(
+    instance: WhatsappInstance,
+    *,
+    client: EvolutionClient | None = None,
+    reason: str = SUSPENSION_DISCONNECT_REASON,
+) -> None:
+    """Encerra sessão WhatsApp no Evolution sem apagar a instância (reconexão via QR)."""
+    client = client or EvolutionClient()
+    if not (instance.api_key or "").strip():
+        mark_whatsapp_session_disconnected(instance, reason=reason)
+        return
+    try:
+        client.logout_instance(instance_api_key=instance.api_key)
+    except Exception:
+        logger.warning(
+            "Evolution logout falhou para %s",
+            instance.instance_name,
+            exc_info=True,
+        )
+        raise
+    try:
+        client.disconnect_remote_session(instance_api_key=instance.api_key)
+    except Exception:
+        logger.debug(
+            "Evolution disconnect opcional falhou para %s (ignorado)",
+            instance.instance_name,
+            exc_info=True,
+        )
+    mark_whatsapp_session_disconnected(instance, reason=reason)
+
+
 def disconnect_whatsapp_instance(
     instance: WhatsappInstance,
     *,

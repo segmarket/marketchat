@@ -30,6 +30,29 @@ def _unique_slug(base_slug: str) -> str:
     return candidate
 
 
+def _attribution_kwargs(attribution: dict[str, Any] | None) -> dict[str, str]:
+    if not attribution:
+        return {}
+    fields = (
+        "utm_source",
+        "utm_medium",
+        "utm_campaign",
+        "utm_term",
+        "utm_content",
+        "gclid",
+        "fbclid",
+    )
+    result: dict[str, str] = {}
+    for field in fields:
+        raw = attribution.get(field)
+        if raw is None:
+            continue
+        value = str(raw).strip()[:255]
+        if value:
+            result[field] = value
+    return result
+
+
 def register_tenant_with_admin(
     *,
     company_name: str,
@@ -41,6 +64,7 @@ def register_tenant_with_admin(
     credit_card: dict[str, Any],
     credit_card_holder_info: dict[str, Any],
     remote_ip: str,
+    attribution: dict[str, Any] | None = None,
 ) -> tuple[Tenant, User]:
     base = slugify(slug or company_name) or "empresa"
     now = timezone.now()
@@ -58,6 +82,7 @@ def register_tenant_with_admin(
                 trial_started_at=now,
                 trial_ends_at=trial_end,
                 subscription_status=Tenant.SubscriptionStatus.TRIAL,
+                **_attribution_kwargs(attribution),
             )
             user = User.objects.create_user(
                 admin_email,

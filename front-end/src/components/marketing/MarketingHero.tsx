@@ -1,10 +1,14 @@
-import { getAppUrl } from "../../utils/host";
+import { Check, Lock } from "lucide-react";
 import ChatMockup from "./ChatMockup";
 import DashboardMockup from "./DashboardMockup";
+import MarketingCtaLink from "./MarketingCtaLink";
 
 export default function MarketingHero() {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-brand-25 to-white px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
+    <section
+      id="marketing-hero"
+      className="relative overflow-hidden bg-gradient-to-b from-brand-25 to-white px-4 py-16 sm:px-6 sm:py-24 lg:px-8"
+    >
       <div className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-2 lg:gap-16">
         <div>
           <p className="mb-4 inline-flex rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700 ring-1 ring-brand-200">
@@ -19,12 +23,24 @@ export default function MarketingHero() {
             tempo real e deixe nossa Inteligência Artificial lidar com o suporte dos moradores.
             Tudo em um único painel.
           </p>
-          <a
-            href={getAppUrl("/signin")}
+          <MarketingCtaLink
             className="mt-8 inline-flex animate-pulse items-center justify-center rounded-md bg-green-500 px-8 py-4 text-lg font-semibold text-white shadow-md transition-all hover:bg-green-600"
           >
             Começar 7 Dias Grátis
-          </a>
+          </MarketingCtaLink>
+          <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500">
+            <span className="inline-flex items-center gap-1.5">
+              <Lock className="size-3.5 shrink-0 text-brand-500" aria-hidden />
+              7 dias grátis
+            </span>
+            <span aria-hidden>•</span>
+            <span className="inline-flex items-center gap-1.5">
+              <Check className="size-3.5 shrink-0 text-green-600" aria-hidden />
+              Cancele quando quiser
+            </span>
+            <span aria-hidden>•</span>
+            <span>Cobrança só após o trial</span>
+          </p>
         </div>
 
         <div className="relative flex items-center justify-center gap-4 lg:justify-end">

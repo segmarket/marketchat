@@ -792,6 +792,20 @@ span.flatpickr-weekday,
 }
 
 /* Barra de loading indeterminada (consulta CEP) */
+@keyframes spotlight-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-spotlight-float {
+  animation: spotlight-float 2s ease-in-out infinite;
+}
+
 @keyframes cep-load-slide {
   0% {
     transform: translateX(-100%);

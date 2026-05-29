@@ -53,7 +53,7 @@ def test_overdue_day_4_blocks_and_suspends():
     client = _auth_client(user)
 
     with mock.patch(
-        "apps.billing.services.tenant_suspension.disconnect_whatsapp_instance",
+        "apps.billing.services.subscription_enforcement.logout_tenant_whatsapp_sessions",
     ):
         response = client.get(reverse("products-list"))
 

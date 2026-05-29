@@ -194,6 +194,56 @@ Resposta `GET latest`: `{ "unread_count": number, "results": [{ "id", "title", "
 
 Resposta `POST read-all`: `{ "marked_read": number }`.
 
+## Suporte Copilot (`/api/support/`)
+
+Assistente de IA contextual do painel admin. Usa `OPENAI_API_KEY` e `OPENAI_MODEL` (padrão `gpt-4o-mini`) com `temperature=0.3` e contexto injetado conforme `current_route` (pathname + query string do front).
+
+| Método | Caminho | Autenticação | Descrição |
+|--------|---------|--------------|-----------|
+| POST | `/api/support/chat/` | JWT | Envia mensagem do operador e recebe resposta do copilot. |
+
+Corpo POST:
+
+- `message` (obrigatório, até 2000 caracteres)
+- `current_route` (obrigatório, até 512 caracteres — ex.: `/admin/settings?section=integrations`)
+- `chat_history` (opcional, até 20 itens `{ "role": "user" \| "assistant", "content": "..." }`)
+
+Resposta: `{ "reply": "<texto>" }`.
+
+Erros: `400` (validação), `502` (falha na OpenAI), `503` (`OPENAI_API_KEY` ausente).
+
+Variáveis opcionais: `SUPPORT_COPILOT_HISTORY_MAX` (padrão 20), `SUPPORT_COPILOT_MAX_TOKENS` (padrão 500), `SUPPORT_COPILOT_TEMPERATURE` (padrão 0.3).
+
+### Tickets de suporte (`/api/support/tickets/`)
+
+Chamados manuais e thread de mensagens (`SupportTicketMessage`). Listagem e detalhe escopados por **tenant** do usuário logado.
+
+| Método | Caminho | Autenticação | Descrição |
+|--------|---------|--------------|-----------|
+| GET | `/api/support/tickets/` | JWT | Lista todos os chamados da empresa (tenant). |
+| POST | `/api/support/tickets/` | JWT | Abre chamado (+ primeira mensagem com o `description`). |
+| GET | `/api/support/tickets/<id>/` | JWT | Detalhe com `messages[]` em ordem cronológica. |
+| PATCH | `/api/support/tickets/<id>/` | JWT | Atualiza status (`RESOLVED` ou `CLOSED`) pelo operador no painel. |
+| POST | `/api/support/tickets/<id>/reply/` | JWT | Nova mensagem do operador (`is_from_admin=false`). |
+
+Corpo POST (criar):
+
+- `subject`, `description`, `category_route`
+
+Resposta `201` (criar): `{ "id", "subject", "status", "priority", "created_at" }`.
+
+Corpo POST (reply): `{ "message" }` (até 4000 caracteres). Resposta `201`: `{ "ticket_id", "status", "message": { ... } }`.
+
+Corpo PATCH: `{ "status": "RESOLVED" | "CLOSED" }`. Resposta `200`: detalhe completo do ticket. Reply bloqueado em `RESOLVED` e `CLOSED`.
+
+Item da lista: `id`, `subject`, `status`, `priority`, `category_route`, `created_at`, `updated_at`, `user_email`, `message_count`.
+
+Detalhe inclui `description` e `messages[]` (`id`, `sender_email`, `sender_name`, `is_from_admin`, `message`, `created_at`).
+
+Erros: `400` (sem tenant, validação, ticket `CLOSED` no reply), `404` (ticket de outro tenant).
+
+Gestão interna: Django Admin com inline de mensagens; nova resposta do suporte no inline define `is_from_admin=true` e move `NEW` → `IN_PROGRESS`.
+
 ## Onboarding gamificado (`/api/onboarding/`)
 
 Jornada de setup (4 missões). O `GET status` sincroniza automaticamente o progresso com mercados, pelo menos um produto cadastrado, WhatsApp conectado e primeiro pedido concluído com foto de auditoria.

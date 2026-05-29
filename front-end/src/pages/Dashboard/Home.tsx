@@ -192,9 +192,11 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-4 md:gap-6">
-        <div className="col-span-12 space-y-6 xl:col-span-7">
-          <EcommerceMetrics cards={analytics?.cards ?? null} loading={loading} />
+      <div className="space-y-6">
+        <EcommerceMetrics cards={analytics?.cards ?? null} loading={loading} />
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <div className="xl:col-span-2">
           <ChartsBlurGuard locked={chartsLocked}>
             <MonthlySalesChart
               hourlyDistribution={analytics?.hourly_distribution}
@@ -203,21 +205,20 @@ export default function Home() {
           </ChartsBlurGuard>
         </div>
 
-        <div className="col-span-12 xl:col-span-5">
+        <div>
           <ChartsBlurGuard locked={chartsLocked}>
             <MonthlyTarget retention={analytics?.retention ?? null} loading={loading} />
           </ChartsBlurGuard>
         </div>
+      </div>
 
-        <div className="col-span-12">
-          <ChartsBlurGuard locked={chartsLocked}>
-            <StatisticsChart
-              stabilitySeries={analytics?.stability_series}
-              stabilityMarketNames={analytics?.stability_market_names}
-              loading={loading}
-            />
-          </ChartsBlurGuard>
-        </div>
+      <ChartsBlurGuard locked={chartsLocked}>
+        <StatisticsChart
+          stabilitySeries={analytics?.stability_series}
+          stabilityMarketNames={analytics?.stability_market_names}
+          loading={loading}
+        />
+      </ChartsBlurGuard>
       </div>
     </AdminPageLayout>
   );

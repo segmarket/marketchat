@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import AdminPageLayout from "../../components/layout/AdminPageShell";
+import OnboardingSpotlight from "../../components/onboarding/OnboardingSpotlight";
 import ProductEditModal from "../../components/products/ProductEditModal";
 import ProductImportConfirmModal from "../../components/products/ProductImportConfirmModal";
 import ProductsSearchPanel from "../../components/products/ProductsSearchPanel";
@@ -19,11 +20,15 @@ import {
   type ProductsSearchFilters,
 } from "../../features/products/searchTypes";
 import type { ImportPreviewResponse, Product } from "../../features/products/types";
+import { PRODUCT_IMPORT_SPOTLIGHT_COPY } from "../../features/onboarding/productImportSpotlightCopy";
+import { useOnboardingStatus } from "../../features/onboarding/useOnboardingStatus";
 import { getAxiosErrorMessage } from "../../utils/apiError";
 
 type Props = {
   embedded?: boolean;
 };
+
+type SpotlightStep = "DOWNLOAD" | "IMPORT";
 
 export default function ProductsPage({ embedded = false }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -37,6 +42,9 @@ export default function ProductsPage({ embedded = false }: Props) {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [importPreview, setImportPreview] = useState<ImportPreviewResponse | null>(null);
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const [spotlightStep, setSpotlightStep] = useState<SpotlightStep | null>(null);
+  const spotlightWasEligibleRef = useRef(false);
+  const { status: onboarding, loading: onboardingLoading } = useOnboardingStatus();
 
   const loadProducts = useCallback(async (filters: ProductsSearchFilters) => {
     setLoading(true);
@@ -55,10 +63,37 @@ export default function ProductsPage({ embedded = false }: Props) {
     void loadProducts(appliedFilters);
   }, [appliedFilters, loadProducts]);
 
+  const filtersActive = hasActiveProductsFilters(appliedFilters);
+
+  const spotlightEligible =
+    !loading &&
+    !onboardingLoading &&
+    onboarding !== null &&
+    !onboarding.step_product_created &&
+    products.length === 0 &&
+    !filtersActive;
+
+  useEffect(() => {
+    if (spotlightEligible && !spotlightWasEligibleRef.current) {
+      setSpotlightStep("DOWNLOAD");
+    }
+    if (!spotlightEligible) {
+      setSpotlightStep(null);
+      spotlightWasEligibleRef.current = false;
+    } else {
+      spotlightWasEligibleRef.current = true;
+    }
+  }, [spotlightEligible]);
+
   async function handleDownloadTemplate() {
+    await downloadProductsTemplate();
+    toast.success("Modelo baixado.");
+  }
+
+  async function handleDownloadTemplateSpotlight() {
     try {
-      await downloadProductsTemplate();
-      toast.success("Modelo baixado.");
+      await handleDownloadTemplate();
+      setSpotlightStep("IMPORT");
     } catch (err) {
       toast.error(getAxiosErrorMessage(err, { notAxiosMessage: "Falha ao baixar modelo." }));
     }
@@ -66,6 +101,11 @@ export default function ProductsPage({ embedded = false }: Props) {
 
   function handleImportClick() {
     fileInputRef.current?.click();
+  }
+
+  function handleImportClickSpotlight() {
+    setSpotlightStep(null);
+    handleImportClick();
   }
 
   function resetFileInput() {
@@ -81,6 +121,8 @@ export default function ProductsPage({ embedded = false }: Props) {
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setSpotlightStep(null);
+
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -118,26 +160,66 @@ export default function ProductsPage({ embedded = false }: Props) {
     setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
   }
 
-  const filtersActive = hasActiveProductsFilters(appliedFilters);
   const listBusy = loading || analyzing;
+
+  const downloadButton = (
+    <Button
+      variant="outline"
+      onClick={() => void handleDownloadTemplate()}
+      disabled={analyzing}
+    >
+      Baixar Modelo de Planilha
+    </Button>
+  );
+
+  const importButton = (
+    <Button onClick={handleImportClick} disabled={analyzing}>
+      {analyzing ? (
+        <span className="inline-flex items-center gap-2">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          Analisando planilha…
+        </span>
+      ) : (
+        "Importar Planilha"
+      )}
+    </Button>
+  );
 
   const panelBody = (
     <>
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => void handleDownloadTemplate()} disabled={analyzing}>
-              Baixar Modelo de Planilha
-            </Button>
-            <Button onClick={handleImportClick} disabled={analyzing}>
-              {analyzing ? (
-                <span className="inline-flex items-center gap-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  Analisando planilha…
-                </span>
-              ) : (
-                "Importar Planilha"
-              )}
-            </Button>
+            {spotlightStep === "DOWNLOAD" ? (
+              <OnboardingSpotlight message={PRODUCT_IMPORT_SPOTLIGHT_COPY.download}>
+                <Button
+                  variant="outline"
+                  onClick={() => void handleDownloadTemplateSpotlight()}
+                  disabled={analyzing}
+                >
+                  Baixar Modelo de Planilha
+                </Button>
+              </OnboardingSpotlight>
+            ) : (
+              downloadButton
+            )}
+
+            {spotlightStep === "IMPORT" ? (
+              <OnboardingSpotlight message={PRODUCT_IMPORT_SPOTLIGHT_COPY.import}>
+                <Button onClick={handleImportClickSpotlight} disabled={analyzing}>
+                  {analyzing ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Analisando planilha…
+                    </span>
+                  ) : (
+                    "Importar Planilha"
+                  )}
+                </Button>
+              </OnboardingSpotlight>
+            ) : (
+              importButton
+            )}
+
             <input
               ref={fileInputRef}
               type="file"

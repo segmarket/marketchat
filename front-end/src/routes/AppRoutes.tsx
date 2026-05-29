@@ -11,6 +11,7 @@ import ChatLogsPage from "../pages/admin/ChatLogsPage";
 import SalesDashboard from "../pages/admin/SalesDashboard";
 import ResidentsPage from "../pages/admin/ResidentsPage";
 import ProductsPage from "../pages/admin/ProductsPage";
+import SupportHistoryPage from "../pages/admin/SupportHistoryPage";
 import NotFound from "../pages/OtherPage/NotFound";
 import BillingBlocked from "../pages/admin/BillingBlocked";
 import TrialExpired from "../pages/admin/TrialExpired";
@@ -37,6 +38,7 @@ export default function AppRoutes() {
           <Route path="sales" element={<SalesDashboard />} />
           <Route path="residents" element={<ResidentsPage />} />
           <Route path="products" element={<ProductsPage />} />
+          <Route path="support" element={<SupportHistoryPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="chatbot-flows" element={<ChatbotFlowsPage />} />
 

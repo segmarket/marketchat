@@ -28,6 +28,13 @@ class Tenant(models.Model):
     )
     overdue_since = models.DateTimeField(null=True, blank=True)
     billing_blocked_at = models.DateTimeField(null=True, blank=True)
+    utm_source = models.CharField(max_length=255, blank=True, default="")
+    utm_medium = models.CharField(max_length=255, blank=True, default="")
+    utm_campaign = models.CharField(max_length=255, blank=True, default="")
+    utm_term = models.CharField(max_length=255, blank=True, default="")
+    utm_content = models.CharField(max_length=255, blank=True, default="")
+    gclid = models.CharField(max_length=255, blank=True, default="")
+    fbclid = models.CharField(max_length=255, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     "apps.sales",
     "apps.notifications",
     "apps.onboarding",
+    "apps.support",
     "apps.core",
 ]
 
@@ -242,6 +243,9 @@ RESIDENT_CONDO_MATCH_MIN_RATIO = env.float("RESIDENT_CONDO_MATCH_MIN_RATIO", def
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_MODEL = env("OPENAI_MODEL", default="gpt-4o-mini")
 OPENAI_HISTORY_WINDOW = env.int("OPENAI_HISTORY_WINDOW", default=6)
+SUPPORT_COPILOT_HISTORY_MAX = env.int("SUPPORT_COPILOT_HISTORY_MAX", default=20)
+SUPPORT_COPILOT_MAX_TOKENS = env.int("SUPPORT_COPILOT_MAX_TOKENS", default=500)
+SUPPORT_COPILOT_TEMPERATURE = env.float("SUPPORT_COPILOT_TEMPERATURE", default=0.3)
 
 # Inatividade: ao receber mensagem após este intervalo, carrinho e FSM são resetados.
 CHAT_SESSION_LAZY_EXPIRY_MINUTES = env.int("CHAT_SESSION_LAZY_EXPIRY_MINUTES", default=30)

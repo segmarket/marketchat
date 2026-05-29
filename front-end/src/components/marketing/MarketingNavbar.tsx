@@ -1,5 +1,6 @@
 import { getAppUrl } from "../../utils/host";
 import MarketingBrandLogo, { MARKETING_LOGO_CLASS } from "./MarketingBrandLogo";
+import MarketingCtaLink from "./MarketingCtaLink";
 
 const NAV_LINKS = [
   { label: "Pilares", href: "#pilares" },
@@ -27,12 +28,20 @@ export default function MarketingNavbar() {
           ))}
         </nav>
 
-        <a
-          href={getAppUrl()}
-          className="rounded-md bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
-        >
-          Acessar Sistema
-        </a>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <MarketingCtaLink
+            path="/auth/signup"
+            className="hidden rounded-md bg-green-500 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-600 sm:inline-flex"
+          >
+            Teste grátis
+          </MarketingCtaLink>
+          <a
+            href={getAppUrl()}
+            className="rounded-md bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
+          >
+            Acessar Sistema
+          </a>
+        </div>
       </div>
     </header>
   );

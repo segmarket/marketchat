@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import AdminPageLayout from "../../components/layout/AdminPageShell";
+import FirstMarketSpotlight from "../../components/onboarding/FirstMarketSpotlight";
 import MarketDeleteConfirmModal from "../../components/markets/MarketDeleteConfirmModal";
 import MarketFormModal from "../../components/markets/MarketFormModal";
 import MarketsSearchPanel from "../../components/markets/MarketsSearchPanel";
@@ -13,6 +14,7 @@ import {
   type MarketsSearchFilters,
 } from "../../features/markets/searchTypes";
 import type { Market } from "../../features/markets/types";
+import { useOnboardingStatus } from "../../features/onboarding/useOnboardingStatus";
 import { getAxiosErrorMessage } from "../../utils/apiError";
 
 type Props = {
@@ -30,6 +32,8 @@ export default function MarketsPage({ embedded = false }: Props) {
   const [editingMarket, setEditingMarket] = useState<Market | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Market | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [spotlightDismissed, setSpotlightDismissed] = useState(false);
+  const { status: onboarding, loading: onboardingLoading } = useOnboardingStatus();
 
   const loadMarkets = useCallback(async (filters: MarketsSearchFilters) => {
     setLoading(true);
@@ -52,6 +56,11 @@ export default function MarketsPage({ embedded = false }: Props) {
     setFormMode("create");
     setEditingMarket(null);
     setFormOpen(true);
+  }
+
+  function handleCreateClick() {
+    setSpotlightDismissed(true);
+    openCreateModal();
   }
 
   function openEditModal(market: Market) {
@@ -87,10 +96,26 @@ export default function MarketsPage({ embedded = false }: Props) {
 
   const filtersActive = hasActiveMarketsFilters(appliedFilters);
 
+  const spotlightEligible =
+    !loading &&
+    !onboardingLoading &&
+    onboarding !== null &&
+    !onboarding.step_market_created &&
+    markets.length === 0 &&
+    !filtersActive;
+
+  const showSpotlightTour = spotlightEligible && !spotlightDismissed;
+
   const panelBody = (
     <>
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
-          <Button onClick={openCreateModal}>+ Adicionar Novo Mercado</Button>
+          {showSpotlightTour ? (
+            <FirstMarketSpotlight>
+              <Button onClick={handleCreateClick}>+ Adicionar Novo Mercado</Button>
+            </FirstMarketSpotlight>
+          ) : (
+            <Button onClick={openCreateModal}>+ Adicionar Novo Mercado</Button>
+          )}
         </div>
 
         <MarketsSearchPanel

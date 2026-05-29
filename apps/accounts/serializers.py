@@ -43,6 +43,16 @@ class CreditCardHolderSerializer(serializers.Serializer):
     phone = serializers.CharField()
 
 
+class AttributionSerializer(serializers.Serializer):
+    utm_source = serializers.CharField(required=False, allow_blank=True, default="")
+    utm_medium = serializers.CharField(required=False, allow_blank=True, default="")
+    utm_campaign = serializers.CharField(required=False, allow_blank=True, default="")
+    utm_term = serializers.CharField(required=False, allow_blank=True, default="")
+    utm_content = serializers.CharField(required=False, allow_blank=True, default="")
+    gclid = serializers.CharField(required=False, allow_blank=True, default="")
+    fbclid = serializers.CharField(required=False, allow_blank=True, default="")
+
+
 class RegisterSerializer(serializers.Serializer):
     company_name = serializers.CharField(max_length=255)
     tenant_slug = serializers.SlugField(required=False, allow_blank=True, max_length=80)
@@ -52,6 +62,7 @@ class RegisterSerializer(serializers.Serializer):
     last_name = serializers.CharField(required=False, allow_blank=True, default="")
     credit_card = CreditCardSerializer()
     credit_card_holder = CreditCardHolderSerializer()
+    attribution = AttributionSerializer(required=False)
 
     def create(self, validated_data: dict) -> User:
         request = self.context["request"]
@@ -62,6 +73,7 @@ class RegisterSerializer(serializers.Serializer):
         if not (holder.get("cpfCnpj") or "").strip():
             holder.pop("cpfCnpj", None)
         slug = (validated_data.get("tenant_slug") or "").strip() or None
+        attribution = validated_data.pop("attribution", None) or {}
         try:
             tenant, user = register_tenant_with_admin(
                 company_name=validated_data["company_name"],
@@ -73,6 +85,7 @@ class RegisterSerializer(serializers.Serializer):
                 credit_card=dict(card),
                 credit_card_holder_info=holder,
                 remote_ip=remote_ip,
+                attribution=attribution,
             )
         except RegistrationError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc

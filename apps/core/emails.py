@@ -31,6 +31,7 @@ User = get_user_model()
 
 WELCOME_SUBJECT = "Bem-vindo ao MarketChat - Seu gerente virtual esta pronto"
 PASSWORD_RESET_SUBJECT = "Recuperacao de Senha - MarketChat"
+SUBSCRIPTION_SUSPENDED_SUBJECT = "MarketChat pausado - Regularize sua assinatura"
 
 
 def _display_first_name(user: User) -> str:
@@ -172,4 +173,49 @@ def send_welcome_trial_email_safe(user: User, tenant: Tenant) -> None:
             "Falha ao enviar e-mail de boas-vindas para %s (tenant=%s)",
             user.email,
             tenant.pk,
+        )
+
+
+def send_subscription_suspended_email(
+    user: User,
+    tenant: Tenant,
+    *,
+    reason: str,
+    reason_label: str,
+) -> None:
+    context = build_email_context(
+        first_name=_display_first_name(user),
+        company_name=tenant.name,
+        suspension_reason_label=reason_label,
+        action_url=(settings.FRONTEND_SIGNIN_URL or "").strip(),
+    )
+    send_market_transactional_email(
+        SUBSCRIPTION_SUSPENDED_SUBJECT,
+        "subscription_suspended",
+        context,
+        user.email,
+    )
+
+
+def send_subscription_suspended_email_safe(
+    user: User,
+    tenant: Tenant,
+    *,
+    reason: str,
+    reason_label: str,
+) -> None:
+    """Não propaga falha de SMTP na task de suspensão."""
+    try:
+        send_subscription_suspended_email(
+            user,
+            tenant,
+            reason=reason,
+            reason_label=reason_label,
+        )
+    except Exception:
+        logger.exception(
+            "Falha ao enviar e-mail de suspensão para %s (tenant=%s reason=%s)",
+            user.email,
+            tenant.pk,
+            reason,
         )

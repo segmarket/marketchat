@@ -5,6 +5,7 @@ import GracePeriodBanner from "../components/billing/GracePeriodBanner";
 import { useAuth } from "../context/AuthContext";
 import BillingBlocked from "../pages/admin/BillingBlocked";
 import TrialExpired from "../pages/admin/TrialExpired";
+import SupportCopilot from "../components/support/SupportCopilot";
 import AppHeader from "./AppHeader";
 import Backdrop from "./Backdrop";
 import AppSidebar from "./AppSidebar";
@@ -45,13 +46,14 @@ const LayoutContent: React.FC = () => {
             className={
               isFullscreen
                 ? "flex min-h-0 flex-1 flex-col overflow-hidden"
-                : "w-full min-w-0 max-w-(--breakpoint-2xl) flex-1 p-4 md:p-6"
+                : "flex min-w-0 w-full flex-1 px-6 py-4 md:px-8 md:py-6"
             }
           >
             <Outlet />
           </div>
         </div>
       </div>
+      <SupportCopilot />
     </NotificationsProvider>
   );
 };

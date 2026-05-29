@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { appendAttributionToUrl } from "../../features/attribution/storage";
 import { getAppUrl } from "../../utils/host";
 
 type Props = {
@@ -12,8 +13,15 @@ type Props = {
  */
 export default function RedirectToAppHost({ appPath }: Props) {
   useEffect(() => {
-    const target = new URL(getAppUrl(appPath));
-    target.search = window.location.search;
+    const target = new URL(appendAttributionToUrl(getAppUrl(appPath)));
+    if (window.location.search) {
+      const incoming = new URLSearchParams(window.location.search);
+      incoming.forEach((value, key) => {
+        if (!target.searchParams.has(key)) {
+          target.searchParams.set(key, value);
+        }
+      });
+    }
     window.location.replace(target.toString());
   }, [appPath]);
 

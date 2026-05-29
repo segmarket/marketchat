@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
   LayoutDashboard,
+  LifeBuoy,
   MessagesSquare,
   Package,
   Settings,
@@ -28,7 +29,7 @@ type NavItem = {
   subItems?: NavSubItem[];
 };
 
-const mainNavItems: NavItem[] = [
+const primaryNavItems: NavItem[] = [
   {
     name: "Dashboard",
     path: "/admin",
@@ -54,6 +55,9 @@ const mainNavItems: NavItem[] = [
     path: "/admin/products",
     icon: <Package className="size-5" strokeWidth={2} />,
   },
+];
+
+const secondaryNavItems: NavItem[] = [
   {
     name: "Configurações",
     icon: <Settings className="size-5" strokeWidth={2} />,
@@ -65,6 +69,11 @@ const mainNavItems: NavItem[] = [
       { name: "Plano e pagamento", to: "/admin/settings?tab=plan", adminOnly: true },
       { name: "Histórico de Faturas", to: "/admin/settings?tab=history", adminOnly: true },
     ],
+  },
+  {
+    name: "Meus Chamados",
+    path: "/admin/support",
+    icon: <LifeBuoy className="size-5" strokeWidth={2} />,
   },
 ];
 
@@ -135,7 +144,95 @@ const AppSidebar: React.FC = () => {
   }, [settingsOpen, showExpanded]);
 
   const settingsSubItems =
-    mainNavItems.find((item) => item.name === "Configurações")?.subItems ?? [];
+    secondaryNavItems.find((item) => item.name === "Configurações")?.subItems ?? [];
+
+  const renderNavItem = (item: NavItem) => {
+    const active = isItemActive(item);
+    const hasSub = Boolean(item.subItems?.length);
+
+    if (hasSub) {
+      return (
+        <li key={item.name}>
+          <button
+            type="button"
+            onClick={() => setSettingsOpen((open) => !open)}
+            className={`menu-item group w-full cursor-pointer ${
+              active ? "menu-item-active" : "menu-item-inactive"
+            } ${!showExpanded ? "lg:justify-center" : "lg:justify-start"}`}
+          >
+            <span
+              className={`menu-item-icon-size ${
+                active ? "menu-item-icon-active" : "menu-item-icon-inactive"
+              }`}
+            >
+              {item.icon}
+            </span>
+            {showExpanded && (
+              <>
+                <span className="menu-item-text">{item.name}</span>
+                <ChevronDown
+                  className={`ml-auto size-5 transition-transform duration-200 ${
+                    settingsOpen ? "rotate-180 text-brand-500" : "text-gray-400"
+                  }`}
+                />
+              </>
+            )}
+          </button>
+          {showExpanded && (
+            <div
+              ref={subMenuRef}
+              className="overflow-hidden transition-all duration-300"
+              style={{ height: settingsOpen ? `${subMenuHeight}px` : "0px" }}
+            >
+              <ul className="mt-2 ml-9 space-y-1">
+                {settingsSubItems.map((sub) => {
+                  const subActive = isSubItemActive(
+                    location.pathname,
+                    currentSearch,
+                    sub,
+                  );
+                  return (
+                    <li key={sub.to}>
+                      <Link
+                        to={sub.to}
+                        className={`menu-dropdown-item block ${
+                          subActive
+                            ? "menu-dropdown-item-active"
+                            : "menu-dropdown-item-inactive"
+                        }`}
+                      >
+                        {sub.name}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+        </li>
+      );
+    }
+
+    return (
+      <li key={item.name}>
+        <Link
+          to={item.path!}
+          className={`menu-item group ${
+            active ? "menu-item-active" : "menu-item-inactive"
+          } ${!showExpanded ? "lg:justify-center" : "lg:justify-start"}`}
+        >
+          <span
+            className={`menu-item-icon-size ${
+              active ? "menu-item-icon-active" : "menu-item-icon-inactive"
+            }`}
+          >
+            {item.icon}
+          </span>
+          {showExpanded && <span className="menu-item-text">{item.name}</span>}
+        </Link>
+      </li>
+    );
+  };
 
   return (
     <aside
@@ -150,113 +247,31 @@ const AppSidebar: React.FC = () => {
       >
         <Link to="/admin">
           <MarketchatLogo
-            variant="theme"
+            variant={showExpanded ? "theme" : "mascotTheme"}
             className={
               showExpanded
                 ? MARKETCHAT_LOGO_CLASS
-                : "h-8 w-auto max-h-8 object-contain object-left"
+                : "h-10 w-10 max-h-10 object-contain object-center"
             }
           />
         </Link>
       </div>
 
-      <nav className="no-scrollbar mb-6 flex flex-1 flex-col overflow-y-auto duration-300 ease-linear">
-        <h2
-          className={`mb-4 flex text-xs leading-[20px] font-medium uppercase text-gray-400 ${
-            !showExpanded ? "lg:justify-center" : "justify-start"
-          }`}
-        >
-          {showExpanded ? "Menu" : <HorizontaLDots className="size-6" />}
-        </h2>
-        <ul className="flex flex-col gap-2">
-          {mainNavItems.map((item) => {
-            const active = isItemActive(item);
-            const hasSub = Boolean(item.subItems?.length);
+      <nav className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="no-scrollbar flex-1 overflow-y-auto pb-4 duration-300 ease-linear">
+          <h2
+            className={`mb-4 flex text-xs leading-[20px] font-medium uppercase text-gray-400 ${
+              !showExpanded ? "lg:justify-center" : "justify-start"
+            }`}
+          >
+            {showExpanded ? "Menu" : <HorizontaLDots className="size-6" />}
+          </h2>
+          <ul className="flex flex-col gap-2">{primaryNavItems.map(renderNavItem)}</ul>
+        </div>
 
-            if (hasSub) {
-              return (
-                <li key={item.name}>
-                  <button
-                    type="button"
-                    onClick={() => setSettingsOpen((open) => !open)}
-                    className={`menu-item group w-full cursor-pointer ${
-                      active ? "menu-item-active" : "menu-item-inactive"
-                    } ${!showExpanded ? "lg:justify-center" : "lg:justify-start"}`}
-                  >
-                    <span
-                      className={`menu-item-icon-size ${
-                        active ? "menu-item-icon-active" : "menu-item-icon-inactive"
-                      }`}
-                    >
-                      {item.icon}
-                    </span>
-                    {showExpanded && (
-                      <>
-                        <span className="menu-item-text">{item.name}</span>
-                        <ChevronDown
-                          className={`ml-auto size-5 transition-transform duration-200 ${
-                            settingsOpen ? "rotate-180 text-brand-500" : "text-gray-400"
-                          }`}
-                        />
-                      </>
-                    )}
-                  </button>
-                  {showExpanded && (
-                    <div
-                      ref={subMenuRef}
-                      className="overflow-hidden transition-all duration-300"
-                      style={{ height: settingsOpen ? `${subMenuHeight}px` : "0px" }}
-                    >
-                      <ul className="mt-2 ml-9 space-y-1">
-                        {settingsSubItems.map((sub) => {
-                          const subActive = isSubItemActive(
-                            location.pathname,
-                            currentSearch,
-                            sub,
-                          );
-                          return (
-                            <li key={sub.to}>
-                              <Link
-                                to={sub.to}
-                                className={`menu-dropdown-item block ${
-                                  subActive
-                                    ? "menu-dropdown-item-active"
-                                    : "menu-dropdown-item-inactive"
-                                }`}
-                              >
-                                {sub.name}
-                              </Link>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  )}
-                </li>
-              );
-            }
-
-            return (
-              <li key={item.path}>
-                <Link
-                  to={item.path!}
-                  className={`menu-item group ${
-                    active ? "menu-item-active" : "menu-item-inactive"
-                  } ${!showExpanded ? "lg:justify-center" : "lg:justify-start"}`}
-                >
-                  <span
-                    className={`menu-item-icon-size ${
-                      active ? "menu-item-icon-active" : "menu-item-icon-inactive"
-                    }`}
-                  >
-                    {item.icon}
-                  </span>
-                  {showExpanded && <span className="menu-item-text">{item.name}</span>}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="shrink-0 border-t border-gray-200 pt-4 pb-6 dark:border-gray-800">
+          <ul className="flex flex-col gap-2">{secondaryNavItems.map(renderNavItem)}</ul>
+        </div>
       </nav>
     </aside>
   );

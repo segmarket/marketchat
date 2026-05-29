@@ -32,8 +32,8 @@ export default function EcommerceMetrics({ cards, loading = false }: Props) {
   const incidentsChange = cards?.critical_incidents_change_pct ?? 0;
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6">
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 lg:col-span-2">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-800">
           <GroupIcon className="size-6 text-gray-800 dark:text-white/90" />
         </div>
@@ -54,7 +54,7 @@ export default function EcommerceMetrics({ cards, loading = false }: Props) {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 lg:col-span-2">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-800">
           <BoxIconLine className="size-6 text-gray-800 dark:text-white/90" />
         </div>

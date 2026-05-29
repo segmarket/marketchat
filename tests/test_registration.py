@@ -62,6 +62,54 @@ def test_register_client_success(api_client):
 
 
 @pytest.mark.django_db
+def test_register_persists_attribution(api_client):
+    url = reverse("auth-register")
+    payload = {
+        "company_name": "Ads Co",
+        "tenant_slug": "ads-co",
+        "admin_email": "ads@example.com",
+        "admin_password": "StrongPass123!",
+        "first_name": "Ana",
+        "last_name": "Ads",
+        "attribution": {
+            "utm_source": "google",
+            "utm_medium": "cpc",
+            "utm_campaign": "trial_br",
+            "gclid": "gclid_test_abc",
+        },
+        "credit_card": {
+            "holderName": "ANA ADS",
+            "number": "5162306219378829",
+            "expiryMonth": "12",
+            "expiryYear": "2030",
+            "ccv": "123",
+        },
+        "credit_card_holder": {
+            "name": "Ana Ads",
+            "email": "ads@example.com",
+            "cpfCnpj": "24971563792",
+            "postalCode": "01311000",
+            "address": "Av Paulista",
+            "addressNumber": "1000",
+            "province": "SP",
+            "phone": "11999999999",
+        },
+    }
+    patcher, _ = _asaas_mock()
+    try:
+        response = api_client.post(url, payload, format="json")
+    finally:
+        patcher.stop()
+    assert response.status_code == 201
+    tenant = Tenant.objects.get(slug="ads-co")
+    assert tenant.utm_source == "google"
+    assert tenant.utm_medium == "cpc"
+    assert tenant.utm_campaign == "trial_br"
+    assert tenant.gclid == "gclid_test_abc"
+    assert tenant.fbclid == ""
+
+
+@pytest.mark.django_db
 def test_register_rejects_duplicate_email(api_client):
     url = reverse("auth-register")
     base_payload = {

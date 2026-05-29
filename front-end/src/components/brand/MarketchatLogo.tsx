@@ -12,11 +12,13 @@ type MarketchatLogoProps = {
   className?: string;
   /** `theme`: branco no modo escuro, preto no modo claro. */
   variant?: MarketchatLogoVariant;
+  loading?: "lazy" | "eager";
 };
 
 export default function MarketchatLogo({
   className = MARKETCHAT_LOGO_CLASS,
   variant = "theme",
+  loading = "eager",
 }: MarketchatLogoProps) {
   const { theme } = useTheme();
   const src = getMarketchatLogoSrc(theme, variant);
@@ -27,6 +29,7 @@ export default function MarketchatLogo({
       alt="MarketChat"
       className={className}
       decoding="async"
+      loading={loading}
       key={src}
     />
   );

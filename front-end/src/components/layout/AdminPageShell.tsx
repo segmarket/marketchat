@@ -31,6 +31,8 @@ type PageLayoutProps = {
   metaTitle?: string;
   metaDescription?: string;
   description?: string;
+  /** Classes extras no card principal (ex.: `!p-0` para layout mestre-detalhe). */
+  panelClassName?: string;
   children: ReactNode;
 };
 
@@ -40,8 +42,12 @@ export default function AdminPageLayout({
   metaTitle,
   metaDescription,
   description,
+  panelClassName = "",
   children,
 }: PageLayoutProps) {
+  const descriptionOutsideCard =
+    Boolean(description) && (panelClassName.includes("!p-0") || panelClassName.includes(" p-0"));
+
   return (
     <div className={adminPageRootClassName}>
       <PageMeta
@@ -49,7 +55,15 @@ export default function AdminPageLayout({
         description={metaDescription ?? pageTitle}
       />
       <PageBreadcrumb pageTitle={pageTitle} />
-      <AdminPanelCard description={description}>{children}</AdminPanelCard>
+      {descriptionOutsideCard ? (
+        <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">{description}</p>
+      ) : null}
+      <AdminPanelCard
+        description={descriptionOutsideCard ? undefined : description}
+        className={panelClassName}
+      >
+        {children}
+      </AdminPanelCard>
     </div>
   );
 }

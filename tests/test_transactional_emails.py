@@ -16,9 +16,11 @@ from django.utils.http import urlsafe_base64_encode
 from apps.billing.models import Subscription
 from apps.core.emails import (
     PASSWORD_RESET_SUBJECT,
+    SUBSCRIPTION_SUSPENDED_SUBJECT,
     WELCOME_SUBJECT,
     send_market_transactional_email,
     send_password_reset_email,
+    send_subscription_suspended_email,
     send_welcome_trial_email,
 )
 from apps.tenants.models import Tenant
@@ -117,6 +119,27 @@ def test_send_password_reset_email(sample_user):
     html, _ = msg.alternatives[0]
     assert "Redefinir Minha Senha" in html
     assert "1E3A8A" in html
+
+
+@pytest.mark.django_db
+def test_send_subscription_suspended_email(sample_user, settings):
+    settings.FRONTEND_SIGNIN_URL = "https://app.example/signin"
+    mail.outbox.clear()
+    tenant = sample_user.tenant
+    send_subscription_suspended_email(
+        sample_user,
+        tenant,
+        reason="trial_expired",
+        reason_label="período de testes encerrado",
+    )
+    assert len(mail.outbox) == 1
+    msg = mail.outbox[0]
+    assert msg.subject == SUBSCRIPTION_SUSPENDED_SUBJECT
+    assert "pausada" in msg.body.lower() or "pausada" in msg.subject.lower()
+    assert "https://app.example/signin" in msg.body
+    html, _ = msg.alternatives[0]
+    assert "059669" in html or "#059669" in html
+    assert "Regularizar" in html
 
 
 @pytest.mark.django_db

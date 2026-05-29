@@ -18,7 +18,14 @@ import PasswordStrengthMeter from "../../components/auth/signup/PasswordStrength
 import TrialSummaryCard from "../../components/auth/signup/TrialSummaryCard";
 import { UF_SELECT_OPTIONS } from "../../constants/brazilUF";
 import { fullSignupSchema, type FullSignupValues } from "../../features/signup/schema";
+import {
+  hasAttributionParams,
+  loadAttribution,
+  parseAttributionFromSearch,
+  saveAttribution,
+} from "../../features/attribution/storage";
 import { api } from "../../services/api";
+import { pushToDataLayer } from "../../utils/analytics";
 import { getAxiosErrorMessage } from "../../utils/apiError";
 import { digitsOnly } from "../../utils/cpfCnpj";
 
@@ -44,6 +51,11 @@ export default function SignupPage() {
   const [submitting, setSubmitting] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
   const [cepLookupFailed, setCepLookupFailed] = useState(false);
+
+  useEffect(() => {
+    const fromUrl = parseAttributionFromSearch(window.location.search);
+    saveAttribution(fromUrl);
+  }, []);
 
   const form = useForm<FullSignupValues>({
     resolver: zodResolver(fullSignupSchema) as Resolver<FullSignupValues>,
@@ -157,6 +169,7 @@ export default function SignupPage() {
     const [mm, yy] = data.cardExpiry.split("/");
     const y4 = parseInt(yy!, 10) >= 70 ? `19${yy}` : `20${yy}`;
 
+    const attribution = loadAttribution();
     const payload = {
       company_name: data.company_name,
       tenant_slug: slugify(data.company_name),
@@ -164,6 +177,7 @@ export default function SignupPage() {
       admin_password: data.password,
       first_name: firstName,
       last_name: lastName,
+      ...(hasAttributionParams(attribution) ? { attribution } : {}),
       credit_card: {
         holderName: data.cardName,
         number: digitsOnly(data.cardNumber),
@@ -186,6 +200,7 @@ export default function SignupPage() {
 
     try {
       await api.post("/api/auth/register/", payload);
+      pushToDataLayer("sign_up_complete", { ...attribution });
       toast.success("Conta criada! Faça login para continuar.");
       navigate("/signin", { replace: true });
     } catch (e: unknown) {

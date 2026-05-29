@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { getAppUrl } from "../../utils/host";
+import MarketingCtaLink from "./MarketingCtaLink";
 
 const planPrice = import.meta.env.VITE_PLAN_PRICE?.trim() || "59,90";
 
@@ -47,12 +47,11 @@ export default function MarketingPricing() {
               </li>
             ))}
           </ul>
-          <a
-            href={getAppUrl("/signin")}
+          <MarketingCtaLink
             className="mt-8 block rounded-md bg-green-500 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-green-600"
           >
             Começar 7 Dias Grátis
-          </a>
+          </MarketingCtaLink>
         </article>
       </div>
     </section>

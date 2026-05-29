@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import ComponentCard from "../../components/common/ComponentCard";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
+import OnboardingSpotlight from "../../components/onboarding/OnboardingSpotlight";
 import Button from "../../components/ui/button/Button";
 import DisconnectConfirmModal from "../../components/integrations/whatsapp/DisconnectConfirmModal";
 import WhatsappActionCenter from "../../components/integrations/whatsapp/WhatsappActionCenter";
@@ -19,6 +20,8 @@ import {
   restartWhatsapp,
 } from "../../features/integrations/api";
 import type { WhatsappDashboard } from "../../features/integrations/types";
+import { WHATSAPP_CONNECT_SPOTLIGHT_COPY } from "../../features/onboarding/whatsappConnectSpotlightCopy";
+import { useOnboardingStatus } from "../../features/onboarding/useOnboardingStatus";
 import { useModal } from "../../hooks/useModal";
 import { getAxiosErrorMessage } from "../../utils/apiError";
 
@@ -40,6 +43,8 @@ type Props = {
   embedded?: boolean;
 };
 
+type ConnectSpotlightStep = "TRIGGER" | "SCAN";
+
 export default function WhatsAppConfig({ embedded = false }: Props) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -50,6 +55,9 @@ export default function WhatsAppConfig({ embedded = false }: Props) {
   const loadInFlightRef = useRef(false);
   const avatarFetchStartedRef = useRef(false);
   const disconnectModal = useModal();
+  const [connectStep, setConnectStep] = useState<ConnectSpotlightStep | null>(null);
+  const spotlightWasEligibleRef = useRef(false);
+  const { status: onboarding, loading: onboardingLoading } = useOnboardingStatus();
 
   const canManage = Boolean(state?.can_manage_integrations);
 
@@ -127,6 +135,7 @@ export default function WhatsAppConfig({ embedded = false }: Props) {
       if (isConnected(data)) {
         stopPolling();
         setQrcodeImage("");
+        setConnectStep(null);
         toast.success("WhatsApp conectado com sucesso.");
       }
     } catch {
@@ -249,6 +258,11 @@ export default function WhatsAppConfig({ embedded = false }: Props) {
       setQrcodeImage("");
       stopPolling();
       disconnectModal.closeModal();
+      if (spotlightEligible) {
+        setConnectStep("TRIGGER");
+      } else {
+        setConnectStep(null);
+      }
       toast.success("WhatsApp desconectado.");
     } catch (err) {
       toast.error(getAxiosErrorMessage(err, { notAxiosMessage: "Falha ao desconectar." }));
@@ -271,6 +285,121 @@ export default function WhatsAppConfig({ embedded = false }: Props) {
 
   const showFirstConnect =
     Boolean(state && !connected && !showQr && !showStaleConnecting && !showReconnect);
+
+  const spotlightEligible =
+    !loading &&
+    !onboardingLoading &&
+    onboarding !== null &&
+    !onboarding.step_whatsapp_connected &&
+    state !== null &&
+    !connected &&
+    canManage &&
+    (showFirstConnect || showStaleConnecting);
+
+  useEffect(() => {
+    if (spotlightEligible && !spotlightWasEligibleRef.current) {
+      setConnectStep("TRIGGER");
+    }
+    if (!spotlightEligible || connected) {
+      setConnectStep(null);
+      spotlightWasEligibleRef.current = false;
+    } else {
+      spotlightWasEligibleRef.current = true;
+    }
+  }, [spotlightEligible, connected]);
+
+  useEffect(() => {
+    if (connectStep === "SCAN" && spotlightEligible && !qrcodeImage && !busy && !showQr) {
+      setConnectStep("TRIGGER");
+    }
+  }, [connectStep, spotlightEligible, qrcodeImage, busy, showQr]);
+
+  async function handleConnectSpotlight() {
+    setConnectStep("SCAN");
+    try {
+      await handleConnect();
+    } catch {
+      if (spotlightEligible) {
+        setConnectStep("TRIGGER");
+      }
+    }
+  }
+
+  function renderConnectButton(label = "Conectar WhatsApp") {
+    const button = (
+      <Button onClick={() => void handleConnectSpotlight()} disabled={busy}>
+        {busy ? (
+          <span className="inline-flex items-center gap-2">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+            Conectando…
+          </span>
+        ) : (
+          label
+        )}
+      </Button>
+    );
+
+    if (connectStep === "TRIGGER") {
+      return (
+        <OnboardingSpotlight
+          message={WHATSAPP_CONNECT_SPOTLIGHT_COPY.trigger}
+          align="center"
+          intense
+        >
+          {button}
+        </OnboardingSpotlight>
+      );
+    }
+
+    return button;
+  }
+
+  function renderQrPanel() {
+    const panel = (
+      <div className="flex flex-col items-center gap-4 rounded-xl border border-gray-200 bg-gray-50 p-6 dark:border-gray-800 dark:bg-gray-900/50">
+        <WhatsappStatusBadge state={state!} />
+        {qrcodeImage ? (
+          <>
+            <p className="text-center text-sm text-gray-600 dark:text-gray-400">
+              Abra o WhatsApp → Aparelhos conectados → Conectar aparelho e escaneie o código:
+            </p>
+            <img
+              src={qrcodeImage}
+              alt="QR Code WhatsApp"
+              className="h-56 w-56 rounded-lg bg-white p-2"
+            />
+          </>
+        ) : (
+          <p className="text-center text-sm text-gray-600 dark:text-gray-400">
+            Gerando QR Code… aguarde alguns instantes.
+          </p>
+        )}
+        <p className="text-xs text-gray-500">
+          Atualizamos o status automaticamente a cada poucos segundos.
+        </p>
+        {canManage && qrcodeImage ? (
+          <Button variant="outline" onClick={() => void handleRefreshQr()} disabled={busy}>
+            Atualizar QR
+          </Button>
+        ) : null}
+      </div>
+    );
+
+    if (connectStep === "SCAN") {
+      return (
+        <OnboardingSpotlight
+          message={WHATSAPP_CONNECT_SPOTLIGHT_COPY.scan}
+          align="center"
+          highlightMode="block"
+          calloutPlacement="above"
+        >
+          {panel}
+        </OnboardingSpotlight>
+      );
+    }
+
+    return panel;
+  }
 
   return (
     <>
@@ -307,24 +436,13 @@ export default function WhatsAppConfig({ embedded = false }: Props) {
               </p>
             )}
 
-            {showStaleConnecting && (
+            {showStaleConnecting && connectStep !== "SCAN" && (
               <div className="flex flex-col items-center gap-4 py-6 text-center">
                 <p className="max-w-md text-sm text-gray-600 dark:text-gray-400">
                   A conexão anterior não foi encontrada. Gere um novo QR Code para vincular o
                   WhatsApp.
                 </p>
-                {canManage && (
-                  <Button onClick={() => void handleConnect()} disabled={busy}>
-                    {busy ? (
-                      <span className="inline-flex items-center gap-2">
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
-                        Conectando…
-                      </span>
-                    ) : (
-                      "Conectar WhatsApp"
-                    )}
-                  </Button>
-                )}
+                {canManage ? renderConnectButton() : null}
               </div>
             )}
 
@@ -353,45 +471,18 @@ export default function WhatsAppConfig({ embedded = false }: Props) {
               </div>
             )}
 
-            {showFirstConnect && (
+            {showFirstConnect && connectStep !== "SCAN" && (
               <div className="flex flex-col items-center gap-4 py-6 text-center">
                 <p className="max-w-md text-sm text-gray-600 dark:text-gray-400">
                   Vincule o número da empresa para enviar e receber mensagens pelo MarketChat.
                 </p>
-                {canManage && (
-                  <Button onClick={() => void handleConnect()} disabled={busy}>
-                    {busy ? (
-                      <span className="inline-flex items-center gap-2">
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
-                        Conectando…
-                      </span>
-                    ) : (
-                      "Conectar WhatsApp"
-                    )}
-                  </Button>
-                )}
+                {canManage ? renderConnectButton() : null}
               </div>
             )}
 
-            {showQr && qrcodeImage && (
-              <div className="flex flex-col items-center gap-4 rounded-xl border border-gray-200 bg-gray-50 p-6 dark:border-gray-800 dark:bg-gray-900/50">
-                <WhatsappStatusBadge state={state} />
-                <p className="text-center text-sm text-gray-600 dark:text-gray-400">
-                  Abra o WhatsApp → Aparelhos conectados → Conectar aparelho e escaneie o código:
-                </p>
-                <img
-                  src={qrcodeImage}
-                  alt="QR Code WhatsApp"
-                  className="h-56 w-56 rounded-lg bg-white p-2"
-                />
-                <p className="text-xs text-gray-500">Atualizamos o status automaticamente a cada poucos segundos.</p>
-                {canManage && (
-                  <Button variant="outline" onClick={() => void handleRefreshQr()} disabled={busy}>
-                    Atualizar QR
-                  </Button>
-                )}
-              </div>
-            )}
+            {(showQr || connectStep === "SCAN") && (qrcodeImage || connectStep === "SCAN") ? (
+              renderQrPanel()
+            ) : null}
 
             {connected && (
               <div className="space-y-6">

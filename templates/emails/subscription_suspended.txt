@@ -1,0 +1,20 @@
+MarketChat — Assinatura pausada
+
+Ola, {{ first_name }}!
+
+Identificamos que o {{ suspension_reason_label }} para {{ company_name }}, e o MarketChat foi desconectado do seu WhatsApp.
+
+Sua assistente virtual foi pausada. Para voltar a vender no piloto automatico e religar o bot, acesse seu painel e regularize sua assinatura.
+
+Acessar Meu Painel e Regularizar:
+{{ action_url }}
+
+---
+{{ company_legal_name }}
+CNPJ: {{ cnpj }}
+{% for line in address_lines %}{{ line }}
+{% endfor %}
+Suporte: {{ support_email }} | WhatsApp {{ support_phone }}
+
+Este e-mail foi enviado automaticamente pelo MarketChat.
+{{ current_year }} | (c) {{ company_legal_name }} | Todos os Direitos Reservados.

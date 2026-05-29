@@ -192,6 +192,11 @@ class EvolutionClient:
                 return {}
             raise
 
+    def logout_instance_by_name(self, instance_name: str, *, instance_api_key: str) -> dict[str, Any]:
+        """Logout pela apikey da instância (nome lógico usado só para logs)."""
+        del instance_name
+        return self.logout_instance(instance_api_key=instance_api_key)
+
     def disconnect_remote_session(self, *, instance_api_key: str) -> dict[str, Any]:
         """Evolution GO: desconecta sessão sem apagar o registro da instância."""
         try:
