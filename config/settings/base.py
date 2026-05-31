@@ -233,6 +233,9 @@ DEFAULT_SUBSCRIPTION_VALUE = env.float("DEFAULT_SUBSCRIPTION_VALUE", default=29.
 MARKET_MONTHLY_PRICE = env.float("MARKET_MONTHLY_PRICE", default=59.90)
 BILLING_GRACE_DAYS = env.int("BILLING_GRACE_DAYS", default=3)
 ASAAS_SUBACCOUNT_INCOME_VALUE = env.float("ASAAS_SUBACCOUNT_INCOME_VALUE", default=5000.0)
+ASAAS_SUBACCOUNT_COMPANY_TYPE = env("ASAAS_SUBACCOUNT_COMPANY_TYPE", default="MEI")
+# E-mail de alerta do webhook criado em cada subconta (fallback: e-mail do formulário Pix).
+ASAAS_WEBHOOK_NOTIFY_EMAIL = env("ASAAS_WEBHOOK_NOTIFY_EMAIL", default="").strip()
 # CPF usado ao criar cliente Asaas do morador (sandbox); use um CPF válido de teste.
 ASAAS_RESIDENT_DEFAULT_CPF = env("ASAAS_RESIDENT_DEFAULT_CPF", default="11144477735")
 # Dev only (com DEBUG=True): cobrança Pix na conta principal, sem split para subconta.

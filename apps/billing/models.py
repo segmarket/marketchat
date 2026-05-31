@@ -62,11 +62,20 @@ class AsaasSubaccount(models.Model):
     pix_key_type = models.CharField(max_length=16, choices=PixKeyType.choices)
     pix_key = models.CharField(max_length=255)
     asaas_wallet_id = models.CharField(max_length=64, blank=True, default="")
+    asaas_account_id = models.CharField(max_length=64, blank=True, default="", db_index=True)
+    # Chave da subconta (retornada uma vez no POST /accounts); usada só para GET /myAccount/status.
+    asaas_subaccount_api_key = models.CharField(max_length=255, blank=True, default="")
     account_status = models.CharField(
         max_length=16,
         choices=AccountStatus.choices,
         default=AccountStatus.PENDING,
     )
+    asaas_status_general = models.CharField(max_length=32, blank=True, default="")
+    asaas_status_commercial = models.CharField(max_length=32, blank=True, default="")
+    asaas_status_documentation = models.CharField(max_length=32, blank=True, default="")
+    asaas_status_bank = models.CharField(max_length=32, blank=True, default="")
+    status_message = models.TextField(blank=True, default="")
+    status_synced_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

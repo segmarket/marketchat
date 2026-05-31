@@ -130,11 +130,13 @@ Requer JWT. Escrita (`PUT`) exige administrador do tenant (`IsTenantAdmin`).
 
 Corpo PUT: `name`, `email`, `cpf_cnpj`, `pix_key_type` (`CPF`, `CNPJ`, `EMAIL`, `PHONE`, `RANDOM`), `pix_key`.
 
-Resposta inclui: `asaas_wallet_id`, `account_status` (`PENDING`, `APPROVED`, `REJECTED`), `has_wallet`, `has_market_address`, `can_manage`.
+Resposta inclui: `asaas_wallet_id`, `account_status` (`PENDING`, `APPROVED`, `REJECTED`), `has_wallet`, `has_market_address`, `can_manage`, `split_ready`, `asaas_status_general|commercial|documentation|bank`, `status_message`, `can_sync_status`.
 
-Erros: `400` (sem mercado com endereço válido, falha Asaas com `detail` em português).
+| POST | `/api/integrations/pix/sync-status/` | JWT + admin tenant | Consulta situação cadastral no Asaas (`GET /myAccount/status` com apiKey da subconta). |
 
-Variável de ambiente: `ASAAS_SUBACCOUNT_INCOME_VALUE` (faturamento mensal enviado ao Asaas na criação da subconta; padrão `5000`).
+Erros: `400` (sem mercado com endereço completo — cidade/UF inclusos, falha Asaas com `detail` em português). Em **produção**, subconta exige **CNPJ**.
+
+Variáveis: `ASAAS_SUBACCOUNT_INCOME_VALUE`, `ASAAS_SUBACCOUNT_COMPANY_TYPE` (padrão `MEI`), `ASAAS_WEBHOOK_NOTIFY_EMAIL`. Webhooks `ACCOUNT_STATUS_*` — ver `docs/asaas-subcontas-pix.md`.
 
 ## Chatbot — fluxos visuais (`/api/chatbot/`)
 

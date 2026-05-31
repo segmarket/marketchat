@@ -121,6 +121,8 @@ def update_subscription_card(
     token_payload = {
         "customer": customer_id,
         "creditCard": dict(credit_card),
+        "creditCardHolderInfo": dict(credit_card_holder_info),
+        "remoteIp": remote_ip or "127.0.0.1",
     }
     token_resp = client.tokenize_credit_card(token_payload)
     credit_card_token = token_resp.get("creditCardToken") or token_resp.get("token")

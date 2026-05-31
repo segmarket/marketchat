@@ -46,9 +46,17 @@ def test_pix_put_creates_subaccount_success(api_client):
     _market_with_address(tenant)
     _auth(api_client, user)
 
-    with mock.patch("apps.billing.services.asaas_subaccount.AsaasClient") as mock_cls:
+    with (
+        mock.patch("apps.billing.services.asaas_subaccount.AsaasClient") as mock_cls,
+        mock.patch(
+            "apps.billing.services.asaas_account_status.sync_subaccount_status_from_asaas",
+            return_value=False,
+        ),
+    ):
         mock_cls.return_value.create_subaccount.return_value = {
             "walletId": "wal_test_abc123",
+            "id": "acc_test_abc123",
+            "accessToken": {"apiKey": "$aact_sub_test_key"},
         }
         response = api_client.put(reverse("integrations-pix"), PIX_PAYLOAD, format="json")
 
@@ -60,7 +68,12 @@ def test_pix_put_creates_subaccount_success(api_client):
 
     sub = AsaasSubaccount.objects.get(tenant=tenant)
     assert sub.asaas_wallet_id == "wal_test_abc123"
+    assert sub.asaas_account_id == "acc_test_abc123"
+    assert sub.asaas_subaccount_api_key == "$aact_sub_test_key"
     mock_cls.return_value.create_subaccount.assert_called_once()
+    call_body = mock_cls.return_value.create_subaccount.call_args[0][0]
+    assert call_body["state"] == "SP"
+    assert call_body["postalCode"] == "13000000"
 
 
 @pytest.mark.django_db

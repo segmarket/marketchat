@@ -2,11 +2,8 @@ import type { ComponentType, ReactNode, SVGProps } from "react";
 import { getAppUrl } from "../../utils/host";
 import { appendAttributionToUrl } from "../../features/attribution/storage";
 import MarketchatLogo, { MARKETCHAT_LOGO_FOOTER_CLASS } from "../brand/MarketchatLogo";
+import { INSTAGRAM_URL, WHATSAPP_SUPPORT_URL } from "../../constants/marketingUrls";
 import { InstagramIcon, WhatsAppIcon } from "./MarketingSocialIcons";
-
-const WHATSAPP_SUPPORT_URL = "https://wa.me/5514991683639";
-const INSTAGRAM_URL =
-  "https://www.instagram.com/app.marketchat?igsh=NWo5NHEwc3dzaWdt";
 
 type SocialIcon = ComponentType<SVGProps<SVGSVGElement>>;
 

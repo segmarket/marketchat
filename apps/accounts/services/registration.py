@@ -115,6 +115,13 @@ def register_tenant_with_admin(
                     "Defina ASAAS_API_KEY no .env na raiz do repositório (mesmo nível que manage.py). "
                     "A chave do sandbox costuma começar com $aact_hmlg_ (o $ faz parte do token)."
                 ) from exc
+            if exc.status_code == 403:
+                raise RegistrationError(
+                    "O Asaas não liberou tokenização de cartão na conta de produção (403). "
+                    "No sandbox isso já vem habilitado; em produção é preciso solicitar ao gerente de contas "
+                    "a habilitação de tokenização / cobrança por cartão na API. "
+                    "Confira também ASAAS_API_URL=https://api.asaas.com/v3 e chave de produção ($aact_prod_...)."
+                ) from exc
             raise RegistrationError(
                 f"Não foi possível concluir o cadastro no provedor de pagamentos: {exc}"
             ) from exc

@@ -25,6 +25,8 @@ class AsaasSubaccountAdmin(admin.ModelAdmin):
         "pix_key_type",
         "account_status",
         "asaas_wallet_id",
+        "asaas_account_id",
+        "asaas_status_general",
         "updated_at",
     )
     list_filter = ("account_status", "pix_key_type")

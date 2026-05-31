@@ -48,6 +48,11 @@ def test_asaas_subscription_payload_credit_card_and_first_due_plus_7():
                 },
                 "203.0.113.1",
             )
+        token_payload = inst.tokenize_credit_card.call_args[0][0]
+        assert token_payload["customer"] == "cus_x"
+        assert token_payload["remoteIp"] == "203.0.113.1"
+        assert token_payload["creditCardHolderInfo"]["email"] == "u@example.com"
+
         payload = inst.create_subscription.call_args[0][0]
         assert payload["billingType"] == "CREDIT_CARD"
         assert payload["nextDueDate"] == "2026-05-19"

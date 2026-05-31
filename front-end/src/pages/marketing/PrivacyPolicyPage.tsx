@@ -8,6 +8,7 @@ export default function PrivacyPolicyPage() {
       <PageMeta
         title="Política de Privacidade | MarketChat"
         description="Como o MarketChat coleta, usa e protege seus dados pessoais."
+        path="/privacidade"
       />
       <header className="border-b border-gray-200 bg-white">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4 sm:px-6">

@@ -22,3 +22,8 @@ export async function savePixConfig(values: PixConfigFormValues): Promise<PixCon
   });
   return data;
 }
+
+export async function syncPixAccountStatus(): Promise<PixConfig> {
+  const { data } = await api.post<PixConfig>("/api/integrations/pix/sync-status/");
+  return data;
+}

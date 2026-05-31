@@ -1,11 +1,15 @@
 import axios, { type InternalAxiosRequestConfig } from "axios";
 
 /**
- * Base da API. Em staging, prioriza mesma origem (Apache faz ProxyPass /api → :8001).
- * Evita CORS e staging-api sem DNS.
+ * Base da API.
+ * Staging (Opção A): app em staging-app, Django em staging-api — usa VITE_API_BASE_URL.
+ * Alternativa: ProxyPass /api no vhost do app e VITE_API_BASE_URL=https://staging-app...
  */
 function resolveApiBaseUrl(): string {
   if (import.meta.env.DEV) return "";
+
+  const fromEnv = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
 
   if (typeof window !== "undefined") {
     const host = window.location.hostname.toLowerCase();
@@ -13,12 +17,10 @@ function resolveApiBaseUrl(): string {
       host === "staging-app.marketchat.com.br" ||
       host === "staging.marketchat.com.br"
     ) {
-      return `${window.location.protocol}//${window.location.host}`;
+      return "https://staging-api.marketchat.com.br";
     }
   }
 
-  const fromEnv = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
-  if (fromEnv) return fromEnv.replace(/\/$/, "");
   return "";
 }
 

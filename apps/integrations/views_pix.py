@@ -9,11 +9,15 @@ from rest_framework.views import APIView
 from apps.accounts.permissions import IsTenantAdmin
 from apps.accounts.services.tenant_access import user_can_manage_tenant
 from apps.billing.models import AsaasSubaccount
+from apps.billing.services.asaas_account_status import (
+    subaccount_status_payload,
+    sync_subaccount_status_from_asaas,
+)
 from apps.billing.services.asaas_subaccount import (
     SubaccountSetupError,
     create_tenant_subaccount,
     get_primary_market_address,
-    market_address_is_valid,
+    market_address_is_valid_for_subaccount,
 )
 from apps.integrations.serializers_pix import PixConfigWriteSerializer
 from apps.tenants.models import Tenant
@@ -43,7 +47,9 @@ def _build_pix_payload(
 ) -> dict:
     prefill = _build_prefill(tenant, user)
     market_parts = get_primary_market_address(tenant.id) if tenant else None
-    has_market_address = market_address_is_valid(market_parts) if market_parts else False
+    has_market_address = (
+        market_address_is_valid_for_subaccount(market_parts) if market_parts else False
+    )
 
     if subaccount is None:
         return {
@@ -60,7 +66,7 @@ def _build_pix_payload(
             "can_manage": user_can_manage_tenant(user),
         }
 
-    return {
+    payload = {
         "name": subaccount.name,
         "email": subaccount.email,
         "cpf_cnpj": subaccount.cpf_cnpj,
@@ -73,6 +79,8 @@ def _build_pix_payload(
         "has_market_address": has_market_address,
         "can_manage": user_can_manage_tenant(user),
     }
+    payload.update(subaccount_status_payload(subaccount))
+    return payload
 
 
 class PixIntegrationView(APIView):
@@ -129,4 +137,36 @@ class PixIntegrationView(APIView):
                 ],
             )
 
+        return Response(_build_pix_payload(subaccount, tenant, request.user))
+
+
+class PixSyncStatusView(APIView):
+    """Atualiza status KYC da subconta consultando o Asaas (apiKey gravada na criação)."""
+
+    permission_classes = [IsAuthenticated, IsTenantAdmin]
+
+    def post(self, request: Request) -> Response:
+        tenant = _get_tenant(request)
+        if tenant is None:
+            return Response({"detail": "Tenant inválido."}, status=status.HTTP_403_FORBIDDEN)
+
+        subaccount = AsaasSubaccount.objects.filter(tenant=tenant).first()
+        if subaccount is None or not subaccount.asaas_wallet_id:
+            return Response(
+                {"detail": "Configure o Pix antes de sincronizar o status."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not sync_subaccount_status_from_asaas(subaccount):
+            return Response(
+                {
+                    "detail": (
+                        "Não foi possível consultar o status no Asaas. "
+                        "Aguarde o webhook ou verifique se a subconta foi criada com apiKey armazenada."
+                    ),
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        subaccount.refresh_from_db()
         return Response(_build_pix_payload(subaccount, tenant, request.user))

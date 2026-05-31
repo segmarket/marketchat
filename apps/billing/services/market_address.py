@@ -56,6 +56,16 @@ def market_address_is_valid(parts: MarketAddressParts) -> bool:
     )
 
 
+def market_address_is_valid_for_subaccount(parts: MarketAddressParts) -> bool:
+    """Endereço completo exigido pelo Asaas na criação da subconta (CEP resolve cidade)."""
+    state = (parts.state or "").strip().upper()
+    return bool(
+        market_address_is_valid(parts)
+        and parts.city.strip()
+        and len(state) == 2
+    )
+
+
 def market_address_validation_message(parts: MarketAddressParts) -> str | None:
     if not parts.street.strip() and not parts.cep:
         return (
@@ -70,4 +80,16 @@ def market_address_validation_message(parts: MarketAddressParts) -> str | None:
         return "O mercado precisa ter o número do endereço preenchido."
     if not parts.neighborhood.strip():
         return "O mercado precisa ter o bairro preenchido."
+    return None
+
+
+def market_address_validation_message_for_subaccount(parts: MarketAddressParts) -> str | None:
+    msg = market_address_validation_message(parts)
+    if msg:
+        return msg
+    if not parts.city.strip():
+        return "O mercado precisa ter a cidade preenchida."
+    state = (parts.state or "").strip().upper()
+    if len(state) != 2:
+        return "O mercado precisa ter o estado (UF) com 2 letras (ex.: SP)."
     return None

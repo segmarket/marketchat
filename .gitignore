@@ -11,6 +11,7 @@ db.sqlite3
 !.env.development.example
 !.env.production.example
 !.env.staging.example
+scripts/producao/env.deploy
 front-end/.env
 .venv/
 venv/

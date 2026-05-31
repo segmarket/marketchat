@@ -72,7 +72,7 @@ export default function PixConfigPanel() {
               submitting={submitting}
               onSubmit={(values) => void handleSubmit(values)}
             />
-            <PixAccountStatusCard hasWallet={config.has_wallet} accountStatus={config.account_status} />
+            <PixAccountStatusCard config={config} onSynced={setConfig} />
           </div>
         </div>
       )}

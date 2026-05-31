@@ -62,7 +62,7 @@ export default function Home() {
   const loadMarkets = useCallback(async () => {
     try {
       const data = await fetchResidentMarkets();
-      setMarkets(data);
+      setMarkets(Array.isArray(data) ? data : []);
     } catch (err) {
       toast.error(
         getAxiosErrorMessage(err, { notAxiosMessage: "Não foi possível carregar condomínios." }),
@@ -199,7 +199,11 @@ export default function Home() {
         <div className="xl:col-span-2">
           <ChartsBlurGuard locked={chartsLocked}>
             <MonthlySalesChart
-              hourlyDistribution={analytics?.hourly_distribution}
+              hourlyDistribution={
+                Array.isArray(analytics?.hourly_distribution)
+                  ? analytics.hourly_distribution
+                  : undefined
+              }
               loading={loading}
             />
           </ChartsBlurGuard>
@@ -214,8 +218,14 @@ export default function Home() {
 
       <ChartsBlurGuard locked={chartsLocked}>
         <StatisticsChart
-          stabilitySeries={analytics?.stability_series}
-          stabilityMarketNames={analytics?.stability_market_names}
+          stabilitySeries={
+            Array.isArray(analytics?.stability_series) ? analytics.stability_series : undefined
+          }
+          stabilityMarketNames={
+            Array.isArray(analytics?.stability_market_names)
+              ? analytics.stability_market_names
+              : undefined
+          }
           loading={loading}
         />
       </ChartsBlurGuard>

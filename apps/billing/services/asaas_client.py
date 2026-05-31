@@ -144,6 +144,17 @@ class AsaasClient:
         assert isinstance(data, dict)
         return data
 
+    def get_subaccount(self, account_id: str) -> dict[str, Any]:
+        data = self._request("GET", f"/accounts/{account_id}")
+        assert isinstance(data, dict)
+        return data
+
+    def get_my_account_status(self) -> dict[str, Any]:
+        """Situação cadastral — requer apiKey da subconta (não da conta raiz)."""
+        data = self._request("GET", "/myAccount/status")
+        assert isinstance(data, dict)
+        return data
+
     def update_subscription_credit_card(
         self,
         subscription_id: str,

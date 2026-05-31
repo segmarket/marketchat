@@ -112,9 +112,10 @@ export function NotificationsProvider({
     setLoading(true);
     try {
       const data = await fetchLatestNotifications();
-      setItems(data.results);
-      setUnreadCount(data.unread_count);
-      processNewNotifications(data.results);
+      const results = Array.isArray(data.results) ? data.results : [];
+      setItems(results);
+      setUnreadCount(typeof data.unread_count === "number" ? data.unread_count : 0);
+      processNewNotifications(results);
     } catch (err) {
       console.error(getAxiosErrorMessage(err));
     } finally {

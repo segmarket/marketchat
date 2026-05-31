@@ -1,0 +1,42 @@
+# Produção — API no host :9001 (Apache ProxyPass /api) e front :3000.
+# Postgres, Evolution e Redis externos (variáveis em .env.production).
+# Uso: docker compose --env-file .env.production -f docker-compose.production.yml ...
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    container_name: marketchat_backend_prd
+    restart: always
+    ports:
+      - "${PRODUCTION_BACKEND_PORT:-9001}:8000"
+    env_file:
+      - .env.production
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      DEBUG: "False"
+    volumes:
+      - marketchat_media_prd:/app/media
+
+  frontend:
+    build:
+      context: ./front-end
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://app.marketchat.com.br}
+        VITE_APP_ORIGIN: ${VITE_APP_ORIGIN:-https://app.marketchat.com.br}
+        VITE_MARKETING_ORIGIN: ${VITE_MARKETING_ORIGIN:-https://marketchat.com.br}
+        VITE_FB_APP_ID: ${VITE_FB_APP_ID:-}
+        VITE_GTM_ID: ${VITE_GTM_ID:-}
+        VITE_PLAN_PRICE: ${VITE_PLAN_PRICE:-59,90}
+        VITE_TRIAL_SUBSCRIPTION_PRICE: ${VITE_TRIAL_SUBSCRIPTION_PRICE:-59,90}
+    container_name: marketchat_frontend_prd
+    restart: always
+    ports:
+      - "${PRODUCTION_FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - backend
+
+volumes:
+  marketchat_media_prd:

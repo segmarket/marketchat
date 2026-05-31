@@ -3,7 +3,7 @@
  * (/signin, staging-app.marketchat.com.br, sem staging.app.*).
  */
 import { lazy, Suspense } from "react";
-import PageMeta from "../../components/common/PageMeta";
+import PageMeta, { defaultSocialMeta } from "../../components/common/PageMeta";
 import CookieConsentBanner from "../../components/marketing/CookieConsentBanner";
 import MarketingAnalytics from "../../components/marketing/MarketingAnalytics";
 import MarketingFooter from "../../components/marketing/MarketingFooter";
@@ -22,8 +22,9 @@ export default function LandingPage() {
   return (
     <div className="scroll-smooth font-outfit min-h-screen bg-white text-gray-900 antialiased">
       <PageMeta
-        title="MarketChat | Gerente virtual para mercados autônomos"
-        description="Ecossistema completo: vendas no WhatsApp, alertas de estoque e infraestrutura, Photo-Lock e painel operacional em tempo real para o dono do mercado."
+        title={defaultSocialMeta.title}
+        description={defaultSocialMeta.description}
+        path="/"
       />
       <MarketingAnalytics />
       <MarketingNavbar />
