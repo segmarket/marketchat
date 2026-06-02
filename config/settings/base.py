@@ -148,6 +148,8 @@ CACHES = {
         "LOCATION": REDIS_URL,
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            # Redis 7+ com senha: redis-py RESP3 envia HELLO antes de AUTH e falha.
+            "CONNECTION_POOL_KWARGS": {"protocol": 2},
         },
     }
 }

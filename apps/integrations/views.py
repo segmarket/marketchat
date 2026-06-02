@@ -1,3 +1,5 @@
+import logging
+
 from django.db import IntegrityError
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -23,6 +25,8 @@ from apps.integrations.services.provisioning import (
     sync_connection_status,
 )
 from apps.integrations.services.restart import EvolutionRestartError, restart_whatsapp_instance
+
+logger = logging.getLogger(__name__)
 
 
 def _get_active_instance(request: Request) -> WhatsappInstance | None:
@@ -83,6 +87,11 @@ class WhatsappProvisionView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
         except EvolutionProvisionError as exc:
+            logger.warning(
+                "WhatsApp provision failed (step=%s): %s",
+                exc.step or "?",
+                exc,
+            )
             return Response(
                 {"detail": str(exc), "step": exc.step},
                 status=status.HTTP_502_BAD_GATEWAY,

@@ -33,6 +33,15 @@ class EvolutionProvisionError(Exception):
         self.step = step
 
 
+def _provision_error(exc: BaseException, *, step: str) -> EvolutionProvisionError:
+    if isinstance(exc, urllib.error.HTTPError):
+        return EvolutionProvisionError(
+            EvolutionClient.format_http_error(exc),
+            step=step,
+        )
+    return EvolutionProvisionError(str(exc), step=step)
+
+
 STALE_EVOLUTION_REASON = (
     "A instância foi removida no Evolution. Clique em Conectar para vincular novamente."
 )
@@ -255,7 +264,7 @@ def provision_whatsapp_instance(
             token=token,
         )
     except Exception as exc:
-        raise EvolutionProvisionError(str(exc), step="create") from exc
+        raise _provision_error(exc, step="create") from exc
 
     try:
         connect_payload = client.connect_instance(
@@ -268,7 +277,7 @@ def provision_whatsapp_instance(
         _delete_remote_instance(
             client, instance_name=instance_name, instance_id=instance_id
         )
-        raise EvolutionProvisionError(str(exc), step="connect") from exc
+        raise _provision_error(exc, step="connect") from exc
 
     if existing:
         existing.instance_name = instance_name

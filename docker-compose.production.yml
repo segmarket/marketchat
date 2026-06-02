@@ -14,8 +14,10 @@ services:
     env_file:
       - .env.production
     environment:
+      TZ: America/Sao_Paulo
       DJANGO_SETTINGS_MODULE: config.settings.production
       DEBUG: "False"
+      GUNICORN_TIMEOUT: "120"
     volumes:
       - marketchat_media_prd:/app/media
 

@@ -107,12 +107,37 @@ cd ~/Documentos/marketchat
 | `./scripts/bootstrap-prd.sh` | Mesmo que `producao/bootstrap.sh` |
 | `./scripts/deploy-prd.sh full` | Mesmo que `deploy-remote.sh full` |
 
+## Redis (cache / chat)
+
+Histórico de pagamentos usa cache Django (`billing_history`). Erro `HELLO must be called with the client already authenticated`:
+
+1. **`REDIS_URL` com senha correta** (mesma do servidor Redis em `10.10.10.150`):
+   ```bash
+   REDIS_URL=redis://default:SENHA@10.10.10.150:6379/7
+   ```
+   ou só senha (usuário default): `redis://:SENHA@10.10.10.150:6379/7`
+
+2. Teste no container:
+   ```bash
+   docker exec marketchat_backend_prd python -c "
+   import os, django; django.setup()
+   from django.core.cache import cache
+   cache.set('ping','pong',10); print(cache.get('ping'))
+   "
+   ```
+
+3. Código usa **RESP2** (`protocol: 2`) para compatibilidade com Redis 7+ autenticado.
+
+Não confundir com trial: cliente em teste pode ter histórico vazio no Asaas; o 500 era falha de **Redis**, não de assinatura.
+
 ## Infra esperada no servidor
 
 - **Docker** + Compose
 - **API** publicada em `127.0.0.1:9001` → Apache `ProxyPass /api` em `app.marketchat.com.br`
 - **Front** em `127.0.0.1:3000` → Apache `ProxyPass /`
-- Postgres `192.168.1.30`, Evolution `10.10.10.140:8090`, Redis `10.10.10.150` (ver `.env.production`)
+- Postgres `192.168.1.30`, Evolution `10.10.10.140:9080` (evoapicloud), Redis `10.10.10.150` (ver `.env.production`)
+- WhatsApp/Evolution: `EVOLUTION_API_BASE_URL` + `EVOLUTION_GLOBAL_API_KEY` — ver [docs/production-whatsapp-evolution.md](../../docs/production-whatsapp-evolution.md)
+- Fuso: `TZ=America/Sao_Paulo` no container backend; Gunicorn `timeout=120` para provision
 
 ## Avisos comuns no log do deploy
 

@@ -58,6 +58,27 @@ def test_billing_history_maps_and_caches(api_client):
 
 
 @pytest.mark.django_db
+def test_billing_history_works_when_redis_unavailable(api_client):
+    sub = SubscriptionFactory(asaas_customer_id="cus_hist_redis")
+    user = UserFactory(tenant=sub.tenant, email="billing-redis@example.com")
+    url = reverse("settings-billing-history")
+
+    with mock.patch("apps.billing.services.billing_history.AsaasClient") as mock_cls:
+        inst = mock_cls.return_value
+        inst.list_payments.return_value = _PAYMENT_FIXTURE
+        with mock.patch(
+            "apps.billing.services.billing_history.cache.get",
+            side_effect=OSError("redis down"),
+        ):
+            _auth_client(api_client, user)
+            response = api_client.get(url)
+
+    assert response.status_code == 200
+    assert len(response.json()["results"]) == 2
+    inst.list_payments.assert_called_once()
+
+
+@pytest.mark.django_db
 def test_billing_history_non_admin_forbidden(api_client):
     sub = SubscriptionFactory()
     user = UserFactory(tenant=sub.tenant, email="member@example.com", is_tenant_admin=False)

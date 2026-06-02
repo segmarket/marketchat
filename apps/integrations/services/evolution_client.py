@@ -92,6 +92,30 @@ class EvolutionClient:
             else getattr(settings, "EVOLUTION_GLOBAL_API_KEY", "") or ""
         )
 
+    @staticmethod
+    def format_http_error(exc: urllib.error.HTTPError) -> str:
+        preview = (getattr(exc, "_body_preview", b"") or b"")[:300]
+        body_hint = preview.decode("utf-8", errors="replace").strip()
+        if exc.code == 401:
+            return (
+                "Evolution recusou a chave administrativa (401). "
+                "Defina EVOLUTION_GLOBAL_API_KEY no .env.production com o mesmo valor de "
+                "GLOBAL_API_KEY ou AUTHENTICATION_API_KEY do container evolution-go no Portainer."
+                + (f" Resposta: {body_hint}" if body_hint else "")
+            )
+        if exc.code == 403:
+            return f"Evolution: acesso negado (403).{f' {body_hint}' if body_hint else ''}"
+        return f"HTTP Error {exc.code}: {body_hint or exc.reason}"
+
+    def check_global_api_key(self) -> None:
+        """Falha rápido se a chave admin estiver ausente ou rejeitada pelo Evolution."""
+        if not (self.global_api_key or "").strip():
+            raise RuntimeError(
+                "EVOLUTION_GLOBAL_API_KEY não está definida. "
+                "Copie GLOBAL_API_KEY (evoapicloud) ou AUTHENTICATION_API_KEY do container evolution-go."
+            )
+        self._request("GET", "/instance/all", apikey=self.global_api_key, timeout=15)
+
     def _request(
         self,
         method: str,
