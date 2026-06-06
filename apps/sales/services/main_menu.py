@@ -10,6 +10,7 @@ from apps.residents.models import ChatSession, Resident
 from apps.residents.services.whatsapp_reply import send_whatsapp_reply
 from apps.sales.services.cart_repository import get_or_create_open_cart
 from apps.sales.services.chat_fsm import reset_to_idle, transition
+from apps.sales.services.intent_gatekeeper import is_opening_greeting
 from apps.sales.services.product_search import MAIN_MENU_PURCHASE_PROMPT
 from apps.sales.services.resident_ai_context import resident_display_name
 
@@ -134,6 +135,9 @@ def handle_main_menu_message(
 
     choice = parse_main_menu_choice(text)
     if choice is None:
+        # Evolution pode reenviar o mesmo MESSAGE após a saudação já ter exibido o menu.
+        if is_opening_greeting(text):
+            return True
         send_whatsapp_reply(instance, phone, build_main_menu_reminder())
         return True
 

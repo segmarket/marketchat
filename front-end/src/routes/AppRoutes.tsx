@@ -9,6 +9,7 @@ import SettingsPage from "../pages/admin/SettingsPage";
 import ChatbotFlowsPage from "../pages/admin/ChatbotFlowsPage";
 import ChatLogsPage from "../pages/admin/ChatLogsPage";
 import SalesDashboard from "../pages/admin/SalesDashboard";
+import FinancialPage from "../pages/admin/FinancialPage";
 import ResidentsPage from "../pages/admin/ResidentsPage";
 import ProductsPage from "../pages/admin/ProductsPage";
 import SupportHistoryPage from "../pages/admin/SupportHistoryPage";
@@ -36,6 +37,7 @@ export default function AppRoutes() {
           <Route index element={<Home />} />
           <Route path="chat-logs" element={<ChatLogsPage />} />
           <Route path="sales" element={<SalesDashboard />} />
+          <Route path="financial" element={<FinancialPage />} />
           <Route path="residents" element={<ResidentsPage />} />
           <Route path="products" element={<ProductsPage />} />
           <Route path="support" element={<SupportHistoryPage />} />

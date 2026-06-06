@@ -130,4 +130,8 @@ def map_connection_state(raw: str) -> str:
         return "connecting"
     if v in ("close", "closed", "disconnected", "logout"):
         return "close"
+    if v.startswith("401") or v.startswith("403"):
+        return "close"
+    if any(h in v for h in ("logged out", "disconnected", "logout", "forbidden")):
+        return "close"
     return ""

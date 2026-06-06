@@ -6,7 +6,6 @@ from typing import Any
 from django.utils import timezone
 
 from apps.billing.models import Subscription
-from apps.billing.services.asaas_account_status import process_subaccount_status_webhook
 from apps.billing.services.asaas_webhook_payload import normalize_asaas_webhook
 from apps.sales.services.asaas_payment_webhook import process_cart_asaas_event
 from apps.tenants.models import Tenant
@@ -139,9 +138,6 @@ def process_asaas_webhook_payload(payload: dict[str, Any]) -> None:
         payment.get("id"),
         payment.get("externalReference"),
     )
-
-    if process_subaccount_status_webhook(event=event, payload=payload):
-        return
 
     if process_cart_asaas_event(event=event, payment=payment):
         return

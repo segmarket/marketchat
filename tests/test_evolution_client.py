@@ -137,21 +137,102 @@ def test_restart_instance_uses_evolution_go_reconnect():
     )
 
 
-def test_reconnect_instance_calls_connect_and_qr():
+def test_reconnect_instance_fast_path_skips_qr_wait():
     client = EvolutionClient(base_url="http://evo.test", global_api_key="global")
-    with patch.object(client, "connect_instance", return_value={"message": "success"}) as mock_connect:
+    with patch.object(
+        client,
+        "_connect_for_qr",
+        return_value={"message": "success"},
+    ) as mock_connect:
+        with patch.object(client, "_fetch_qrcode_after_connect") as mock_qr:
+            result = client.reconnect_instance(
+                instance_api_key="tok",
+                webhook_url="https://app.example/webhook",
+            )
+    assert result["qr_pending"] is True
+    assert result["connect"] == {"message": "success"}
+    mock_connect.assert_called_once()
+    mock_qr.assert_not_called()
+
+
+def test_reconnect_instance_calls_connect_and_qr_when_wait_enabled():
+    client = EvolutionClient(base_url="http://evo.test", global_api_key="global")
+    with patch.object(
+        client,
+        "_connect_for_qr",
+        return_value={"message": "success"},
+    ) as mock_connect:
         with patch.object(
             client,
-            "fetch_qrcode",
+            "_fetch_qrcode_after_connect",
             return_value={"data": {"Qrcode": f"data:image/png;base64,{'A' * 120}"}},
         ) as mock_qr:
             result = client.reconnect_instance(
                 instance_api_key="tok",
                 webhook_url="https://app.example/webhook",
+                wait_for_qr=True,
             )
     assert result["connect"] == {"message": "success"}
     mock_connect.assert_called_once()
     mock_qr.assert_called_once()
+
+
+def test_logout_instance_treats_client_disconnected_as_success():
+    client = EvolutionClient(base_url="http://evo.test", global_api_key="global")
+    exc = urllib.error.HTTPError(
+        "http://evo.test/instance/logout",
+        400,
+        "Bad Request",
+        {},
+        None,
+    )
+    exc._body_preview = b'{"error":"client disconnected"}'
+    with patch.object(client, "_request", side_effect=exc):
+        assert client.logout_instance(instance_api_key="tok") == {}
+
+
+def test_connect_for_qr_uses_immediate_without_phone():
+    client = EvolutionClient(base_url="http://evo.test", global_api_key="global")
+    with patch.object(
+        client,
+        "connect_instance",
+        return_value={"message": "success"},
+    ) as mock_connect:
+        client._connect_for_qr(
+            instance_api_key="tok",
+            webhook_url="https://app.example/webhook",
+            events=["MESSAGE", "QRCODE"],
+        )
+    mock_connect.assert_called_once_with(
+        instance_api_key="tok",
+        webhook_url="https://app.example/webhook",
+        events=["MESSAGE", "QRCODE"],
+        phone="",
+        immediate=True,
+    )
+
+
+def _qr_not_ready_error() -> urllib.error.HTTPError:
+    exc = urllib.error.HTTPError(
+        "http://evo.test/instance/qr",
+        400,
+        "Bad Request",
+        {},
+        None,
+    )
+    exc._body_preview = b'{"error":"no QR code available. Please wait a moment and try again"}'
+    return exc
+
+
+def test_fetch_qrcode_retries_when_not_ready():
+    client = EvolutionClient(base_url="http://evo.test", global_api_key="global")
+    ok_payload = {"data": {"Qrcode": f"data:image/png;base64,{'Z' * 120}"}}
+    with patch.object(client, "_request", side_effect=[_qr_not_ready_error(), ok_payload]) as mock_req:
+        with patch("apps.integrations.services.evolution_client.time.sleep") as mock_sleep:
+            result = client.fetch_qrcode(instance_api_key="tok", retries=2, retry_delay=0.01)
+    assert result == ok_payload
+    assert mock_req.call_count == 2
+    mock_sleep.assert_called_once_with(0.01)
 
 
 def test_extract_avatar_image_url():

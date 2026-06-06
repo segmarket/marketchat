@@ -83,6 +83,30 @@ def test_greeting_transitions_to_main_menu():
 
 
 @pytest.mark.django_db
+def test_main_menu_ignores_repeated_greeting_without_reminder():
+    tenant = TenantFactory()
+    instance = WhatsappInstanceFactory(tenant=tenant)
+    resident = ResidentFactory(tenant=tenant, phone_number="5511999887766")
+    session = ChatSessionFactory(
+        tenant=tenant,
+        phone_number=resident.phone_number,
+        state=ChatSession.State.AWAITING_MAIN_MENU,
+    )
+
+    with mock.patch("apps.sales.services.main_menu.send_whatsapp_reply") as send:
+        with tenant_scope(tenant.id):
+            handled = process_cart_flow(
+                tenant.id,
+                instance,
+                resident.phone_number,
+                _event_text("Oi Bom dia"),
+            )
+
+    assert handled is True
+    send.assert_not_called()
+
+
+@pytest.mark.django_db
 def test_main_menu_option_1_starts_product_search():
     tenant = TenantFactory()
     instance = WhatsappInstanceFactory(tenant=tenant)

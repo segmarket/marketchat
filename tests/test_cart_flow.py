@@ -4,7 +4,6 @@ from unittest import mock
 import pytest
 from django.urls import reverse
 from rest_framework.test import APIClient
-from apps.billing.models import AsaasSubaccount
 from apps.residents.models import ChatSession
 from apps.sales.models import Cart, CartItem
 from apps.sales.services.cart_flow import process_cart_flow
@@ -15,7 +14,6 @@ from apps.sales.services.owner_alert import SUPPORT_RESIDENT_MESSAGE
 from apps.sales.services.whatsapp_interactive import CART_ADD_MORE, CART_CHECKOUT, PROD_ID_PREFIX
 from apps.tenants.context import tenant_scope
 from tests.factories import (
-    AsaasSubaccountFactory,
     CartFactory,
     ChatSessionFactory,
     ProductFactory,
@@ -121,6 +119,50 @@ def test_flow_product_search_to_selection():
     assert session.state == ChatSession.State.PRODUCT_SEARCH
     assert session.active_cart_id is not None
     send_list.assert_called_once()
+
+
+@pytest.mark.django_db
+def test_numeric_product_choice_preserves_list_order():
+    """SKU__in no ORM não preserva ordem da lista numerada enviada ao morador."""
+    tenant = TenantFactory()
+    instance = WhatsappInstanceFactory(tenant=tenant)
+    resident = ResidentFactory(tenant=tenant, phone_number="5511999887766")
+    first = ProductFactory(
+        tenant=tenant,
+        sku="ZZZ-LAST-PK",
+        name="Amendoim Chocolate",
+        price=Decimal("1.30"),
+    )
+    second = ProductFactory(
+        tenant=tenant,
+        sku="AAA-FIRST-PK",
+        name="Ana Maria Chocolate",
+        price=Decimal("5.19"),
+    )
+    cart = CartFactory(tenant=tenant, resident=resident)
+    session = ChatSessionFactory(
+        tenant=tenant,
+        phone_number=resident.phone_number,
+        state=ChatSession.State.PRODUCT_SEARCH,
+        active_cart=cart,
+        temporary_name=f"{first.sku},{second.sku}",
+    )
+
+    with mock.patch("apps.sales.services.cart_flow.send_whatsapp_reply") as send:
+        with tenant_scope(tenant.id):
+            handled = process_cart_flow(
+                tenant.id,
+                instance,
+                resident.phone_number,
+                _event_text("2", resident.phone_number),
+            )
+
+    assert handled is True
+    session.refresh_from_db()
+    assert session.state == ChatSession.State.QUANTITY_SELECTION
+    assert session.pending_product_id == second.id
+    assert second.name in send.call_args[0][2]
+    assert first.name not in send.call_args[0][2]
 
 
 @pytest.mark.django_db
@@ -260,10 +302,6 @@ def test_flow_checkout_requests_photo():
 @pytest.mark.django_db
 def test_webhook_image_sets_awaiting_payment():
     tenant = TenantFactory()
-    AsaasSubaccountFactory(
-        tenant=tenant,
-        account_status=AsaasSubaccount.AccountStatus.APPROVED,
-    )
     instance = WhatsappInstanceFactory(tenant=tenant, instance_name="mc-cart-test")
     resident = ResidentFactory(tenant=tenant, phone_number="5511999887766")
     cart = CartFactory(

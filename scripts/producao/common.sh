@@ -128,23 +128,44 @@ production_compose() {
   docker compose -f "$COMPOSE_FILE" "$@"
 }
 
+# Retorna 0 se algum container MarketChat publica a porta no host.
+production_marketchat_owns_port() {
+  local port="${1:?}"
+  local name ports
+  for name in marketchat_backend_prd marketchat_frontend_prd; do
+    ports="$(docker ps --filter "name=^${name}$" --format '{{.Ports}}' 2>/dev/null || true)"
+    if [[ -n "$ports" ]] && grep -qE "(^|[, ])[^ ]*:${port}->" <<<"$ports"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# mode=bootstrap (padrão): portas devem estar livres (primeiro deploy).
+# mode=redeploy: portas em uso pelos containers MarketChat são aceitas (rolling update).
 production_check_ports_available() {
-  local api_port fe_port
+  local mode="${1:-bootstrap}"
+  local api_port fe_port label
   api_port="$(production_env_get PRODUCTION_BACKEND_PORT 9001)"
   fe_port="$(production_env_get PRODUCTION_FRONTEND_PORT 3000)"
   local err=0
-  if command -v ss >/dev/null 2>&1; then
-    if ss -tln 2>/dev/null | grep -q ":${api_port} "; then
-      echo "Erro: porta ${api_port} (API) já está em uso no servidor." >&2
-      echo "  Diagnóstico: ss -tlnp | grep :${api_port}" >&2
-      err=1
-    fi
-    if ss -tln 2>/dev/null | grep -q ":${fe_port} "; then
-      echo "Erro: porta ${fe_port} (front) já está em uso no servidor." >&2
-      echo "  Diagnóstico: ss -tlnp | grep :${fe_port}" >&2
-      err=1
-    fi
+  if ! command -v ss >/dev/null 2>&1; then
+    return 0
   fi
+  for label in "API:${api_port}" "front:${fe_port}"; do
+    local port="${label#*:}"
+    local svc="${label%%:*}"
+    if ! ss -tln 2>/dev/null | grep -q ":${port} "; then
+      continue
+    fi
+    if [[ "$mode" == "redeploy" ]] && production_marketchat_owns_port "$port"; then
+      echo "Porta ${port} (${svc}) em uso pelos containers MarketChat — redeploy OK."
+      continue
+    fi
+    echo "Erro: porta ${port} (${svc}) já está em uso no servidor." >&2
+    echo "  Diagnóstico: ss -tlnp | grep :${port}" >&2
+    err=1
+  done
   return "$err"
 }
 

@@ -90,9 +90,13 @@ def _load_products_from_session(session: ChatSession, tenant_id: int) -> list[Pr
     skus = [s.strip() for s in session.temporary_name.split(",") if s.strip()]
     if not skus:
         return []
-    return list(
-        Product.objects.filter(tenant_id=tenant_id, sku__in=skus, status=Product.Status.ACTIVE),
+    rows = Product.objects.filter(
+        tenant_id=tenant_id,
+        sku__in=skus,
+        status=Product.Status.ACTIVE,
     )
+    by_sku = {p.sku: p for p in rows}
+    return [by_sku[sku] for sku in skus if sku in by_sku]
 
 
 def _resolve_interactive_id(
@@ -342,7 +346,16 @@ def _handle_active_product_list_input(
     if stripped.isdigit():
         idx = int(stripped)
         if 1 <= idx <= len(products):
-            return False
+            row_id = f"{PROD_ID_PREFIX}{products[idx - 1].sku}"
+            return _handle_product_selection(
+                tenant_id,
+                instance,
+                phone,
+                resident,
+                session,
+                text,
+                row_id,
+            )
         send_whatsapp_reply(instance, phone, PRODUCT_SELECTION_INVALID_REPLY)
         return True
 

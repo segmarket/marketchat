@@ -7,6 +7,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.residents.models import ChatSession
+from apps.financial.models import LedgerTransaction, Wallet
 from apps.sales.models import Cart
 from apps.billing.services.asaas_webhook_payload import cart_external_reference
 from apps.sales.services.asaas_payment_webhook import (
@@ -79,6 +80,10 @@ def test_payment_received_completes_cart_and_unlocks_session(mock_send, cart_set
     assert "PAGAMENTO CONFIRMADO" in text
     assert "Maria Silva" in text
     assert "R$ 25,50" in text
+
+    wallet = Wallet.objects.get(tenant=_tenant)
+    assert wallet.balance_available == Decimal("24.99")
+    assert LedgerTransaction.objects.filter(external_id=cart.asaas_billing_id).count() == 1
 
 
 @pytest.mark.django_db
@@ -208,6 +213,25 @@ def test_payment_received_idempotent(mock_send, cart_setup):
         payment={"id": cart.asaas_billing_id},
     )
     mock_send.assert_not_called()
+
+
+@pytest.mark.django_db
+@mock.patch("apps.sales.services.asaas_payment_webhook.send_whatsapp_reply")
+def test_wallet_credit_idempotent_on_duplicate_webhook(mock_send, cart_setup):
+    _tenant, _resident, cart, _session = cart_setup
+
+    process_cart_asaas_event(
+        event="PAYMENT_RECEIVED",
+        payment={"id": cart.asaas_billing_id},
+    )
+    process_cart_asaas_event(
+        event="PAYMENT_RECEIVED",
+        payment={"id": cart.asaas_billing_id},
+    )
+
+    wallet = Wallet.objects.get(tenant=_tenant)
+    assert wallet.balance_available == Decimal("24.99")
+    assert LedgerTransaction.objects.filter(external_id=cart.asaas_billing_id).count() == 1
 
 
 @pytest.mark.django_db

@@ -1,4 +1,8 @@
-# Subcontas Asaas (Pix + split)
+# Subcontas Asaas (Pix + split) — OBSOLETO
+
+> **Descontinuado.** Recebimentos Pix usam conta master + carteira virtual. Ver [financial-ledger.md](financial-ledger.md).
+
+# Subcontas Asaas (Pix + split) — legado
 
 ## Fluxo no MarketChat
 

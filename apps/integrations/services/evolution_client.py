@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 import uuid as uuid_module
 import urllib.error
 import urllib.parse
@@ -214,6 +215,8 @@ class EvolutionClient:
         except urllib.error.HTTPError as exc:
             if self._http_error_is_not_found(exc):
                 return {}
+            if self._http_error_is_client_disconnected(exc):
+                return {}
             raise
 
     def logout_instance_by_name(self, instance_name: str, *, instance_api_key: str) -> dict[str, Any]:
@@ -233,12 +236,86 @@ class EvolutionClient:
         except urllib.error.HTTPError as exc:
             if self._http_error_is_not_found(exc):
                 return {}
+            if self._http_error_is_client_disconnected(exc):
+                return {}
             raise
+
+    def _clear_remote_session(self, *, instance_api_key: str) -> None:
+        """Logout/disconnect antes de reconectar; sessão já desconectada é ignorada."""
+        for label, action in (
+            ("logout", self.logout_instance),
+            ("disconnect", self.disconnect_remote_session),
+        ):
+            try:
+                action(instance_api_key=instance_api_key)
+            except urllib.error.HTTPError as exc:
+                if self._http_error_is_client_disconnected(exc):
+                    logger.debug(
+                        "Evolution %s: sessão já desconectada (ok antes de reconectar)",
+                        label,
+                    )
+                    continue
+                logger.warning(
+                    "Evolution %s antes de reconectar falhou: HTTP %s",
+                    label,
+                    exc.code,
+                )
+            except Exception:
+                logger.warning(
+                    "Evolution %s antes de reconectar falhou (ignorado)",
+                    label,
+                    exc_info=True,
+                )
+
+    def _connect_for_qr(
+        self,
+        *,
+        instance_api_key: str,
+        webhook_url: str,
+        events: Iterable[str] | None = None,
+    ) -> dict[str, Any]:
+        """Inicia sessão para leitura de QR (sem pairing code por telefone)."""
+        return self.connect_instance(
+            instance_api_key=instance_api_key,
+            webhook_url=webhook_url,
+            events=events,
+            phone="",
+            immediate=True,
+        )
+
+    def _fetch_qrcode_after_connect(
+        self,
+        *,
+        instance_api_key: str,
+        connect_payload: dict[str, Any],
+        retries: int = 12,
+        retry_delay: float = 3.0,
+    ) -> dict[str, Any]:
+        if connect_payload.get("connected"):
+            return connect_payload
+        image = self.extract_qrcode_image(connect_payload)
+        if image:
+            return connect_payload
+        time.sleep(2.0)
+        return self.fetch_qrcode(
+            instance_api_key=instance_api_key,
+            retries=retries,
+            retry_delay=retry_delay,
+        )
 
     @staticmethod
     def _http_error_is_qr_limit(exc: urllib.error.HTTPError) -> bool:
         preview = (getattr(exc, "_body_preview", b"") or b"").lower()
         return b"qr code limit" in preview or b"qrcode limit" in preview
+
+    @staticmethod
+    def _http_error_is_qr_not_ready(exc: urllib.error.HTTPError) -> bool:
+        """QR ainda não gerado após connect (Evolution pede para aguardar)."""
+        preview = (getattr(exc, "_body_preview", b"") or b"").lower()
+        return exc.code == 400 and (
+            b"no qr code available" in preview
+            or b"please wait" in preview
+        )
 
     def reconnect_instance(
         self,
@@ -248,49 +325,71 @@ class EvolutionClient:
         events: Iterable[str] | None = None,
         phone: str = "",
         reset_session: bool = False,
+        wait_for_qr: bool = False,
     ) -> dict[str, Any]:
         """
         Evolution GO não possui /instance/restart — reconexão via logout (opcional),
-        connect e leitura do QR.
-        """
-        if reset_session:
-            try:
-                self.logout_instance(instance_api_key=instance_api_key)
-            except Exception:
-                logger.warning(
-                    "Evolution logout antes de reconectar falhou (ignorado)",
-                    exc_info=True,
-                )
-            try:
-                self.disconnect_remote_session(instance_api_key=instance_api_key)
-            except Exception:
-                logger.warning(
-                    "Evolution disconnect antes de reconectar falhou (ignorado)",
-                    exc_info=True,
-                )
+        connect e (opcionalmente) leitura do QR.
 
-        connect_payload = self.connect_instance(
+        Por padrão wait_for_qr=False: só dispara o connect e devolve rápido
+        (o painel busca o QR via GET /qrcode/ com polling).
+        """
+        del phone  # QR no painel: pairing code por telefone bloqueia GET /instance/qr
+        if reset_session:
+            self._clear_remote_session(instance_api_key=instance_api_key)
+
+        connect_payload = self._connect_for_qr(
             instance_api_key=instance_api_key,
             webhook_url=webhook_url,
             events=events,
-            phone=phone,
         )
+        if not wait_for_qr:
+            return {
+                "connect": connect_payload,
+                "qrcode": {},
+                "qr_pending": True,
+            }
+
         try:
-            qrcode_payload = self.fetch_qrcode(instance_api_key=instance_api_key)
+            qrcode_payload = self._fetch_qrcode_after_connect(
+                instance_api_key=instance_api_key,
+                connect_payload=connect_payload,
+            )
         except urllib.error.HTTPError as exc:
-            if reset_session or not self._http_error_is_qr_limit(exc):
+            if self._http_error_is_qr_not_ready(exc):
+                logger.info(
+                    "Evolution QR pendente após connect (Evolution ainda gerando)",
+                )
+                return {
+                    "connect": connect_payload,
+                    "qrcode": {},
+                    "qr_pending": True,
+                }
+            if not self._http_error_is_qr_limit(exc):
                 raise
             logger.info(
                 "Evolution QR limit; tentando logout e novo connect",
             )
-            self.logout_instance(instance_api_key=instance_api_key)
-            connect_payload = self.connect_instance(
+            self._clear_remote_session(instance_api_key=instance_api_key)
+            time.sleep(2.0)
+            connect_payload = self._connect_for_qr(
                 instance_api_key=instance_api_key,
                 webhook_url=webhook_url,
                 events=events,
-                phone=phone,
             )
-            qrcode_payload = self.fetch_qrcode(instance_api_key=instance_api_key)
+            try:
+                qrcode_payload = self._fetch_qrcode_after_connect(
+                    instance_api_key=instance_api_key,
+                    connect_payload=connect_payload,
+                )
+            except urllib.error.HTTPError as retry_exc:
+                if self._http_error_is_qr_not_ready(retry_exc):
+                    return {
+                        "connect": connect_payload,
+                        "qrcode": {},
+                        "qr_pending": True,
+                    }
+                raise
 
         return {"connect": connect_payload, "qrcode": qrcode_payload}
 
@@ -309,7 +408,7 @@ class EvolutionClient:
     def _http_error_is_client_disconnected(exc: urllib.error.HTTPError) -> bool:
         """Sessão WhatsApp desconectada no Evolution (não é instância inexistente)."""
         preview = (getattr(exc, "_body_preview", b"") or b"").lower()
-        return exc.code == 400 and (
+        return exc.code in (400, 500) and (
             b"client disconnected" in preview
             or b"disconnected" in preview
             or b"not connected" in preview
@@ -610,14 +709,35 @@ class EvolutionClient:
             return search(payload.get("data", payload))
         return b""
 
-    def fetch_qrcode(self, *, instance_api_key: str) -> dict[str, Any]:
-        try:
-            return self._request("GET", "/instance/qr", apikey=instance_api_key)
-        except urllib.error.HTTPError as e:
-            preview = (getattr(e, "_body_preview", b"") or b"").lower()
-            if e.code == 400 and b"already logged in" in preview:
-                return {"connected": True, "message": "session already logged in"}
-            raise
+    def fetch_qrcode(
+        self,
+        *,
+        instance_api_key: str,
+        retries: int = 3,
+        retry_delay: float = 2.0,
+    ) -> dict[str, Any]:
+        attempts = max(1, retries + 1)
+        for attempt in range(attempts):
+            try:
+                return self._request("GET", "/instance/qr", apikey=instance_api_key)
+            except urllib.error.HTTPError as e:
+                preview = (getattr(e, "_body_preview", b"") or b"").lower()
+                if e.code == 400 and b"already logged in" in preview:
+                    return {"connected": True, "message": "session already logged in"}
+                if (
+                    self._http_error_is_qr_not_ready(e)
+                    and attempt < attempts - 1
+                ):
+                    logger.info(
+                        "Evolution QR ainda não pronto (tentativa %s/%s); aguardando %.0fs",
+                        attempt + 1,
+                        attempts,
+                        retry_delay,
+                    )
+                    time.sleep(retry_delay)
+                    continue
+                raise
+        raise RuntimeError("fetch_qrcode: loop inesperado")
 
     def connection_state(self, *, instance_api_key: str) -> dict[str, Any]:
         return self._request("GET", "/instance/status", apikey=instance_api_key)

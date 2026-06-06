@@ -21,7 +21,15 @@ from apps.integrations.services.provisioning import (
 
 
 WEBHOOK_OK_WINDOW = timedelta(minutes=10)
-SESSION_EXPIRED_HINTS = ("expired", "qr code limit", "logout", "session")
+SESSION_EXPIRED_HINTS = (
+    "expired",
+    "qr code limit",
+    "logout",
+    "logged out",
+    "another device",
+    "401",
+    "session",
+)
 
 
 def humanize_disconnect_reason(reason: str) -> str:
@@ -37,6 +45,15 @@ def humanize_disconnect_reason(reason: str) -> str:
         )
     if "client disconnected" in lower:
         return "WhatsApp desconectado no celular. Gere um novo QR Code para reconectar."
+    if "logged out" in lower and "another device" in lower:
+        return (
+            "WhatsApp desconectado em outro aparelho. Clique em Reconectar e escaneie "
+            "um novo QR Code."
+        )
+    if lower.startswith("401") or "logged out" in lower:
+        return (
+            "Sessão encerrada no WhatsApp. Clique em Reconectar para gerar um novo QR Code."
+        )
     return text
 
 

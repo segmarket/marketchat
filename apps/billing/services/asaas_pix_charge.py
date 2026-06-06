@@ -1,23 +1,50 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import date
 from decimal import Decimal
 
 from django.conf import settings
 
-from apps.billing.models import AsaasSubaccount
 from apps.billing.services.asaas_client import AsaasAPIError, AsaasClient
 from apps.billing.services.asaas_webhook_payload import cart_external_reference
-from apps.billing.services.asaas_subaccount import format_asaas_error
+from apps.billing.services.asaas_errors import format_asaas_error
 from apps.residents.models import Resident
 from apps.sales.models import Cart
 
 logger = logging.getLogger(__name__)
 
+PIX_QR_FETCH_RETRIES = 4
+PIX_QR_FETCH_DELAY_SECONDS = 1.5
+
 
 class PixChargeError(Exception):
     pass
+
+
+def _pix_setup_required_message() -> str:
+    return (
+        "A conta Asaas de produção não está habilitada para cobranças Pix. "
+        "No painel Asaas (Conta → Pix → Minhas chaves), cadastre uma chave Pix "
+        "e confirme que a conta pode receber cobranças via Pix."
+    )
+
+
+def _asaas_pix_charge_not_allowed(payload: object) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    errors = payload.get("errors")
+    if not isinstance(errors, list):
+        return False
+    for item in errors:
+        if not isinstance(item, dict):
+            continue
+        code = str(item.get("code") or "").lower()
+        description = str(item.get("description") or "").lower()
+        if code == "invalid_action" and "pix" in description:
+            return True
+    return False
 
 
 def _digits_only(value: str) -> str:
@@ -74,70 +101,41 @@ def fetch_pix_copy_paste(client: AsaasClient, payment_id: str) -> str:
     """O Asaas geralmente exige GET /payments/{id}/pixQrCode após criar a cobrança."""
     if not payment_id:
         return ""
-    try:
-        qr = client.get_payment_pix_qrcode(payment_id)
-    except AsaasAPIError as exc:
-        logger.warning("Asaas pixQrCode falhou payment=%s: %s", payment_id, exc.payload)
-        return ""
-    return extract_pix_copy_paste(qr)
-
-
-def use_main_account_pix_dev() -> bool:
-    """
-    Cobrança na conta principal (sem split). Só ativo com DEBUG=True e flag explícita.
-    Nunca use em produção.
-    """
-    if not getattr(settings, "DEBUG", False):
-        return False
-    return bool(getattr(settings, "ASAAS_PIX_USE_MAIN_ACCOUNT_IN_DEV", False))
-
-
-def _validate_subaccount_for_pix(subaccount: AsaasSubaccount) -> None:
-    if subaccount.account_status == AsaasSubaccount.AccountStatus.REJECTED:
-        raise PixChargeError(
-            "A conta Pix do mercado foi rejeitada no Asaas. Atualize os dados em Configurações.",
-        )
-    if subaccount.account_status == AsaasSubaccount.AccountStatus.PENDING:
-        raise PixChargeError(
-            "A subconta Pix do mercado ainda está em análise no Asaas (sandbox pode levar alguns "
-            "minutos após o cadastro). Enquanto isso, o QR Code Pix pode não ser gerado. "
-            "Confira o painel Asaas → Minha conta / Subcontas.",
-        )
+    for attempt in range(PIX_QR_FETCH_RETRIES):
+        try:
+            qr = client.get_payment_pix_qrcode(payment_id)
+        except AsaasAPIError as exc:
+            if _asaas_pix_charge_not_allowed(exc.payload):
+                logger.warning(
+                    "Asaas pixQrCode: cobrança sem Pix habilitado payment=%s",
+                    payment_id,
+                )
+                raise PixChargeError(_pix_setup_required_message()) from exc
+            logger.warning(
+                "Asaas pixQrCode tentativa %s/%s payment=%s: %s",
+                attempt + 1,
+                PIX_QR_FETCH_RETRIES,
+                payment_id,
+                exc.payload,
+            )
+            if attempt < PIX_QR_FETCH_RETRIES - 1:
+                time.sleep(PIX_QR_FETCH_DELAY_SECONDS)
+            continue
+        pix_code = extract_pix_copy_paste(qr)
+        if pix_code:
+            return pix_code
+        if attempt < PIX_QR_FETCH_RETRIES - 1:
+            time.sleep(PIX_QR_FETCH_DELAY_SECONDS)
+    return ""
 
 
 def create_cart_pix_charge(cart: Cart, resident: Resident) -> str:
     """
-    Cria cobrança Pix no Asaas.
-    Produção: split 100% para wallet da subconta do tenant.
-    Dev (opcional): conta principal sem split — ver ASAAS_PIX_USE_MAIN_ACCOUNT_IN_DEV.
+    Cria cobrança Pix na conta master do Asaas (sem split).
     Retorna o código Pix copia e cola.
     """
     if cart.total_value <= Decimal("0"):
         raise PixChargeError("Carrinho sem valor para cobrança.")
-
-    dev_main_account = use_main_account_pix_dev()
-    subaccount: AsaasSubaccount | None = None
-
-    if not dev_main_account:
-        try:
-            subaccount = resident.tenant.asaas_subaccount
-        except AsaasSubaccount.DoesNotExist as exc:
-            raise PixChargeError(
-                "Pagamento Pix ainda não está configurado para este mercado.",
-            ) from exc
-
-        wallet_id = (subaccount.asaas_wallet_id or "").strip()
-        if not wallet_id:
-            raise PixChargeError(
-                "Configure o recebimento Pix em Configurações antes de finalizar compras.",
-            )
-        _validate_subaccount_for_pix(subaccount)
-    else:
-        logger.warning(
-            "DEV: Pix carrinho #%s sem split (conta principal Asaas). "
-            "Desative ASAAS_PIX_USE_MAIN_ACCOUNT_IN_DEV em produção.",
-            cart.id,
-        )
 
     client = AsaasClient()
     customer_id = get_or_create_resident_customer(resident, client)
@@ -150,14 +148,6 @@ def create_cart_pix_charge(cart: Cart, resident: Resident) -> str:
         "description": f"Compra mercado — carrinho #{cart.id}",
         "externalReference": cart_external_reference(cart.id),
     }
-    if not dev_main_account and subaccount is not None:
-        wallet_id = (subaccount.asaas_wallet_id or "").strip()
-        body["split"] = [
-            {
-                "walletId": wallet_id,
-                "percentualValue": 100,
-            },
-        ]
 
     try:
         payment = client.create_payment(body)
@@ -166,21 +156,32 @@ def create_cart_pix_charge(cart: Cart, resident: Resident) -> str:
         raise PixChargeError(format_asaas_error(exc)) from exc
 
     payment_id = str(payment.get("id") or "").strip()
+    billing_type = str(payment.get("billingType") or "").upper()
+    if billing_type and billing_type != "PIX":
+        logger.warning(
+            "Asaas create_payment retornou billingType=%s (esperado PIX) payment=%s cart=%s",
+            billing_type,
+            payment_id,
+            cart.id,
+        )
+
     pix_code = extract_pix_copy_paste(payment)
     if not pix_code and payment_id:
-        pix_code = fetch_pix_copy_paste(client, payment_id)
+        try:
+            pix_code = fetch_pix_copy_paste(client, payment_id)
+        except PixChargeError:
+            raise
 
     if not pix_code:
         invoice = str(payment.get("invoiceUrl") or "").strip()
+        hint = _pix_setup_required_message()
         if invoice:
             raise PixChargeError(
-                "Cobrança criada, mas o Pix ainda não está disponível. "
-                f"Tente pelo link: {invoice}"
+                "Cobrança criada no Asaas, mas o código Pix não foi gerado. "
+                f"{hint} "
+                f"Link da cobrança: {invoice}"
             )
-        raise PixChargeError(
-            "Pix não disponível. Verifique no painel Asaas se a subconta Pix está aprovada "
-            "e se a chave Pix está ativa.",
-        )
+        raise PixChargeError(hint)
 
     cart.asaas_billing_id = payment_id
     cart.status = Cart.Status.AWAITING_PAYMENT

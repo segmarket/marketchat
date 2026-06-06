@@ -8,6 +8,7 @@ import {
   Settings,
   ShoppingBag,
   Users,
+  Wallet,
 } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import MarketchatLogo, { MARKETCHAT_LOGO_CLASS } from "../components/brand/MarketchatLogo";
@@ -44,6 +45,11 @@ const primaryNavItems: NavItem[] = [
     name: "Painel de Vendas",
     path: "/admin/sales",
     icon: <ShoppingBag className="size-5" strokeWidth={2} />,
+  },
+  {
+    name: "Financeiro",
+    path: "/admin/financial",
+    icon: <Wallet className="size-5" strokeWidth={2} />,
   },
   {
     name: "Moradores",

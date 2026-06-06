@@ -67,6 +67,80 @@ EVOLUTION_API_BASE_URL=http://10.10.10.140:9080
 
 ---
 
+## Reconectar WhatsApp (502 / `client disconnected` / `no QR code available`)
+
+Sintomas no log do backend:
+
+```
+Evolution HTTP 400 em GET /instance/status: {"error":"client disconnected"}
+WhatsApp sessão desconectada no Evolution: mc-...
+Evolution HTTP 400 em GET /instance/qr: {"error":"no QR code available..."}
+Bad Gateway: /api/integrations/whatsapp/restart/
+```
+
+**O Evolution está UP** — isso é sessão WhatsApp caída, não falha de infra.
+
+O painel chama `POST /api/integrations/whatsapp/restart/`, que:
+
+1. Ignora `logout`/`disconnect` com `client disconnected` (sessão já caída — normal)
+2. `POST /instance/connect` com `immediate: true` e **sem** `phone` (pairing code bloqueia o QR)
+3. Responde **rápido** em `CONNECTING` (evita timeout do Apache) — o painel busca o QR via `GET /api/integrations/whatsapp/qrcode/` com polling
+
+Logs esperados (não são erro fatal):
+
+```
+Evolution logout: sessão já desconectada (ok antes de reconectar)
+Evolution QR ainda não pronto (tentativa N/M); aguardando 3s
+```
+
+Após deploy do backend com essa correção:
+
+```bash
+./scripts/producao/deploy-backend.sh
+```
+
+Confirme também:
+
+```bash
+# URL pública do webhook (Apache → Django)
+grep PUBLIC_WEBHOOK_BASE_URL ~/marketchat/.env.production
+
+# Evolution acessível do container backend
+docker exec marketchat_backend_prd python -c "
+import os, urllib.request
+base = os.environ['EVOLUTION_API_BASE_URL'].rstrip('/')
+key = os.environ['EVOLUTION_GLOBAL_API_KEY']
+urllib.request.urlopen(urllib.request.Request(f'{base}/instance/all', headers={'apikey': key}), timeout=15)
+print('Evolution OK')
+"
+```
+
+Se o QR ainda não aparecer na primeira tentativa, aguarde ~15s e clique em **Reconectar** de novo.
+
+---
+
+## `401: logged out from another device`
+
+Significa que o WhatsApp **invalidou a sessão** (desconectou em outro aparelho ou logout no celular). O Evolution mantém credenciais antigas — só `connect` não gera QR novo.
+
+**O que o backend faz ao clicar em Reconectar:**
+
+1. Detecta logout permanente (`401`, `logged out`, `another device`) ou sessão que já esteve conectada
+2. **Apaga e recria** a instância no Evolution (`delete` + `create` + `connect` com novo token)
+3. Marca status `CONNECTING` e o painel busca o QR via polling (`GET /qrcode/`)
+
+**Importante:** enquanto o QR não for escaneado, o polling de status **não** reverte para `CLOSE` (Evolution responde `client disconnected` até o QR existir — isso é esperado).
+
+Deploy:
+
+```bash
+./scripts/producao/deploy-backend.sh
+```
+
+Depois: **Reconectar** → aguardar o QR (ou **Atualizar QR**) → escanear no WhatsApp.
+
+---
+
 ## Fuso horário (Brasília)
 
 Containers usam `TZ=America/Sao_Paulo`. Verificar:

@@ -116,7 +116,7 @@ class WhatsappQrcodeView(APIView):
         if not instance:
             return Response({"detail": "Nenhuma instância WhatsApp ativa."}, status=404)
         try:
-            result = refresh_qrcode(instance)
+            result = refresh_qrcode(instance, skip_status_sync=True)
         except Exception as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
@@ -124,7 +124,7 @@ class WhatsappQrcodeView(APIView):
             instance,
             request_user=request.user,
             qrcode_image=result.get("qrcode_image", ""),
-            sync_evolution=True,
+            sync_evolution=False,
         )
         return Response(data)
 
@@ -136,7 +136,11 @@ class WhatsappStatusView(APIView):
         instance = _resolve_dashboard_instance(request)
         if not instance:
             return Response(build_dashboard_payload(None, request_user=request.user))
-        if instance.is_active:
+        if (
+            instance.is_active
+            and instance.connection_status
+            != WhatsappInstance.ConnectionStatus.CONNECTING
+        ):
             try:
                 sync_connection_status(instance)
             except EvolutionProvisionError as exc:
@@ -147,7 +151,11 @@ class WhatsappStatusView(APIView):
             build_dashboard_payload(
                 instance,
                 request_user=request.user,
-                sync_evolution=bool(instance.is_active),
+                sync_evolution=(
+                    bool(instance.is_active)
+                    and instance.connection_status
+                    != WhatsappInstance.ConnectionStatus.CONNECTING
+                ),
             )
         )
 
@@ -169,8 +177,8 @@ class WhatsappRestartView(APIView):
                 instance,
                 request_user=request.user,
                 qrcode_image=qrcode_image,
-                sync_evolution=True,
-                refresh_avatar=True,
+                sync_evolution=False,
+                refresh_avatar=False,
             )
         )
 

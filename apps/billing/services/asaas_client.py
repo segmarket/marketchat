@@ -139,19 +139,8 @@ class AsaasClient:
         assert isinstance(data, dict)
         return data
 
-    def create_subaccount(self, body: Mapping[str, Any]) -> dict[str, Any]:
-        data = self._request("POST", "/accounts", dict(body))
-        assert isinstance(data, dict)
-        return data
-
-    def get_subaccount(self, account_id: str) -> dict[str, Any]:
-        data = self._request("GET", f"/accounts/{account_id}")
-        assert isinstance(data, dict)
-        return data
-
-    def get_my_account_status(self) -> dict[str, Any]:
-        """Situação cadastral — requer apiKey da subconta (não da conta raiz)."""
-        data = self._request("GET", "/myAccount/status")
+    def create_transfer(self, body: Mapping[str, Any]) -> dict[str, Any]:
+        data = self._request("POST", "/transfers", dict(body))
         assert isinstance(data, dict)
         return data
 

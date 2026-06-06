@@ -50,6 +50,82 @@ SESSION_DISCONNECTED_REASON = (
     "WhatsApp desconectado no celular. Gere um novo QR Code para reconectar."
 )
 
+PERMANENT_LOGOUT_HINTS = (
+    "logged out",
+    "another device",
+    "401",
+    "403",
+    "forbidden",
+    "qr code limit",
+    "qrcode limit",
+)
+
+
+def needs_hard_evolution_recreate(instance: WhatsappInstance) -> bool:
+    """Sessão invalidada no WhatsApp — logout/disconnect não bastam; recriar no Evolution."""
+    reason = (instance.disconnect_reason or "").lower()
+    return any(hint in reason for hint in PERMANENT_LOGOUT_HINTS)
+
+
+def recreate_evolution_instance(
+    instance: WhatsappInstance,
+    *,
+    client: EvolutionClient | None = None,
+) -> WhatsappInstance:
+    """Remove instância zumbi no Evolution e gera novo token + connect (fluxo QR)."""
+    client = client or EvolutionClient()
+    instance_name = instance.instance_name or build_instance_name(instance.tenant)
+    new_instance_id = str(uuid.uuid4())
+    new_token = secrets.token_urlsafe(32)
+    webhook_url = (instance.webhook_url or "").strip()
+    if not webhook_url:
+        webhook_url = evolution_client_module.EvolutionClient.build_webhook_url(
+            build_webhook_base_url(),
+            instance.webhook_secret,
+        )
+    events = getattr(settings, "EVOLUTION_WEBHOOK_EVENTS", None) or list(
+        EvolutionClient.DEFAULT_EVENTS
+    )
+
+    _delete_remote_instance(
+        client,
+        instance_name=instance_name,
+        instance_id=instance.instance_id,
+    )
+    client.create_instance_safe(
+        name=instance_name,
+        instance_id=new_instance_id,
+        token=new_token,
+    )
+    client.connect_instance(
+        instance_api_key=new_token,
+        webhook_url=webhook_url,
+        events=events,
+        phone="",
+        immediate=True,
+    )
+
+    instance.instance_name = instance_name
+    instance.instance_id = new_instance_id
+    instance.api_key = new_token
+    instance.webhook_url = webhook_url
+    instance.connection_status = WhatsappInstance.ConnectionStatus.CONNECTING
+    instance.disconnect_reason = ""
+    instance.is_active = True
+    instance.save(
+        update_fields=[
+            "instance_name",
+            "instance_id",
+            "api_key",
+            "webhook_url",
+            "connection_status",
+            "disconnect_reason",
+            "is_active",
+            "updated_at",
+        ]
+    )
+    return instance
+
 WEBHOOK_TRUST_WINDOW = timedelta(minutes=30)
 
 
@@ -400,11 +476,40 @@ def disconnect_whatsapp_instance(
     )
 
 
-def refresh_qrcode(instance: WhatsappInstance, *, client: EvolutionClient | None = None) -> dict[str, Any]:
+def refresh_qrcode(
+    instance: WhatsappInstance,
+    *,
+    client: EvolutionClient | None = None,
+    skip_status_sync: bool = False,
+) -> dict[str, Any]:
     client = client or EvolutionClient()
-    if reconcile_whatsapp_with_evolution(instance, client=client) is None:
+    if skip_status_sync:
+        if not remote_instance_exists(instance, client=client):
+            raise EvolutionProvisionError(STALE_EVOLUTION_REASON, step="qrcode")
+    elif reconcile_whatsapp_with_evolution(instance, client=client) is None:
         raise EvolutionProvisionError(STALE_EVOLUTION_REASON, step="qrcode")
-    payload = client.fetch_qrcode(instance_api_key=instance.api_key)
+    try:
+        payload = client.fetch_qrcode(
+            instance_api_key=instance.api_key,
+            retries=8,
+            retry_delay=2.0,
+        )
+    except urllib.error.HTTPError as exc:
+        if evolution_client_module.EvolutionClient._http_error_is_qr_not_ready(exc):
+            if instance.connection_status != WhatsappInstance.ConnectionStatus.OPEN:
+                instance.connection_status = WhatsappInstance.ConnectionStatus.CONNECTING
+                instance.save(update_fields=["connection_status", "updated_at"])
+            return {"connected": False, "qrcode_image": "", "qr_pending": True}
+        if evolution_client_module.EvolutionClient._http_error_is_qr_limit(exc):
+            raise EvolutionProvisionError(
+                "Limite de QR Code atingido no Evolution. Desconecte e conecte "
+                "novamente para criar uma sessão limpa.",
+                step="qrcode",
+            ) from exc
+        raise EvolutionProvisionError(
+            evolution_client_module.EvolutionClient.format_http_error(exc),
+            step="qrcode",
+        ) from exc
     if payload.get("connected"):
         instance.connection_status = WhatsappInstance.ConnectionStatus.OPEN
         instance.save(update_fields=["connection_status", "updated_at"])
@@ -426,6 +531,15 @@ def sync_connection_status(
         payload = client.connection_state(instance_api_key=instance.api_key)
     except urllib.error.HTTPError as exc:
         if evolution_client_module.EvolutionClient._http_error_is_client_disconnected(exc):
+            if (
+                instance.connection_status
+                == WhatsappInstance.ConnectionStatus.CONNECTING
+            ):
+                logger.debug(
+                    "Evolution status disconnected durante CONNECTING (aguardando QR): %s",
+                    instance.instance_name,
+                )
+                return WhatsappInstance.ConnectionStatus.CONNECTING
             mark_whatsapp_session_disconnected(instance)
             logger.info(
                 "WhatsApp sessão desconectada no Evolution: %s",

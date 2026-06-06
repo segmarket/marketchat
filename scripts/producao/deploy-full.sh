@@ -17,7 +17,7 @@ production_require_env
 echo "== MarketChat — deploy produção (full) =="
 
 production_compose build
-production_check_ports_available || exit 1
+production_check_ports_available redeploy || exit 1
 production_compose up -d
 
 echo ""

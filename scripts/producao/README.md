@@ -109,15 +109,26 @@ cd ~/Documentos/marketchat
 
 ## Redis (cache / chat)
 
-Histórico de pagamentos usa cache Django (`billing_history`). Erro `HELLO must be called with the client already authenticated`:
+O Redis em `10.10.10.150` é usado para cache Django, dedup de mensagens WhatsApp e histórico do chatbot.
 
-1. **`REDIS_URL` com senha correta** (mesma do servidor Redis em `10.10.10.150`):
+### `Authentication required` ou `AuthenticationError`
+
+O `.env.production` no servidor está **sem senha** ou com senha errada em `REDIS_URL`.
+
+1. Edite no servidor `~/marketchat/.env.production`:
    ```bash
    REDIS_URL=redis://default:SENHA@10.10.10.150:6379/7
    ```
    ou só senha (usuário default): `redis://:SENHA@10.10.10.150:6379/7`
 
-2. Teste no container:
+   Se a senha tiver `@`, `#` ou `%`, use [URL encoding](https://www.urlencoder.org/) na senha.
+
+2. Redeploy só backend:
+   ```bash
+   ./scripts/producao/deploy-backend.sh
+   ```
+
+3. Teste no container (deve imprimir `pong`):
    ```bash
    docker exec marketchat_backend_prd python -c "
    import os, django; django.setup()
@@ -126,9 +137,23 @@ Histórico de pagamentos usa cache Django (`billing_history`). Erro `HELLO must 
    "
    ```
 
-3. Código usa **RESP2** (`protocol: 2`) para compatibilidade com Redis 7+ autenticado.
+4. Código usa **RESP2** (`protocol: 2`) para compatibilidade com Redis 7+ autenticado.
 
-Não confundir com trial: cliente em teste pode ter histórico vazio no Asaas; o 500 era falha de **Redis**, não de assinatura.
+Sintomas no log com Redis quebrado: `Falha no dedup de MESSAGE`, `chat_context: falha ao ler/gravar Redis`.
+
+### `HELLO must be called with the client already authenticated`
+
+Mesma causa — corrija `REDIS_URL` como acima.
+
+## Asaas Pix (carrinho WhatsApp)
+
+Erro `Esta cobrança não permite pagamentos via Pix` no `pixQrCode`:
+
+- A **conta master** Asaas (`ASAAS_API_KEY` em produção) precisa ter **chave Pix cadastrada** para **receber cobranças** (não basta transferência/saque).
+- Painel Asaas → **Conta → Pix → Minhas chaves** → cadastre e aguarde aprovação.
+- Confirme `ASAAS_API_URL=https://api.asaas.com/v3` (produção, não sandbox).
+
+Após cadastrar a chave Pix no Asaas, novas compras no WhatsApp devem retornar o copia-e-cola normalmente.
 
 ## Infra esperada no servidor
 
@@ -154,6 +179,19 @@ ASAAS_API_KEY=$aact_prod_...
 ```
 
 (não use `source .env.production` no bash — o `$` quebra no shell também).
+
+### `Erro: porta 9010 (API) já está em uso` no `deploy-full.sh`
+
+Em **redeploy**, as portas 9010/3000 (ou as definidas em `PRODUCTION_*_PORT`) **devem** estar ocupadas pelos containers `marketchat_backend_prd` e `marketchat_frontend_prd`. Isso é esperado.
+
+O `deploy-full.sh` usa `production_check_ports_available redeploy`: só falha se outro processo (não MarketChat) estiver na porta. O `bootstrap.sh` continua exigindo portas livres (primeiro deploy).
+
+Se o erro persistir após atualizar os scripts, confira quem escuta a porta:
+
+```bash
+ss -tlnp | grep :9010
+docker ps --format 'table {{.Names}}\t{{.Ports}}' | grep -E '9010|3000'
+```
 
 ### `Bind for 0.0.0.0:9001 failed: port is already allocated`
 

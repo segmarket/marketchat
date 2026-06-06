@@ -89,7 +89,7 @@ export default function SettingsPage() {
   const sectionDescriptions: Partial<Record<SettingsSectionId, string>> = {
     account: "Dados da conta e da empresa.",
     markets: "Cadastre e gerencie os mercados do seu condomínio.",
-    integrations: "WhatsApp e recebimentos Pix.",
+    integrations: "WhatsApp e conta Pix de recebimento.",
     plan: "Assinatura e forma de pagamento.",
     history: "Faturas e pagamentos anteriores.",
   };

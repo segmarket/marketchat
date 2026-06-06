@@ -9,11 +9,8 @@ from apps.integrations.views import (
     WhatsappStatusView,
 )
 from apps.integrations.views_avatar import WhatsappAvatarRefreshView
-from apps.integrations.views_pix import PixIntegrationView, PixSyncStatusView
 
 urlpatterns = [
-    path("pix/", PixIntegrationView.as_view(), name="integrations-pix"),
-    path("pix/sync-status/", PixSyncStatusView.as_view(), name="integrations-pix-sync-status"),
     path("webhooks/", include("apps.integrations.urls_webhooks")),
     path("whatsapp/", WhatsappInstanceView.as_view(), name="integrations-whatsapp"),
     path(

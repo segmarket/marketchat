@@ -600,6 +600,8 @@ def test_whatsapp_restart(mock_client_cls, mock_refresh_qr, api_client):
     response = api_client.post(url, {}, format="json")
     assert response.status_code == 200
     mock_client.reconnect_instance.assert_called_once()
+    _, kwargs = mock_client.reconnect_instance.call_args
+    assert kwargs["reset_session"] is True
     data = response.json()
     assert data["has_instance"] is True
     assert data["qrcode_image"].startswith("data:image")
@@ -616,6 +618,27 @@ def _http_error(code: int, body: str) -> urllib.error.HTTPError:
     )
     exc._body_preview = body.encode()
     return exc
+
+
+@pytest.mark.django_db
+@patch("apps.integrations.services.provisioning.EvolutionClient")
+def test_sync_connection_status_preserves_connecting_during_qr(mock_client_cls):
+    inst = WhatsappInstanceFactory(
+        is_active=True,
+        connection_status=WhatsappInstance.ConnectionStatus.CONNECTING,
+    )
+    mock_client = MagicMock()
+    mock_client_cls.return_value = mock_client
+    mock_client.connection_state.side_effect = _http_error(
+        400,
+        '{"error":"client disconnected"}',
+    )
+
+    status = sync_connection_status(inst, client=mock_client)
+
+    assert status == WhatsappInstance.ConnectionStatus.CONNECTING
+    inst.refresh_from_db()
+    assert inst.connection_status == WhatsappInstance.ConnectionStatus.CONNECTING
 
 
 @pytest.mark.django_db

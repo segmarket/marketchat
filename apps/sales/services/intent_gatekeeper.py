@@ -230,6 +230,11 @@ def _detect_courtesy_heuristic(message: str) -> bool:
     return False
 
 
+def is_opening_greeting(message: str) -> bool:
+    """Saudação de abertura (ex.: oi, bom dia) — não é escolha de menu."""
+    return _detect_greeting_heuristic(message)
+
+
 def classify_user_intent(
     message: str,
     *,

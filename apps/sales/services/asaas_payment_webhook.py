@@ -14,6 +14,7 @@ from apps.integrations.models import WhatsappInstance
 from apps.residents.models import Resident
 from apps.residents.services.whatsapp_reply import send_whatsapp_reply
 from apps.sales.models import Cart
+from apps.financial.services.wallet import credit_sale_payment
 from apps.sales.services.cart_session import unlock_resident_chat_session
 from apps.tenants.context import tenant_scope
 
@@ -113,6 +114,12 @@ def handle_cart_payment_received(cart: Cart) -> bool:
 
     cart.status = Cart.Status.COMPLETED
     cart.save(update_fields=["status", "updated_at"])
+
+    credit_sale_payment(
+        cart,
+        payment_id=cart.asaas_billing_id,
+        gross_amount=cart.total_value,
+    )
 
     resident = cart.resident
     unlock_resident_chat_session(resident=resident, clear_cart_link=True)

@@ -119,24 +119,18 @@ Corpo POST/PUT: `name` (obrigatório), `address` (obrigatório), `status` opcion
 
 Mercados de outro tenant retornam **404** em GET/PATCH/PUT/DELETE.
 
-## Integrações — Pix / subconta Asaas (`/api/integrations/pix/`)
+## Financeiro — carteira virtual (`/api/financial/`)
 
-Requer JWT. Escrita (`PUT`) exige administrador do tenant (`IsTenantAdmin`).
+Requer JWT + administrador do tenant (`IsTenantAdmin`). Ver `docs/financial-ledger.md`.
 
-| Método | Caminho | Autenticação | Descrição |
-|--------|---------|--------------|-----------|
-| GET | `/api/integrations/pix/` | JWT | Configuração Pix/subconta do tenant + `prefill` (dados do tenant/usuário) + `has_market_address`. |
-| PUT | `/api/integrations/pix/` | JWT + admin tenant | Salva dados Pix; se ainda não houver `asaas_wallet_id`, cria subconta no Asaas (`POST /v3/accounts`) usando endereço do primeiro mercado cadastrado. |
+| Método | Caminho | Descrição |
+|--------|---------|-----------|
+| GET | `/api/financial/statement/` | Saldo, `has_pix_key_configured`, chave Pix padrão, `fee_percent` e extrato paginado (`page`, default 20 itens). |
+| GET | `/api/financial/wallet/settings/` | Tipo da chave, `default_pix_key_masked`, `has_pix_key_configured`. A chave completa não é retornada quando já configurada. |
+| PATCH | `/api/financial/wallet/settings/` | Salva `default_pix_key_type` e `default_pix_key` na carteira do tenant (validação rigorosa por tipo). |
+| POST | `/api/financial/withdraw/` | Saque automático Pix: body `{ "amount" }`. Usa chave salva na Wallet e dispara `POST /v3/transfers` no Asaas. |
 
-Corpo PUT: `name`, `email`, `cpf_cnpj`, `pix_key_type` (`CPF`, `CNPJ`, `EMAIL`, `PHONE`, `RANDOM`), `pix_key`.
-
-Resposta inclui: `asaas_wallet_id`, `account_status` (`PENDING`, `APPROVED`, `REJECTED`), `has_wallet`, `has_market_address`, `can_manage`, `split_ready`, `asaas_status_general|commercial|documentation|bank`, `status_message`, `can_sync_status`.
-
-| POST | `/api/integrations/pix/sync-status/` | JWT + admin tenant | Consulta situação cadastral no Asaas (`GET /myAccount/status` com apiKey da subconta). |
-
-Erros: `400` (sem mercado com endereço completo — cidade/UF inclusos, falha Asaas com `detail` em português). Em **produção**, subconta exige **CNPJ**.
-
-Variáveis: `ASAAS_SUBACCOUNT_INCOME_VALUE`, `ASAAS_SUBACCOUNT_COMPANY_TYPE` (padrão `MEI`), `ASAAS_WEBHOOK_NOTIFY_EMAIL`. Webhooks `ACCOUNT_STATUS_*` — ver `docs/asaas-subcontas-pix.md`.
+Pix de vendas WhatsApp cai na conta master Asaas; o webhook credita o ledger com taxa `FINANCIAL_PLATFORM_FEE_PERCENT` (default 2%). Saques exigem saldo na conta master Asaas para transferência.
 
 ## Chatbot — fluxos visuais (`/api/chatbot/`)
 

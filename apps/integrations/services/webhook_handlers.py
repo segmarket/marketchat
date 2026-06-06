@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 
+from django.core.cache import cache
+
 from apps.chatbot.models import ChatMessageLog
 from apps.chatbot.services.chat_logging import get_or_create_chat_session, log_inbound
 from apps.residents.services.session_activity import touch_chat_session_activity
@@ -93,9 +95,21 @@ def _handle_connection(event: EvolutionWebhookEvent, instance: WhatsappInstance)
     status = map_connection_state(event.connection_state)
     if not status:
         return
+    update_fields = ["connection_status", "updated_at"]
+    if status == WhatsappInstance.ConnectionStatus.CLOSE:
+        reason = (event.connection_state or "").strip()
+        if reason and reason != instance.disconnect_reason:
+            instance.disconnect_reason = reason
+            update_fields.append("disconnect_reason")
+    elif status == WhatsappInstance.ConnectionStatus.OPEN:
+        if instance.disconnect_reason:
+            instance.disconnect_reason = ""
+            update_fields.append("disconnect_reason")
     if instance.connection_status != status:
         instance.connection_status = status
-        instance.save(update_fields=["connection_status", "updated_at"])
+        instance.save(update_fields=update_fields)
+    elif len(update_fields) > 2:
+        instance.save(update_fields=update_fields)
     if status == WhatsappInstance.ConnectionStatus.OPEN:
         sync_profile_avatar_from_evolution(instance)
     logger.info(
@@ -123,6 +137,25 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
         event.remote_jid,
         len((event.message_text or "").strip()),
     )
+
+    message_id = (event.message_id or "").strip()
+    if message_id:
+        dedup_key = f"evo_webhook_msg:{instance.tenant_id}:{message_id}"
+        try:
+            if not cache.add(dedup_key, "1", timeout=120):
+                logger.info(
+                    "WhatsApp MESSAGE duplicado ignorado: tenant=%s msg_id=%s",
+                    instance.tenant_id,
+                    message_id,
+                )
+                return
+        except Exception:
+            logger.warning(
+                "Falha no dedup de MESSAGE (seguindo): tenant=%s msg_id=%s",
+                instance.tenant_id,
+                message_id,
+                exc_info=True,
+            )
 
     if not tenant_has_messaging_access(instance.tenant_id):
         logger.info(
