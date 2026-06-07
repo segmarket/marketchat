@@ -176,7 +176,7 @@ def test_cart_detail_with_photo_url(api_client):
     assert resp.status_code == 200
     body = resp.json()
     assert body["asaas_billing_id"] == "pay_123"
-    assert body["security_photo_url"]
+    assert body["security_photo_url"].endswith(f"/api/sales/carts/{cart.id}/security-photo/")
     assert len(body["items"]) == 1
     assert body["items"][0]["product_name"] == "Água"
     assert body["items"][0]["subtotal"] == "5.00"
@@ -191,4 +191,41 @@ def test_cart_detail_other_tenant_404(api_client):
 
     _auth(api_client, user_b)
     resp = api_client.get(reverse("sales-cart-detail", kwargs={"pk": cart_a.id}))
+    assert resp.status_code == 404
+
+
+@pytest.mark.django_db
+def test_cart_security_photo_returns_image(api_client):
+    tenant = TenantFactory()
+    user = UserFactory(tenant=tenant, email="sales-photo@example.com")
+    resident = ResidentFactory(tenant=tenant)
+    cart = CartFactory(tenant=tenant, resident=resident, status=Cart.Status.AWAITING_PAYMENT)
+    image_bytes = BytesIO(b"\xff\xd8\xfffake-jpeg").getvalue()
+    cart.product_photo.save(
+        "foto.jpg",
+        SimpleUploadedFile("foto.jpg", image_bytes, content_type="image/jpeg"),
+        save=True,
+    )
+
+    _auth(api_client, user)
+    resp = api_client.get(reverse("sales-cart-security-photo", kwargs={"pk": cart.id}))
+    assert resp.status_code == 200
+    assert resp["Content-Type"].startswith("image/")
+    assert b"".join(resp.streaming_content) == image_bytes
+
+
+@pytest.mark.django_db
+def test_cart_security_photo_other_tenant_404(api_client):
+    tenant_a = TenantFactory()
+    tenant_b = TenantFactory()
+    user_b = UserFactory(tenant=tenant_b, email="sales-photo-iso@example.com")
+    cart_a = CartFactory(tenant=tenant_a, resident=ResidentFactory(tenant=tenant_a))
+    cart_a.product_photo.save(
+        "foto.jpg",
+        SimpleUploadedFile("foto.jpg", b"bytes", content_type="image/jpeg"),
+        save=True,
+    )
+
+    _auth(api_client, user_b)
+    resp = api_client.get(reverse("sales-cart-security-photo", kwargs={"pk": cart_a.id}))
     assert resp.status_code == 404

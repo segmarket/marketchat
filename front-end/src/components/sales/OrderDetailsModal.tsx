@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Search, X } from "lucide-react";
+import { fetchCartSecurityPhoto } from "../../features/sales/api";
 import {
   formatBRL,
   formatOrderDateTime,
@@ -17,10 +18,42 @@ type Props = {
 
 export default function OrderDetailsModal({ open, loading, cart, onClose }: Props) {
   const [isImageExpanded, setIsImageExpanded] = useState(false);
+  const [photoSrc, setPhotoSrc] = useState<string | null>(null);
+  const [photoLoading, setPhotoLoading] = useState(false);
 
   useEffect(() => {
     setIsImageExpanded(false);
   }, [open, cart?.id]);
+
+  useEffect(() => {
+    if (!open || !cart?.security_photo_url) {
+      setPhotoSrc(null);
+      return;
+    }
+
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    setPhotoLoading(true);
+
+    fetchCartSecurityPhoto(cart.id)
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPhotoSrc(objectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setPhotoSrc(null);
+      })
+      .finally(() => {
+        if (!cancelled) setPhotoLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      setPhotoSrc(null);
+    };
+  }, [open, cart?.id, cart?.security_photo_url]);
 
   useEffect(() => {
     if (!open) return;
@@ -166,15 +199,26 @@ export default function OrderDetailsModal({ open, loading, cart, onClose }: Prop
                   {hasPhoto ? (
                     <button
                       type="button"
-                      onClick={() => setIsImageExpanded(true)}
-                      className="group relative block w-full overflow-hidden rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                      onClick={() => photoSrc && setIsImageExpanded(true)}
+                      disabled={!photoSrc}
+                      className="group relative block w-full overflow-hidden rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-wait"
                     >
                       <div className="aspect-[4/3] w-full overflow-hidden">
-                        <img
-                          src={cart.security_photo_url}
-                          alt="Foto de segurança enviada pelo morador"
-                          className="size-full object-cover transition-transform duration-200 group-hover:scale-105"
-                        />
+                        {photoLoading ? (
+                          <div className="flex size-full items-center justify-center bg-gray-200 text-sm text-gray-500 dark:bg-gray-800">
+                            Carregando foto…
+                          </div>
+                        ) : photoSrc ? (
+                          <img
+                            src={photoSrc}
+                            alt="Foto de segurança enviada pelo morador"
+                            className="size-full object-cover transition-transform duration-200 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="flex size-full items-center justify-center bg-gray-200 text-sm text-gray-500 dark:bg-gray-800">
+                            Não foi possível carregar a foto.
+                          </div>
+                        )}
                       </div>
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/35 transition-colors group-hover:bg-black/45">
                         <Search className="size-6 text-white" strokeWidth={2} />
@@ -196,7 +240,7 @@ export default function OrderDetailsModal({ open, loading, cart, onClose }: Prop
         </div>
       </div>
 
-      {isImageExpanded && cart?.security_photo_url ? (
+      {isImageExpanded && photoSrc ? (
         <div
           role="dialog"
           aria-modal="true"
@@ -218,7 +262,7 @@ export default function OrderDetailsModal({ open, loading, cart, onClose }: Prop
             <X className="size-6" />
           </button>
           <img
-            src={cart.security_photo_url}
+            src={photoSrc}
             alt="Foto de segurança ampliada"
             className="relative z-10 max-h-[90vh] max-w-[95vw] object-contain"
             onClick={(e) => e.stopPropagation()}

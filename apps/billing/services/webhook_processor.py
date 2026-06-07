@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from apps.billing.models import Subscription
 from apps.billing.services.asaas_webhook_payload import normalize_asaas_webhook
+from apps.financial.services.asaas_transfer_webhook import process_transfer_asaas_event
 from apps.sales.services.asaas_payment_webhook import process_cart_asaas_event
 from apps.tenants.models import Tenant
 
@@ -131,13 +132,18 @@ def process_asaas_webhook_payload(payload: dict[str, Any]) -> None:
     Estrutura típica: {"event": "PAYMENT_RECEIVED", "payment": {...}}.
     """
     event, payment = normalize_asaas_webhook(payload)
+    transfer = payload.get("transfer") if isinstance(payload.get("transfer"), dict) else {}
 
     logger.info(
-        "Webhook Asaas recebido: event=%s payment_id=%s externalReference=%s",
+        "Webhook Asaas recebido: event=%s payment_id=%s transfer_id=%s externalReference=%s",
         event,
         payment.get("id"),
-        payment.get("externalReference"),
+        transfer.get("id"),
+        payment.get("externalReference") or transfer.get("externalReference"),
     )
+
+    if process_transfer_asaas_event(event=event, payload=payload):
+        return
 
     if process_cart_asaas_event(event=event, payment=payment):
         return

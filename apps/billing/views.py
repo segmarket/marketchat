@@ -6,7 +6,10 @@ from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.views import APIView
 
-from apps.billing.services.asaas_webhook_payload import parse_http_request_body
+from apps.billing.services.asaas_webhook_payload import (
+    extract_asaas_webhook_token,
+    parse_http_request_body,
+)
 from apps.billing.services.webhook_processor import process_asaas_webhook_payload
 
 
@@ -19,7 +22,7 @@ class AsaasWebhookView(APIView):
 
     def post(self, request: Request) -> HttpResponse:
         if settings.ASAAS_WEBHOOK_VERIFY:
-            token = request.headers.get("X-Webhook-Token", "")
+            token = extract_asaas_webhook_token(request)
             if not settings.ASAAS_WEBHOOK_TOKEN or token != settings.ASAAS_WEBHOOK_TOKEN:
                 return HttpResponse(status=401)
         body = parse_http_request_body(request)

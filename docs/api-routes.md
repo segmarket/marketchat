@@ -44,7 +44,7 @@ Acessível mesmo com cobrança em atraso (bypass do middleware 402).
 | Método | Caminho | Autenticação | Descrição |
 |--------|---------|--------------|-----------|
 | POST | `/api/webhooks/asaas/` | Igual à rota em billing. | Webhook Asaas (Pix de carrinho + assinatura SaaS). Em dev local o Asaas **não alcança** `localhost` — use túnel (ngrok) na URL do webhook ou `python manage.py sync_pending_cart_payments` após confirmar no sandbox. |
-| POST | `/api/billing/webhooks/asaas/` | Se `ASAAS_WEBHOOK_VERIFY=True`: header `X-Webhook-Token` = `ASAAS_WEBHOOK_TOKEN`. Em dev (`ASAAS_WEBHOOK_VERIFY=False`) o corpo é aceito sem esse header. | Mesmo handler: `PAYMENT_RECEIVED`/`PAYMENT_CONFIRMED` (carrinho), `PAYMENT_OVERDUE`/`PAYMENT_DELETED` (Pix expirado), assinatura (`PAYMENT_CONFIRMED`, `PAYMENT_OVERDUE`, `SUBSCRIPTION_DELETED`). |
+| POST | `/api/billing/webhooks/asaas/` | Se `ASAAS_WEBHOOK_VERIFY=True`: header `asaas-access-token` = `ASAAS_WEBHOOK_TOKEN` (nome oficial Asaas). Em dev (`ASAAS_WEBHOOK_VERIFY=False`) o corpo é aceito sem esse header. | Mesmo handler: `PAYMENT_RECEIVED`/`PAYMENT_CONFIRMED` (carrinho), `PAYMENT_OVERDUE`/`PAYMENT_DELETED` (Pix expirado), assinatura (`PAYMENT_CONFIRMED`, `PAYMENT_OVERDUE`, `SUBSCRIPTION_DELETED`). |
 
 ## Produtos (`/api/products/`)
 

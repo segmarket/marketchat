@@ -142,10 +142,9 @@ def paginate_orders(
 def build_security_photo_url(cart: Cart, request: Any) -> str:
     if not cart.product_photo:
         return ""
-    try:
-        url = cart.product_photo.url
-    except ValueError:
-        return ""
+    from django.urls import reverse
+
+    path = reverse("sales-cart-security-photo", kwargs={"pk": cart.pk})
     if request:
-        return request.build_absolute_uri(url)
-    return url
+        return request.build_absolute_uri(path)
+    return path

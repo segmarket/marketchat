@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import mimetypes
+
+from django.http import FileResponse, Http404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -88,3 +91,22 @@ class SalesCartDetailView(APIView):
             security_photo_url=build_security_photo_url(cart, request),
         )
         return Response(payload)
+
+
+class SalesCartSecurityPhotoView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request, pk: int) -> FileResponse:
+        tenant_id = getattr(request.user, "tenant_id", None)
+        if not tenant_id:
+            raise Http404
+
+        cart = Cart.objects.filter(tenant_id=int(tenant_id), pk=pk).first()
+        if cart is None or not cart.product_photo:
+            raise Http404
+
+        content_type, _ = mimetypes.guess_type(cart.product_photo.name)
+        return FileResponse(
+            cart.product_photo.open("rb"),
+            content_type=content_type or "image/jpeg",
+        )

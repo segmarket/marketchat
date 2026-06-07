@@ -196,9 +196,23 @@ def test_webhook_rejects_invalid_token_when_verify_enabled(settings, api_client:
         WEBHOOK_URL,
         _payment_payload(event="PAYMENT_RECEIVED", payment_id="pay_x"),
         format="json",
-        HTTP_X_WEBHOOK_TOKEN="wrong",
+        HTTP_ASAAS_ACCESS_TOKEN="wrong",
     )
     assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_webhook_accepts_asaas_access_token_header(settings, api_client: APIClient):
+    settings.ASAAS_WEBHOOK_VERIFY = True
+    settings.ASAAS_WEBHOOK_TOKEN = "secret-token"
+
+    response = api_client.post(
+        BILLING_WEBHOOK_URL,
+        _payment_payload(event="PAYMENT_RECEIVED", payment_id="pay_x"),
+        format="json",
+        HTTP_ASAAS_ACCESS_TOKEN="secret-token",
+    )
+    assert response.status_code == 200
 
 
 @pytest.mark.django_db

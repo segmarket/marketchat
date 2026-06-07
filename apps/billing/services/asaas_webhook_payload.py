@@ -11,6 +11,21 @@ logger = logging.getLogger(__name__)
 CART_EXTERNAL_REF_PREFIX = "marketchat-cart-"
 
 
+def extract_asaas_webhook_token(request) -> str:
+    """
+    Token enviado pelo Asaas no header oficial `asaas-access-token`.
+    Aceita `X-Webhook-Token` como alias (documentação legada).
+    """
+    for header in ("Asaas-Access-Token", "X-Webhook-Token"):
+        value = request.headers.get(header, "")
+        if value:
+            return str(value).strip()
+    meta = request.META.get("HTTP_ASAAS_ACCESS_TOKEN") or request.META.get(
+        "HTTP_X_WEBHOOK_TOKEN"
+    )
+    return str(meta or "").strip()
+
+
 def parse_http_request_body(request) -> dict[str, Any]:
     """Lê o corpo POST (DRF request.data ou JSON bruto)."""
     data = getattr(request, "data", None)

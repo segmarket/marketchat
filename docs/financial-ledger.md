@@ -26,8 +26,12 @@ Recebimentos Pix de moradores caem na **conta master** do Asaas (token da plataf
 3. Backend valida saldo, chama `POST /v3/transfers` no Asaas (conta master).
 4. Sucesso → debita `balance_available`, cria OUTFLOW e `WithdrawalRequest` PAID ou PROCESSING.
 5. Falha Asaas → rollback; saldo do cliente não é alterado.
+6. Webhook `TRANSFER_DONE` → confirma saque (`PROCESSING` → `PAID`); zera `balance_processing` no extrato.
+7. Webhook `TRANSFER_FAILED` / `TRANSFER_CANCELLED` → estorna saldo e marca `REJECTED`.
 
-**Requisito operacional:** a conta master Asaas precisa ter saldo suficiente para transferências Pix.
+**Webhook Asaas (saques):** habilite `TRANSFER_DONE` (e opcionalmente `TRANSFER_FAILED`, `TRANSFER_CANCELLED`) no mesmo webhook `PRD_Asaas` (`/api/billing/webhooks/asaas/`).
+
+**Requisito operacional:** a conta master Asaas precisa ter saldo suficiente para transferências Pix e permissão de saque via API.
 
 ## API
 

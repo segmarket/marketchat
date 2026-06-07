@@ -155,6 +155,43 @@ Erro `Esta cobrança não permite pagamentos via Pix` no `pixQrCode`:
 
 Após cadastrar a chave Pix no Asaas, novas compras no WhatsApp devem retornar o copia-e-cola normalmente.
 
+### Webhook Asaas “interrompido” ou pagamento não confirma no WhatsApp
+
+No painel Asaas → Integrações → Webhooks:
+
+1. **Ative os dois interruptores:**
+   - *Este Webhook ficará ativo?* → **Sim**
+   - *Fila de sincronização ativada?* → **Sim** (sem isso o status fica “interrompido”)
+
+2. **URL correta** (note o `/asaas/` no final):
+   ```text
+   https://app.marketchat.com.br/api/billing/webhooks/asaas/
+   ```
+   Alternativa equivalente: `https://app.marketchat.com.br/api/webhooks/asaas/`
+
+   A URL `.../api/billing/webhooks/` **sem** `asaas` retorna 404.
+
+3. **Token de autenticação** = mesmo valor de `ASAAS_WEBHOOK_TOKEN` no `.env.production` do servidor. O Asaas envia no header **`asaas-access-token`** (não `X-Webhook-Token`).
+
+4. **Eventos de Cobranças** (mínimo para Pix do carrinho WhatsApp):
+   - `PAYMENT_RECEIVED`
+   - `PAYMENT_CONFIRMED`
+   - `PAYMENT_OVERDUE` (Pix expirado)
+   - `PAYMENT_DELETED` (opcional)
+
+   Não basta só `PAYMENT_CREATED` — o MarketChat confirma o carrinho em `PAYMENT_RECEIVED` / `PAYMENT_CONFIRMED`.
+
+5. Redeploy backend após alterar token: `./scripts/producao/deploy-backend.sh`
+
+6. Teste manual (substitua `SEU_TOKEN`):
+   ```bash
+   curl -sI -X POST https://app.marketchat.com.br/api/billing/webhooks/asaas/ \
+     -H 'asaas-access-token: SEU_TOKEN' \
+     -H 'Content-Type: application/json' \
+     -d '{"event":"PAYMENT_RECEIVED","payment":{"id":"pay_test"}}'
+   ```
+   Esperado: HTTP **200** (corpo vazio).
+
 ## Infra esperada no servidor
 
 - **Docker** + Compose

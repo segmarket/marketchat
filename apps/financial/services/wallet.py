@@ -232,34 +232,49 @@ def request_withdrawal(
 
 
 @transaction.atomic
-def mark_withdrawal_paid(withdrawal: WithdrawalRequest) -> None:
-    if withdrawal.status != WithdrawalRequest.Status.PENDING:
-        return
+def mark_withdrawal_paid(withdrawal: WithdrawalRequest) -> bool:
+    if withdrawal.status == WithdrawalRequest.Status.PAID:
+        return False
+    if withdrawal.status == WithdrawalRequest.Status.REJECTED:
+        return False
 
-    wallet = Wallet.objects.select_for_update().get(pk=withdrawal.wallet_id)
-    amount = _quantize_money(withdrawal.amount)
-    wallet.balance_blocked = _quantize_money(max(Decimal("0"), wallet.balance_blocked - amount))
-    wallet.save(update_fields=["balance_blocked", "updated_at"])
+    if withdrawal.status == WithdrawalRequest.Status.PENDING:
+        wallet = Wallet.objects.select_for_update().get(pk=withdrawal.wallet_id)
+        amount = _quantize_money(withdrawal.amount)
+        wallet.balance_blocked = _quantize_money(max(Decimal("0"), wallet.balance_blocked - amount))
+        wallet.save(update_fields=["balance_blocked", "updated_at"])
 
     withdrawal.status = WithdrawalRequest.Status.PAID
     withdrawal.processed_at = timezone.now()
     withdrawal.save(update_fields=["status", "processed_at"])
+    return True
 
 
 @transaction.atomic
-def mark_withdrawal_rejected(withdrawal: WithdrawalRequest) -> None:
-    if withdrawal.status != WithdrawalRequest.Status.PENDING:
-        return
+def mark_withdrawal_rejected(withdrawal: WithdrawalRequest) -> bool:
+    if withdrawal.status == WithdrawalRequest.Status.PAID:
+        return False
+    if withdrawal.status == WithdrawalRequest.Status.REJECTED:
+        return False
 
     wallet = Wallet.objects.select_for_update().get(pk=withdrawal.wallet_id)
     amount = _quantize_money(withdrawal.amount)
-    wallet.balance_blocked = _quantize_money(max(Decimal("0"), wallet.balance_blocked - amount))
-    wallet.balance_available = _quantize_money(wallet.balance_available + amount)
-    wallet.save(update_fields=["balance_blocked", "balance_available", "updated_at"])
+    update_fields = ["updated_at"]
+
+    if withdrawal.status == WithdrawalRequest.Status.PENDING:
+        wallet.balance_blocked = _quantize_money(max(Decimal("0"), wallet.balance_blocked - amount))
+        wallet.balance_available = _quantize_money(wallet.balance_available + amount)
+        update_fields.extend(["balance_blocked", "balance_available"])
+    elif withdrawal.status == WithdrawalRequest.Status.PROCESSING:
+        wallet.balance_available = _quantize_money(wallet.balance_available + amount)
+        update_fields.append("balance_available")
+
+    wallet.save(update_fields=update_fields)
 
     withdrawal.status = WithdrawalRequest.Status.REJECTED
     withdrawal.processed_at = timezone.now()
     withdrawal.save(update_fields=["status", "processed_at"])
+    return True
 
 
 def get_statement(tenant_id: int, *, page: int = 1) -> StatementPage:

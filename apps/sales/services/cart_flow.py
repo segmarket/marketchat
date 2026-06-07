@@ -654,7 +654,11 @@ def _handle_photo(
     send_whatsapp_reply(
         instance,
         phone,
-        f"Pix Copia e Cola:\n\n{pix_code}\n\n"
-        f"Total: {_format_brl(cart.total_value)}",
+        (
+            f"Para pagar {_format_brl(cart.total_value)}, copie o código Pix "
+            "na próxima mensagem e cole no app do seu banco."
+        ),
     )
+    # Mensagem só com o código — mais fácil de selecionar/copiar no WhatsApp.
+    send_whatsapp_reply(instance, phone, pix_code)
     return True
