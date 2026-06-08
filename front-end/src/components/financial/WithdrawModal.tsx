@@ -75,7 +75,7 @@ export default function WithdrawModal({
 
   return (
     <Modal isOpen={open} onClose={onClose} className="max-w-lg">
-      <form onSubmit={handleSubmit} className="p-6">
+      <form onSubmit={handleSubmit} className="p-4 sm:p-6">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white/90">
           Solicitar saque via Pix
         </h2>
@@ -103,11 +103,21 @@ export default function WithdrawModal({
           ) : null}
         </div>
 
-        <div className="mt-6 flex justify-end gap-3">
-          <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
+        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-[44px]"
+            onClick={onClose}
+            disabled={submitting}
+          >
             Cancelar
           </Button>
-          <Button type="submit" disabled={submitting || !!amountError || amountValue <= 0}>
+          <Button
+            type="submit"
+            className="min-h-[44px]"
+            disabled={submitting || !!amountError || amountValue <= 0}
+          >
             {submitting ? "Enviando…" : "Confirmar saque"}
           </Button>
         </div>

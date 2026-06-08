@@ -122,7 +122,7 @@ export default function UpdateCardForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div className="flex justify-center">
+      <div className="flex w-full max-w-full justify-center overflow-hidden">
         <Cards
           number={digitsOnly(cardNumber)}
           name={cardName}
@@ -272,13 +272,13 @@ export default function UpdateCardForm({
           </div>
         </div>
       </div>
-      <div className="flex justify-end gap-3">
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         {showCancel && onCancel && (
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button type="button" variant="outline" className="min-h-[44px]" onClick={onCancel}>
             Cancelar
           </Button>
         )}
-        <Button type="submit" disabled={submitting}>
+        <Button type="submit" className="min-h-[44px]" disabled={submitting}>
           {submitting ? "Salvando…" : submitLabel}
         </Button>
       </div>

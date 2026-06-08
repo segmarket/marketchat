@@ -8,7 +8,7 @@ Todas as URLs abaixo são relativas ao host do backend (ex.: `http://127.0.0.1:8
 |--------|---------|--------------|-----------|
 | POST | `/api/auth/register/` | Nenhuma | Cadastro de novo tenant + usuário administrador + cartão (trial Asaas). |
 | GET | `/api/auth/me/` | JWT | Dados do usuário logado, tenant e `billing_blocked` (sempre acessível, mesmo com cobrança em atraso). |
-| POST | `/api/auth/token/` | Nenhuma | Login (JWT access + refresh). Inclui `tenant_id` no payload do access token. |
+| POST | `/api/auth/token/` | Nenhuma | Login (JWT access + refresh). Inclui `tenant_id` no payload do access token. Rate limit: **5 requisições/minuto por IP** (anti brute-force). |
 | POST | `/api/auth/token/refresh/` | Refresh token | Renova o access token. |
 | POST | `/api/auth/password/change/` | JWT | Troca de senha (senha atual + nova). |
 | POST | `/api/auth/password/reset/` | Nenhuma | Solicita e-mail de recuperação (corpo com link para o front). |
@@ -44,7 +44,7 @@ Acessível mesmo com cobrança em atraso (bypass do middleware 402).
 | Método | Caminho | Autenticação | Descrição |
 |--------|---------|--------------|-----------|
 | POST | `/api/webhooks/asaas/` | Igual à rota em billing. | Webhook Asaas (Pix de carrinho + assinatura SaaS). Em dev local o Asaas **não alcança** `localhost` — use túnel (ngrok) na URL do webhook ou `python manage.py sync_pending_cart_payments` após confirmar no sandbox. |
-| POST | `/api/billing/webhooks/asaas/` | Se `ASAAS_WEBHOOK_VERIFY=True`: header `asaas-access-token` = `ASAAS_WEBHOOK_TOKEN` (nome oficial Asaas). Em dev (`ASAAS_WEBHOOK_VERIFY=False`) o corpo é aceito sem esse header. | Mesmo handler: `PAYMENT_RECEIVED`/`PAYMENT_CONFIRMED` (carrinho), `PAYMENT_OVERDUE`/`PAYMENT_DELETED` (Pix expirado), assinatura (`PAYMENT_CONFIRMED`, `PAYMENT_OVERDUE`, `SUBSCRIPTION_DELETED`). |
+| POST | `/api/billing/webhooks/asaas/` | Se `ASAAS_WEBHOOK_VERIFY=True`: header `asaas-access-token` = `ASAAS_WEBHOOK_TOKEN` (authToken do painel Asaas; **não** use `ASAAS_API_KEY`). Ausente ou inválido → **403**. Em dev (`ASAAS_WEBHOOK_VERIFY=False`) o corpo é aceito sem esse header. Isento de rate limit global. | Mesmo handler: `PAYMENT_RECEIVED`/`PAYMENT_CONFIRMED` (carrinho), `PAYMENT_OVERDUE`/`PAYMENT_DELETED` (Pix expirado), assinatura (`PAYMENT_CONFIRMED`, `PAYMENT_OVERDUE`, `SUBSCRIPTION_DELETED`). |
 
 ## Produtos (`/api/products/`)
 
@@ -128,7 +128,7 @@ Requer JWT + administrador do tenant (`IsTenantAdmin`). Ver `docs/financial-ledg
 | GET | `/api/financial/statement/` | Saldo, `has_pix_key_configured`, chave Pix padrão, `fee_percent` e extrato paginado (`page`, default 20 itens). |
 | GET | `/api/financial/wallet/settings/` | Tipo da chave, `default_pix_key_masked`, `has_pix_key_configured`. A chave completa não é retornada quando já configurada. |
 | PATCH | `/api/financial/wallet/settings/` | Salva `default_pix_key_type` e `default_pix_key` na carteira do tenant (validação rigorosa por tipo). |
-| POST | `/api/financial/withdraw/` | Saque automático Pix: body `{ "amount" }`. Usa chave salva na Wallet e dispara `POST /v3/transfers` no Asaas. |
+| POST | `/api/financial/withdraw/` | Saque automático Pix: body `{ "amount" }`. Usa chave salva na Wallet e dispara `POST /v3/transfers` no Asaas. Rate limit: **5 requisições/hora por usuário**. |
 
 Pix de vendas WhatsApp cai na conta master Asaas; o webhook credita o ledger com taxa `FINANCIAL_PLATFORM_FEE_PERCENT` (default 2%). Saques exigem saldo na conta master Asaas para transferência.
 

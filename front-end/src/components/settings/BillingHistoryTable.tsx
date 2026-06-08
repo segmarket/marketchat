@@ -43,7 +43,7 @@ export default function BillingHistoryTable() {
       ) : items.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">Nenhuma cobrança encontrada.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="w-full overflow-x-auto">
           <Table>
             <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
               <TableRow>

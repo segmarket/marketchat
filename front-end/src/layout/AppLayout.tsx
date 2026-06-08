@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { NotificationsProvider } from "../context/NotificationsContext";
 import { SidebarProvider, useSidebar } from "../context/SidebarContext";
 import { Outlet, useLocation } from "react-router";
@@ -13,9 +14,18 @@ import AppSidebar from "./AppSidebar";
 const FULLSCREEN_ROUTES = ["/admin/chatbot-flows"];
 
 const LayoutContent: React.FC = () => {
-  const { isExpanded, isHovered, isMobileOpen } = useSidebar();
-  const { pathname } = useLocation();
+  const { isExpanded, isHovered, isMobileOpen, closeMobileSidebar } = useSidebar();
+  const { pathname, search } = useLocation();
+  const prevRoute = useRef(`${pathname}${search}`);
   const { user } = useAuth();
+
+  useEffect(() => {
+    const route = `${pathname}${search}`;
+    if (prevRoute.current !== route) {
+      closeMobileSidebar();
+      prevRoute.current = route;
+    }
+  }, [pathname, search, closeMobileSidebar]);
   const isFullscreen = FULLSCREEN_ROUTES.some((route) => pathname.startsWith(route));
   const onBillingSettings = pathname.startsWith("/admin/settings");
   const onBillingBlocked = pathname.startsWith("/admin/billing-blocked");
@@ -46,7 +56,7 @@ const LayoutContent: React.FC = () => {
             className={
               isFullscreen
                 ? "flex min-h-0 flex-1 flex-col overflow-hidden"
-                : "flex min-w-0 w-full flex-1 px-6 py-4 md:px-8 md:py-6"
+                : "flex min-w-0 w-full flex-1 px-4 py-4 md:px-8 md:py-6"
             }
           >
             <Outlet />

@@ -69,11 +69,16 @@ export default function ReactivateSubscriptionModal({
         Sua assinatura será reativada usando o {cardHint}, no valor de R$ {formatBRL(monthlyTotal)}
         /mês conforme seus mercados ativos.
       </p>
-      <div className="flex justify-end gap-3">
-        <Button variant="outline" onClick={onClose} disabled={submitting}>
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <Button variant="outline" className="min-h-[44px]" onClick={onClose} disabled={submitting}>
           Voltar
         </Button>
-        <Button variant="primary" onClick={() => void handleConfirm()} disabled={submitting}>
+        <Button
+          variant="primary"
+          className="min-h-[44px]"
+          onClick={() => void handleConfirm()}
+          disabled={submitting}
+        >
           {submitting ? "Reativando…" : "Confirmar reativação"}
         </Button>
       </div>

@@ -38,7 +38,7 @@ export default function EcommerceMetrics({ cards, loading = false }: Props) {
           <GroupIcon className="size-6 text-gray-800 dark:text-white/90" />
         </div>
 
-        <div className="mt-5 flex items-end justify-between">
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <MetricHelpTooltip
               label="Interações no mês"
@@ -58,7 +58,7 @@ export default function EcommerceMetrics({ cards, loading = false }: Props) {
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-800">
           <BoxIconLine className="size-6 text-gray-800 dark:text-white/90" />
         </div>
-        <div className="mt-5 flex items-end justify-between">
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <MetricHelpTooltip
               label="Incidentes críticos"

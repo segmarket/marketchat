@@ -7,7 +7,7 @@ export const adminPageRootClassName = "w-full min-w-0";
 
 /** Card branco padrão do admin (mesmo visual do Painel de Vendas). */
 export const adminPanelCardClassName =
-  "w-full min-w-0 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6";
+  "w-full min-w-0 rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03] md:p-6";
 
 type PanelCardProps = {
   children: ReactNode;

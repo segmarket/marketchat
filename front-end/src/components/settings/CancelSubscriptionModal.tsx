@@ -45,11 +45,16 @@ export default function CancelSubscriptionModal({
           ? " Você continua com acesso ao painel até o fim do período de testes."
           : " O acesso ao painel será encerrado conforme o plano contratado."}
       </p>
-      <div className="flex justify-end gap-3">
-        <Button variant="outline" onClick={onClose} disabled={submitting}>
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <Button variant="outline" className="min-h-[44px]" onClick={onClose} disabled={submitting}>
           Voltar
         </Button>
-        <Button variant="primary" onClick={() => void handleConfirm()} disabled={submitting}>
+        <Button
+          variant="primary"
+          className="min-h-[44px]"
+          onClick={() => void handleConfirm()}
+          disabled={submitting}
+        >
           {submitting ? "Cancelando…" : "Confirmar cancelamento"}
         </Button>
       </div>

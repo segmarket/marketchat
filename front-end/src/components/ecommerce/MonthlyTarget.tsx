@@ -83,7 +83,7 @@ export default function MonthlyTarget({ retention, loading = false }: Props) {
         </p>
       </div>
 
-      <div className="flex items-center justify-center gap-5 px-6 py-3.5 sm:gap-8 sm:py-5">
+      <div className="flex flex-col items-center justify-center gap-4 px-4 py-4 sm:flex-row sm:gap-8 sm:px-6 sm:py-5">
         <div>
           <div className="mb-1 flex justify-center">
             <MetricHelpTooltip
@@ -97,7 +97,7 @@ export default function MonthlyTarget({ retention, loading = false }: Props) {
           </p>
         </div>
 
-        <div className="h-7 w-px bg-gray-200 dark:bg-gray-800" />
+        <div className="hidden h-7 w-px bg-gray-200 sm:block dark:bg-gray-800" />
 
         <div>
           <div className="mb-1 flex justify-center">
@@ -112,7 +112,7 @@ export default function MonthlyTarget({ retention, loading = false }: Props) {
           </p>
         </div>
 
-        <div className="h-7 w-px bg-gray-200 dark:bg-gray-800" />
+        <div className="hidden h-7 w-px bg-gray-200 sm:block dark:bg-gray-800" />
 
         <div>
           <div className="mb-1 flex justify-center">

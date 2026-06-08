@@ -136,7 +136,20 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
+    "DEFAULT_THROTTLE_CLASSES": (
+        "apps.core.throttling.ForwardedAwareAnonRateThrottle",
+        "apps.core.throttling.ForwardedAwareUserRateThrottle",
+    ),
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "10/minute",
+        "user": "60/minute",
+        "login": "5/minute",
+        "withdraw": "5/hour",
+    },
 }
+
+# Em produção (atrás de Apache/Nginx) use True; em dev local mantenha False.
+TRUST_X_FORWARDED_FOR = env.bool("TRUST_X_FORWARDED_FOR", default=False)
 
 REDIS_URL = env("REDIS_URL", default="redis://127.0.0.1:6379/0")
 CHAT_CONTEXT_TTL_SECONDS = env.int("CHAT_CONTEXT_TTL_SECONDS", default=1200)

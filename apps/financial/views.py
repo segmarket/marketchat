@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.permissions import IsTenantAdmin
+from apps.core.throttling import WithdrawRateThrottle
 from apps.financial.serializers import (
     LedgerTransactionSerializer,
     WalletSettingsSerializer,
@@ -110,6 +111,7 @@ class FinancialWalletSettingsView(APIView):
 
 class FinancialWithdrawView(APIView):
     permission_classes = [IsAuthenticated, IsTenantAdmin]
+    throttle_classes = [WithdrawRateThrottle]
 
     def post(self, request: Request) -> Response:
         tenant_id = getattr(request.user, "tenant_id", None)

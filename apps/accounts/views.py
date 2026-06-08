@@ -17,6 +17,7 @@ from apps.accounts.serializers import (
     TenantTokenObtainPairSerializer,
 )
 from apps.core.emails import send_password_reset_email_safe
+from apps.core.throttling import LoginRateThrottle
 from apps.tenants.models import Tenant
 
 User = get_user_model()
@@ -25,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 class TenantTokenObtainPairView(TokenObtainPairView):
     serializer_class = TenantTokenObtainPairSerializer
+    throttle_classes = [LoginRateThrottle]
 
 
 class MeView(APIView):
