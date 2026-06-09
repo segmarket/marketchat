@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import PageMeta from "../../components/common/PageMeta";
+import { LINKS_PAGE_DESCRIPTION, LINKS_PAGE_TITLE } from "../../constants/socialShare";
 import MarketchatLogo, { MARKETCHAT_LOGO_FOOTER_CLASS } from "../../components/brand/MarketchatLogo";
 import CookieConsentBanner from "../../components/marketing/CookieConsentBanner";
-import MarketingAnalytics from "../../components/marketing/MarketingAnalytics";
 import MarketingCtaLink from "../../components/marketing/MarketingCtaLink";
 import {
   LinksPageButtonExternal,
@@ -10,9 +10,15 @@ import {
   linksPrimaryClass,
 } from "../../components/marketing/LinksPageButton";
 import { InstagramIcon, WhatsAppIcon } from "../../components/marketing/MarketingSocialIcons";
+import { ANALYTICS_EVENTS, CTA_LOCATIONS } from "../../constants/analyticsEvents";
 import { INSTAGRAM_URL, WHATSAPP_SUPPORT_URL } from "../../constants/marketingUrls";
+import {
+  CONSENT_CHANGE_EVENT,
+  hasMarketingConsent,
+  type CookieConsentPreferences,
+} from "../../features/marketing/cookieConsent";
 import { useUTM } from "../../hooks/useUTM";
-import { pushToDataLayer } from "../../utils/analytics";
+import { trackEvent } from "../../utils/analytics";
 
 const SOCIAL_FOOTER_LINKS = [
   { label: "Instagram", href: INSTAGRAM_URL, icon: InstagramIcon },
@@ -23,7 +29,23 @@ export default function LinksPage() {
   useUTM();
 
   useEffect(() => {
-    pushToDataLayer("links_page_view");
+    function trackPageView() {
+      trackEvent(ANALYTICS_EVENTS.LINKS_PAGE_VIEW);
+    }
+
+    if (hasMarketingConsent()) {
+      trackPageView();
+    }
+
+    function onConsentChange(event: Event) {
+      const prefs = (event as CustomEvent<CookieConsentPreferences>).detail;
+      if (prefs?.marketing) {
+        trackPageView();
+      }
+    }
+
+    window.addEventListener(CONSENT_CHANGE_EVENT, onConsentChange);
+    return () => window.removeEventListener(CONSENT_CHANGE_EVENT, onConsentChange);
   }, []);
 
   const year = new Date().getFullYear();
@@ -31,11 +53,10 @@ export default function LinksPage() {
   return (
     <div className="flex min-h-screen flex-col bg-gray-950 font-outfit text-white antialiased">
       <PageMeta
-        title="Links | MarketChat"
-        description="Comece seu trial, conheça o MarketChat ou fale com nosso time. Links oficiais para redes sociais."
+        title={LINKS_PAGE_TITLE}
+        description={LINKS_PAGE_DESCRIPTION}
         path="/links"
       />
-      <MarketingAnalytics />
 
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-6 py-10">
         <header className="mb-10 flex flex-col items-center text-center">
@@ -50,7 +71,11 @@ export default function LinksPage() {
         </header>
 
         <nav className="flex flex-col gap-4" aria-label="Links principais">
-          <MarketingCtaLink className={linksPrimaryClass} path="/auth/signup">
+          <MarketingCtaLink
+            className={linksPrimaryClass}
+            path="/auth/signup"
+            analyticsLocation={CTA_LOCATIONS.LINKS_BIO}
+          >
             Começar 7 Dias Grátis
           </MarketingCtaLink>
 
@@ -58,7 +83,10 @@ export default function LinksPage() {
 
           <LinksPageButtonLink to="/signin">Painel do Cliente</LinksPageButtonLink>
 
-          <LinksPageButtonExternal href={WHATSAPP_SUPPORT_URL}>
+          <LinksPageButtonExternal
+            href={WHATSAPP_SUPPORT_URL}
+            onClick={() => trackEvent(ANALYTICS_EVENTS.CLICK_WHATSAPP, { location: CTA_LOCATIONS.LINKS_BIO })}
+          >
             <WhatsAppIcon className="h-5 w-5 shrink-0" aria-hidden />
             Falar com um Especialista
           </LinksPageButtonExternal>

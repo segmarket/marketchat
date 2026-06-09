@@ -296,7 +296,11 @@ export default function ChatbotFlowsPage() {
 
   return (
     <>
-      <PageMeta title="Fluxos do Chatbot | MarketChat" description="Construtor visual de fluxos WhatsApp" />
+      <PageMeta
+        title="Fluxos do Chatbot | MarketChat"
+        description="Construtor visual de fluxos WhatsApp"
+        noIndex
+      />
 
       <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
         <ChatbotFlowWorkspace

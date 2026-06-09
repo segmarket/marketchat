@@ -1,14 +1,18 @@
 /** Textos e imagem padrão para preview em WhatsApp, LinkedIn, etc. (Open Graph). */
 export const SOCIAL_SHARE_SITE_NAME = "MarketChat";
 
-export const SOCIAL_SHARE_DEFAULT_TITLE =
-  "MarketChat | Gerente virtual para mercados autônomos";
+export const SOCIAL_SHARE_DEFAULT_TITLE = "MarketChat | Sistema para mercado autônomo";
 
 export const SOCIAL_SHARE_DEFAULT_DESCRIPTION =
-  "Ecossistema completo: vendas no WhatsApp, alertas de estoque, Photo-Lock e painel operacional em tempo real para o dono do mercado autônomo.";
+  "Mercado autônomo em condomínio com atendimento via WhatsApp: vendas Pix, alertas de estoque e painel operacional. Teste 7 dias grátis.";
 
 /** Caminho público (absoluto na origem marketing após build). */
 export const SOCIAL_SHARE_DEFAULT_IMAGE_PATH = "/images/brand/og-marketchat-share.png";
+
+export const LINKS_PAGE_TITLE = "Links Oficiais | MarketChat";
+
+export const LINKS_PAGE_DESCRIPTION =
+  "Links oficiais do MarketChat: comece seu trial de 7 dias, acesse o painel ou fale com nosso time.";
 
 /** ID do app Meta (Facebook) — meta fb:app_id no Sharing Debugger. */
 export function getFacebookAppId(): string | undefined {

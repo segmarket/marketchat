@@ -1,6 +1,8 @@
 import { Clock, Wallet } from "lucide-react";
 import Button from "../ui/button/Button";
+import { ANALYTICS_EVENTS } from "../../constants/analyticsEvents";
 import { formatBRL } from "../../features/financial/format";
+import { trackEvent } from "../../utils/analytics";
 
 type Props = {
   balanceAvailable: string;
@@ -43,7 +45,10 @@ export default function FinancialSummaryCards({
             </p>
             <Button
               className="mt-5 min-h-[44px] w-full md:w-auto"
-              onClick={onWithdrawClick}
+              onClick={() => {
+                trackEvent(ANALYTICS_EVENTS.REQUEST_WITHDRAWAL);
+                onWithdrawClick();
+              }}
               disabled={!canWithdraw}
             >
               Solicitar Saque via Pix

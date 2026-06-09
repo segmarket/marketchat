@@ -6,7 +6,7 @@ Todas as URLs abaixo são relativas ao host do backend (ex.: `http://127.0.0.1:8
 
 | Método | Caminho | Autenticação | Descrição |
 |--------|---------|--------------|-----------|
-| POST | `/api/auth/register/` | Nenhuma | Cadastro de novo tenant + usuário administrador + cartão (trial Asaas). |
+| POST | `/api/auth/register/` | Nenhuma | Cadastro de novo tenant + usuário administrador + cartão (trial Asaas). Exige `accept_terms: true`; grava `terms_accepted_at` no tenant. |
 | GET | `/api/auth/me/` | JWT | Dados do usuário logado, tenant e `billing_blocked` (sempre acessível, mesmo com cobrança em atraso). |
 | POST | `/api/auth/token/` | Nenhuma | Login (JWT access + refresh). Inclui `tenant_id` no payload do access token. Rate limit: **5 requisições/minuto por IP** (anti brute-force). |
 | POST | `/api/auth/token/refresh/` | Refresh token | Renova o access token. |
@@ -131,6 +131,20 @@ Requer JWT + administrador do tenant (`IsTenantAdmin`). Ver `docs/financial-ledg
 | POST | `/api/financial/withdraw/` | Saque automático Pix: body `{ "amount" }`. Usa chave salva na Wallet e dispara `POST /v3/transfers` no Asaas. Rate limit: **5 requisições/hora por usuário**. |
 
 Pix de vendas WhatsApp cai na conta master Asaas; o webhook credita o ledger com taxa `FINANCIAL_PLATFORM_FEE_PERCENT` (default 2%). Saques exigem saldo na conta master Asaas para transferência.
+
+## LGPD (`/api/lgpd/`)
+
+Requer JWT + administrador do tenant (`IsTenantAdmin`). Acessível mesmo com cobrança suspensa (bypass 402).
+
+| Método | Caminho | Descrição |
+|--------|---------|-----------|
+| GET | `/api/lgpd/export/` | Download JSON com dados cadastrais e financeiros do tenant (portabilidade). |
+| GET | `/api/lgpd/residents/<id>/export/` | Download JSON com dados do morador (mensagens, pedidos; sem binários de foto). |
+| POST | `/api/lgpd/residents/anonymize/` | Body `{ "phone": "..." }` — anonimiza morador preservando ledger e pedidos. |
+
+Retenção: fotos Photo-Lock e anexos de chat são removidos após 30 dias via `python manage.py cleanup_old_photos` (cron diário sugerido).
+
+Logs da aplicação não devem registrar telefone, CPF ou cartão em texto plano — use `apps.core.pii` para mascaramento.
 
 ## Chatbot — fluxos visuais (`/api/chatbot/`)
 

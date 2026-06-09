@@ -17,6 +17,8 @@ import NotFound from "../pages/OtherPage/NotFound";
 import BillingBlocked from "../pages/admin/BillingBlocked";
 import TrialExpired from "../pages/admin/TrialExpired";
 import AppRootRedirect from "./AppRootRedirect";
+import TermsOfServicePage from "../pages/marketing/TermsOfServicePage";
+import PrivacyPolicyPage from "../pages/marketing/PrivacyPolicyPage";
 
 export default function AppRoutes() {
   return (
@@ -29,6 +31,8 @@ export default function AppRoutes() {
       <Route path="/signup" element={<Navigate to="/auth/signup" replace />} />
       <Route path="/register" element={<SignupPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/privacidade" element={<PrivacyPolicyPage />} />
+      <Route path="/termos" element={<TermsOfServicePage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/admin/trial-expired" element={<TrialExpired />} />

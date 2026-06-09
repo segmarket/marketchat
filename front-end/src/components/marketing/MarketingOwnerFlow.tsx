@@ -68,8 +68,8 @@ export default function MarketingOwnerFlow() {
       className="scroll-mt-24 bg-slate-50 px-4 py-20 sm:px-6 lg:px-8"
     >
       <div className="mx-auto max-w-7xl">
-        <div className="grid items-start gap-12 lg:grid-cols-2 lg:gap-16">
-          <div>
+        <div className="flex flex-col gap-12 lg:grid lg:grid-cols-2 lg:items-start lg:gap-16">
+          <div className="order-1">
             <h2 className="text-3xl font-bold text-gray-900 sm:text-4xl">
               Seus olhos e ouvidos dentro de cada condomínio.
             </h2>
@@ -110,12 +110,12 @@ export default function MarketingOwnerFlow() {
             </ol>
           </div>
 
-          <div className="flex justify-center lg:justify-center">
+          <div className="order-2 flex justify-center lg:order-2 lg:justify-center">
             <div className="w-full max-w-xl rounded-xl border border-gray-200 bg-white p-6 shadow-lg ring-1 ring-gray-100">
               <div className="flex items-center justify-between border-b border-gray-100 pb-4">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">Central de alertas</p>
-                  <p className="text-xs text-gray-500">Tempo real · todos os mercados</p>
+                  <p className="text-xs text-gray-600">Tempo real · todos os mercados</p>
                 </div>
                 <Bell className="h-5 w-5 text-brand-600" aria-hidden />
               </div>

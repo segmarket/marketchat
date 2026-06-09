@@ -34,6 +34,7 @@ from apps.residents.models import ChatSession, Resident
 from apps.sales.services.cart_escape import handle_global_escape
 from apps.sales.services.cart_flow import process_cart_flow
 from apps.sales.services.intent_gatekeeper import GENERAL, classify_user_intent
+from apps.core.pii import mask_jid
 from apps.residents.services.phone import jid_to_phone
 from apps.tenants.context import tenant_scope
 
@@ -134,7 +135,7 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
         "WhatsApp MESSAGE recebido: tenant=%s instance=%s jid=%s text_len=%s",
         instance.tenant_id,
         instance.instance_name,
-        event.remote_jid,
+        mask_jid(event.remote_jid),
         len((event.message_text or "").strip()),
     )
 
@@ -197,6 +198,8 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
         Resident.objects.filter(
             tenant_id=instance.tenant_id,
             phone_number=phone,
+            is_anonymized=False,
+            is_active=True,
         )
         .select_related("market")
         .first()
@@ -265,7 +268,7 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
             logger.info(
                 "WhatsApp MESSAGE sem texto (onboarding): tenant=%s jid=%s",
                 instance.tenant_id,
-                event.remote_jid,
+                mask_jid(event.remote_jid),
             )
             return
         process_inbound_message(instance.tenant_id, instance, phone, text)
@@ -283,6 +286,8 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
                     tenant_id=instance.tenant_id,
                     phone_number=phone,
                     market__isnull=False,
+                    is_anonymized=False,
+                    is_active=True,
                 )
                 .first()
             )
@@ -314,7 +319,7 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
         logger.info(
             "WhatsApp MESSAGE sem texto (fallback): tenant=%s jid=%s kind=%s",
             instance.tenant_id,
-            event.remote_jid,
+            mask_jid(event.remote_jid),
             event.message_kind,
         )
         send_whatsapp_reply(

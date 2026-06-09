@@ -71,6 +71,7 @@ const settingsNavItem: NavItem = {
     { name: "Mercados", to: "/admin/settings?section=markets" },
     { name: "Integrações", to: "/admin/settings?section=integrations", integrationsOnly: true },
     { name: "Minha Conta", to: "/admin/settings" },
+    { name: "Privacidade", to: "/admin/settings?section=privacy", adminOnly: true },
     { name: "Plano e pagamento", to: "/admin/settings?tab=plan", adminOnly: true },
     { name: "Histórico de Faturas", to: "/admin/settings?tab=history", adminOnly: true },
   ],

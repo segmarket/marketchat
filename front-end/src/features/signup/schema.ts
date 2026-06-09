@@ -7,6 +7,11 @@ export const step1Schema = z.object({
   fullName: z.string().min(3, "Informe seu nome completo"),
   email: z.string().email("E-mail inválido"),
   password: z.string().min(8, "Mínimo de 8 caracteres"),
+  acceptTerms: z.literal(true, {
+    errorMap: () => ({
+      message: "Você precisa aceitar a Política de Privacidade e os Termos de Uso.",
+    }),
+  }),
 });
 
 export const step2Schema = z.object({
@@ -19,7 +24,7 @@ export const step2Schema = z.object({
       return d.length === 11 || d.length === 14;
     }, "Informe CPF (11 dígitos) ou CNPJ (14 dígitos)")
     .refine((v) => isValidCpfOrCnpj(v), "CPF ou CNPJ inválido"),
-  phone: z.string().refine((v) => digitsOnly(v).length >= 10, "Telefone inválido"),
+  phone: z.string().refine((v) => digitsOnly(v).length >= 10, "Digite um telefone com DDD."),
   cep: z.string().refine((v) => digitsOnly(v).length === 8, "CEP deve ter 8 dígitos"),
   address: z.string().min(1, "Informe o logradouro e cidade (ou preencha após o CEP)"),
   addressNumber: z.string().min(1, "Número obrigatório"),

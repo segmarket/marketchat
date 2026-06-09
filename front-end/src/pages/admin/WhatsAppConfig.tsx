@@ -405,7 +405,11 @@ export default function WhatsAppConfig({ embedded = false }: Props) {
     <>
       {!embedded && (
         <>
-          <PageMeta title="Integrações | MarketChat" description="Gerencie a conexão WhatsApp da sua empresa." />
+          <PageMeta
+            title="Integrações | MarketChat"
+            description="Gerencie a conexão WhatsApp da sua empresa."
+            noIndex
+          />
           <PageBreadcrumb pageTitle="Integrações" />
         </>
       )}

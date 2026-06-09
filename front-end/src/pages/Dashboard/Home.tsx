@@ -192,6 +192,13 @@ export default function Home() {
         </div>
       </div>
 
+      {!loading && analytics && analytics.cards.total_interactions === 0 && analytics.cards.critical_incidents === 0 ? (
+        <div className="mb-6 rounded-2xl border border-brand-200 bg-brand-25 px-5 py-4 text-sm text-gray-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-gray-300">
+          Nenhum alerta crítico neste período — tudo sob controle. Quando moradores interagirem pelo
+          WhatsApp, os dados aparecerão aqui.
+        </div>
+      ) : null}
+
       <div className="space-y-6">
         <EcommerceMetrics cards={analytics?.cards ?? null} loading={loading} />
 

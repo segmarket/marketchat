@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     "apps.support",
     "apps.core",
     "apps.financial",
+    "apps.lgpd",
 ]
 
 MIDDLEWARE = [

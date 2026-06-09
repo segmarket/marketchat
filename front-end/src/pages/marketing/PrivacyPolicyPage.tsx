@@ -1,95 +1,129 @@
 import { Link } from "react-router";
-import PageMeta from "../../components/common/PageMeta";
-import MarketingBrandLogo from "../../components/marketing/MarketingBrandLogo";
+import LegalDocumentLayout from "../../components/marketing/LegalDocumentLayout";
+import {
+  COMPANY_CNPJ,
+  COMPANY_LEGAL_NAME,
+  DPO_EMAIL,
+  LEGAL_LAST_UPDATED,
+} from "../../constants/legalContent";
 
 export default function PrivacyPolicyPage() {
   return (
-    <div className="min-h-screen bg-white font-outfit text-gray-900 antialiased">
-      <PageMeta
-        title="Política de Privacidade | MarketChat"
-        description="Como o MarketChat coleta, usa e protege seus dados pessoais."
-        path="/privacidade"
-      />
-      <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4 sm:px-6">
-          <Link to="/" className="inline-flex items-center gap-2">
-            <MarketingBrandLogo showWordmark={false} />
+    <LegalDocumentLayout
+      title="Política de Privacidade | MarketChat"
+      description="Como o MarketChat coleta, usa e protege os dados de operadores e moradores, em conformidade com a LGPD."
+      path="/privacidade"
+    >
+      <h1 className="text-3xl font-bold text-gray-900">Política de Privacidade – MarketChat</h1>
+      <p className="mt-2 text-sm text-gray-600">Última atualização: {LEGAL_LAST_UPDATED}</p>
+
+      <div className="mt-8 space-y-8 text-sm leading-relaxed text-gray-700">
+        <p>
+          A MarketChat (razão social {COMPANY_LEGAL_NAME}, CNPJ {COMPANY_CNPJ}) valoriza a
+          privacidade de seus usuários. Esta Política descreve como coletamos, usamos e protegemos
+          os dados pessoais de nossos Clientes (Operadores de Mercado) e dos Consumidores finais
+          (Moradores), em conformidade com a Lei Geral de Proteção de Dados (LGPD — Lei nº
+          13.709/2018).
+        </p>
+
+        <section>
+          <h2 className="text-lg font-semibold text-gray-900">1. Dados que Coletamos</h2>
+          <p className="mt-3">
+            <strong>Do Cliente (Operador do Mercado):</strong> Nome completo, CPF/CNPJ, e-mail,
+            telefone, chave Pix e dados de faturamento para processamento da assinatura.
+          </p>
+          <p className="mt-3">
+            <strong>Do Consumidor (Morador):</strong> Número de telefone (via WhatsApp), nome (se
+            fornecido), histórico de conversas com o assistente virtual, registros de compras, código
+            Pix transacionado e fotos ambientais (ex.: verificação de geladeira/Photo-Lock).{" "}
+            <strong>Não armazenamos dados de cartão de crédito dos consumidores.</strong>
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-gray-900">2. Finalidade do Uso dos Dados</h2>
+          <ul className="mt-3 list-disc space-y-2 pl-5">
+            <li>Viabilizar o atendimento automatizado e o processamento de vendas via WhatsApp.</li>
+            <li>
+              Prevenção de fraudes e auditoria de incidentes de segurança (uso de fotos do local).
+            </li>
+            <li>Processamento financeiro e repasse de valores (Saques Pix).</li>
+            <li>Suporte técnico e envio de comunicações essenciais sobre o sistema.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-gray-900">3. Compartilhamento de Dados</h2>
+          <p className="mt-3">
+            O MarketChat <strong>não vende</strong> seus dados. Compartilhamos informações
+            estritamente necessárias com parceiros de infraestrutura tecnológica:
+          </p>
+          <ul className="mt-3 list-disc space-y-2 pl-5">
+            <li>
+              <strong>Gateways de Pagamento (Asaas):</strong> Para processamento de assinaturas,
+              geração de cobranças Pix e transferências bancárias.
+            </li>
+            <li>
+              <strong>Provedores de Comunicação (Meta/Evolution API):</strong> Para tráfego de
+              mensagens no WhatsApp.
+            </li>
+            <li>
+              <strong>Hospedagem em Nuvem:</strong> Para armazenamento seguro do banco de dados e
+              arquivos.
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-gray-900">4. Retenção e Exclusão de Dados</h2>
+          <p className="mt-3">
+            Os dados são armazenados pelo tempo necessário para a prestação do serviço.
+          </p>
+          <ul className="mt-3 list-disc space-y-2 pl-5">
+            <li>
+              <strong>Fotos de Auditoria (Photo-Lock):</strong> São excluídas automaticamente de
+              nossos servidores após 30 dias.
+            </li>
+            <li>
+              <strong>Dados Financeiros:</strong> Por exigência do Banco Central e leis fiscais
+              brasileiras, registros de transações (extratos de Pix) são mantidos por até 5 (cinco)
+              anos, não podendo ser apagados antes deste prazo, mesmo mediante solicitação.
+            </li>
+            <li>
+              <strong>Anonimização:</strong> Consumidores podem solicitar a exclusão de seus dados
+              de contato. O MarketChat realizará a anonimização irreversível do número de telefone
+              e nome, mantendo apenas os dados transacionais essenciais.
+            </li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-gray-900">5. Seus Direitos (Art. 18 da LGPD)</h2>
+          <p className="mt-3">
+            Você tem direito de confirmar a existência de tratamento, acessar seus dados, corrigir
+            informações incompletas, solicitar anonimização e revogar o consentimento.
+          </p>
+          <p className="mt-3">
+            Para exercer seus direitos, entre em contato com nosso Encarregado de Proteção de Dados
+            (DPO) através do e-mail:{" "}
+            <a
+              href={`mailto:${DPO_EMAIL}`}
+              className="font-medium text-brand-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-sm"
+            >
+              {DPO_EMAIL}
+            </a>
+            .
+          </p>
+        </section>
+
+        <p className="border-t border-gray-200 pt-6 text-gray-600">
+          Consulte também nossos{" "}
+          <Link to="/termos" className="font-medium text-brand-600 hover:underline">
+            Termos de Uso
           </Link>
-          <Link to="/" className="text-sm font-medium text-brand-600 hover:text-brand-700">
-            Voltar à landing
-          </Link>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
-        <h1 className="text-3xl font-bold text-gray-900">Política de Privacidade</h1>
-        <p className="mt-2 text-sm text-gray-500">Última atualização: maio de 2026</p>
-
-        <div className="prose prose-gray mt-8 max-w-none space-y-6 text-sm leading-relaxed text-gray-700">
-          <section>
-            <h2 className="text-lg font-semibold text-gray-900">1. Quem somos</h2>
-            <p>
-              O MarketChat é uma plataforma de gestão para mercados autônomos. Esta política descreve
-              como tratamos dados pessoais de visitantes, leads e clientes.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold text-gray-900">2. Dados que coletamos</h2>
-            <ul className="list-disc space-y-2 pl-5">
-              <li>Dados de cadastro: nome, e-mail, telefone, empresa e dados de pagamento.</li>
-              <li>Dados de navegação: cookies, endereço IP, páginas visitadas e origem da campanha (UTMs).</li>
-              <li>Parâmetros de marketing: utm_source, utm_medium, utm_campaign, gclid e fbclid quando presentes na URL.</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold text-gray-900">3. Cookies e tecnologias similares</h2>
-            <p>
-              Utilizamos cookies essenciais para o funcionamento do site e cookies analíticos/de marketing
-              (via Google Tag Manager) para medir campanhas e melhorar conversões. Você pode aceitar ou
-              recusar cookies não essenciais pelo banner exibido na landing page.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold text-gray-900">4. Finalidade do tratamento</h2>
-            <p>
-              Os dados são utilizados para criar e gerenciar sua conta, processar assinaturas, prestar
-              suporte, cumprir obrigações legais e mensurar a eficácia de campanhas publicitárias.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold text-gray-900">5. Compartilhamento</h2>
-            <p>
-              Podemos compartilhar dados com provedores de pagamento (Asaas), infraestrutura de
-              hospedagem e ferramentas de analytics quando necessário para operar o serviço, sempre
-              observando medidas de segurança adequadas.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold text-gray-900">6. Seus direitos (LGPD)</h2>
-            <p>
-              Você pode solicitar acesso, correção, exclusão ou portabilidade dos seus dados, além de
-              revogar consentimentos, entrando em contato pelo e-mail{" "}
-              <a href="mailto:contato@marketchat.com.br" className="text-brand-600 hover:underline">
-                contato@marketchat.com.br
-              </a>
-              .
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold text-gray-900">7. Retenção</h2>
-            <p>
-              Mantemos os dados pelo tempo necessário para cumprir as finalidades descritas e obrigações
-              legais, incluindo registros de atribuição de campanhas vinculados à criação da conta.
-            </p>
-          </section>
-        </div>
-      </main>
-    </div>
+          .
+        </p>
+      </div>
+    </LegalDocumentLayout>
   );
 }

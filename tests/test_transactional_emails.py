@@ -179,6 +179,7 @@ def test_register_sends_welcome_email(api_client):
         "admin_password": "StrongPass123!",
         "first_name": "Ada",
         "last_name": "Lovelace",
+        "accept_terms": True,
         "credit_card": {
             "holderName": "ADA LOVELACE",
             "number": "5162306219378829",

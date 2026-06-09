@@ -79,5 +79,6 @@ export type SettingsSectionId =
   | "account"
   | "markets"
   | "integrations"
+  | "privacy"
   | "plan"
   | "history";

@@ -10,6 +10,7 @@ export default function TrialExpired() {
       <PageMeta
         title="Trial encerrado | MarketChat"
         description="Ative sua assinatura para continuar usando o MarketChat."
+        noIndex
       />
       <div className="mx-auto max-w-lg text-center">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-brand-50 text-brand-600">

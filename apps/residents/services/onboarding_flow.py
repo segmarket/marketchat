@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import logging
 
+from django.conf import settings
+
+from apps.core.pii import mask_phone
 from apps.integrations.models import WhatsappInstance
 from apps.residents.models import ChatSession, Resident
 from apps.sales.services.resident_ai_context import resident_first_name_from_string
@@ -21,7 +24,21 @@ def resident_has_completed_onboarding(tenant_id: int, phone: str) -> bool:
         tenant_id=tenant_id,
         phone_number=phone,
         market__isnull=False,
+        is_anonymized=False,
+        is_active=True,
     ).exists()
+
+
+def build_onboarding_privacy_message() -> str:
+    privacy_url = f"{settings.MARKETING_PUBLIC_ORIGIN.rstrip('/')}/privacidade"
+    greeting = greeting_for_now()
+    return (
+        f"👋 {greeting}! Sou o assistente virtual do mercado. "
+        "Para fazer compras e garantir sua segurança, processamos seus dados conforme nossa "
+        f"Política de Privacidade: {privacy_url}. "
+        "Ao continuar e enviar sua lista, você concorda com nossos termos.\n\n"
+        "Para começarmos seu atendimento, por favor, nos diga seu Nome Completo:"
+    )
 
 
 def process_inbound_message(
@@ -68,12 +85,10 @@ def process_inbound_message(
 
 
 def _start_onboarding(instance: WhatsappInstance, phone: str, tenant_id: int) -> None:
-    greeting = greeting_for_now()
     send_whatsapp_reply(
         instance,
         phone,
-        f"{greeting}! Seja bem-vindo ao assistente virtual do seu mercado autônomo. "
-        "Para começarmos seu atendimento, por favor, nos diga seu Nome Completo:",
+        build_onboarding_privacy_message(),
     )
     ChatSession.objects.update_or_create(
         tenant_id=tenant_id,
@@ -156,6 +171,6 @@ def _handle_awaiting_condo(
     logger.info(
         "Morador cadastrado: tenant=%s phone=%s market=%s",
         tenant_id,
-        phone,
+        mask_phone(phone),
         market.id,
     )

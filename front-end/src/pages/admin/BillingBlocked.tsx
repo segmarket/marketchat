@@ -37,6 +37,7 @@ export default function BillingBlocked() {
       <PageMeta
         title="Acesso suspenso | MarketChat"
         description="Regularize o pagamento para reativar o MarketChat."
+        noIndex
       />
       <div className="mx-auto w-full max-w-2xl">
         <div className="text-center">

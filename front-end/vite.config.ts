@@ -1,20 +1,19 @@
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import svgr from "vite-plugin-svgr";
-
-const DEFAULT_OG_TITLE = "MarketChat | Gerente virtual para mercados autônomos";
-const DEFAULT_OG_DESCRIPTION =
-  "Ecossistema completo: vendas no WhatsApp, alertas de estoque, Photo-Lock e painel operacional em tempo real para o dono do mercado autônomo.";
-/** Nome novo quebra cache do Sharing Debugger (troque o sufixo ao atualizar a arte). */
-const DEFAULT_OG_IMAGE_PATH = "/images/brand/og-marketchat-share.png";
+import {
+  SOCIAL_SHARE_DEFAULT_DESCRIPTION,
+  SOCIAL_SHARE_DEFAULT_IMAGE_PATH,
+  SOCIAL_SHARE_DEFAULT_TITLE,
+} from "./src/constants/socialShare";
 
 function socialShareHtmlPlugin(marketingOrigin: string, fbAppId: string): Plugin {
   const origin = marketingOrigin.replace(/\/$/, "") || "https://marketchat.com.br";
   const ogUrl = `${origin}/`;
-  const ogImage = `${origin}${DEFAULT_OG_IMAGE_PATH}`;
+  const ogImage = `${origin}${SOCIAL_SHARE_DEFAULT_IMAGE_PATH}`;
   const replacements: Record<string, string> = {
-    __OG_TITLE__: DEFAULT_OG_TITLE,
-    __OG_DESCRIPTION__: DEFAULT_OG_DESCRIPTION,
+    __OG_TITLE__: SOCIAL_SHARE_DEFAULT_TITLE,
+    __OG_DESCRIPTION__: SOCIAL_SHARE_DEFAULT_DESCRIPTION,
     __OG_URL__: ogUrl,
     __OG_IMAGE__: ogImage,
   };

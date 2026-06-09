@@ -10,13 +10,14 @@ import type { AccountSettingsResponse, SettingsSectionId } from "../../features/
 import { getAxiosErrorMessage } from "../../utils/apiError";
 import MarketsPage from "./MarketsPage";
 import IntegrationsPage from "./IntegrationsPage";
+import PrivacyHub from "../../components/settings/PrivacyHub";
 
 function resolveActiveSection(
   tab: string | null,
   section: string | null,
 ): SettingsSectionId {
   if (tab === "plan" || tab === "history") return tab;
-  if (section === "markets" || section === "integrations") {
+  if (section === "markets" || section === "integrations" || section === "privacy") {
     return section;
   }
   return "account";
@@ -64,6 +65,9 @@ export default function SettingsPage() {
     if (!showIntegrations && activeSection === "integrations") {
       setSearchParams({}, { replace: true });
     }
+    if (!isTenantAdmin && activeSection === "privacy") {
+      setSearchParams({}, { replace: true });
+    }
     if (searchParams.get("section") === "products") {
       navigate("/admin/products", { replace: true });
     }
@@ -82,6 +86,7 @@ export default function SettingsPage() {
     account: "Minha Conta",
     markets: "Mercados",
     integrations: "Integrações",
+    privacy: "Privacidade",
     plan: "Plano e pagamento",
     history: "Histórico de Faturas",
   };
@@ -90,6 +95,7 @@ export default function SettingsPage() {
     account: "Dados da conta e da empresa.",
     markets: "Cadastre e gerencie os mercados do seu condomínio.",
     integrations: "WhatsApp e conta Pix de recebimento.",
+    privacy: "Exportação de dados e anonimização de moradores (LGPD).",
     plan: "Assinatura e forma de pagamento.",
     history: "Faturas e pagamentos anteriores.",
   };
@@ -104,9 +110,11 @@ export default function SettingsPage() {
       description={sectionDescriptions[activeSection]}
     >
       {loading || !accountData ? (
-        <p className="animate-pulse text-sm text-gray-500 dark:text-gray-400">
-          Carregando configurações…
-        </p>
+        <div className="space-y-4" aria-hidden>
+          <div className="h-8 w-48 animate-pulse rounded bg-gray-100 dark:bg-white/10" />
+          <div className="h-40 animate-pulse rounded-2xl border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-white/5" />
+          <div className="h-40 animate-pulse rounded-2xl border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-white/5" />
+        </div>
       ) : (
         <>
           {activeSection === "account" && (
@@ -116,6 +124,7 @@ export default function SettingsPage() {
           {activeSection === "integrations" && showIntegrations && (
             <IntegrationsPage embedded />
           )}
+          {activeSection === "privacy" && isTenantAdmin && <PrivacyHub />}
           {activeSection === "plan" && isTenantAdmin && (
             <PlanPaymentPanel accountData={accountData} />
           )}

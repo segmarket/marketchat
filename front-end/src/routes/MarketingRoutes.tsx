@@ -3,12 +3,14 @@ import RedirectToAppHost from "../components/marketing/RedirectToAppHost";
 import LandingPage from "../pages/marketing/LandingPage";
 import LinksPage from "../pages/marketing/LinksPage";
 import PrivacyPolicyPage from "../pages/marketing/PrivacyPolicyPage";
+import TermsOfServicePage from "../pages/marketing/TermsOfServicePage";
 
 export default function MarketingRoutes() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/privacidade" element={<PrivacyPolicyPage />} />
+      <Route path="/termos" element={<TermsOfServicePage />} />
       <Route path="/links" element={<LinksPage />} />
       <Route path="/reset-password" element={<RedirectToAppHost appPath="/reset-password" />} />
       <Route path="/signin" element={<RedirectToAppHost appPath="/signin" />} />

@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.tenants.models import Tenant, TenantAwareModel
@@ -14,21 +15,30 @@ class Resident(TenantAwareModel):
         blank=True,
         related_name="residents",
     )
-    phone_number = models.CharField(max_length=32, db_index=True)
+    phone_number = models.CharField(max_length=64, db_index=True)
     name = models.CharField(max_length=255, blank=True, default="")
     asaas_customer_id = models.CharField(max_length=64, blank=True, default="")
+    is_active = models.BooleanField(default=True)
+    is_anonymized = models.BooleanField(default=False, db_index=True)
+    anonymized_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-created_at"]
         constraints = [
             models.UniqueConstraint(
                 fields=["tenant", "phone_number"],
-                name="uniq_resident_tenant_phone",
+                condition=Q(is_anonymized=False),
+                name="uniq_resident_tenant_phone_active",
             ),
         ]
         indexes = [
             models.Index(fields=["tenant", "market"]),
         ]
+
+    def anonymize_data(self) -> None:
+        from apps.lgpd.services.anonymization import perform_resident_anonymization
+
+        perform_resident_anonymization(self)
 
     def __str__(self) -> str:
         return f"{self.name or self.phone_number}"

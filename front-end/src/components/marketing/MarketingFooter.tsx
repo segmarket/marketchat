@@ -1,8 +1,15 @@
 import type { ComponentType, ReactNode, SVGProps } from "react";
-import { getAppUrl } from "../../utils/host";
-import { appendAttributionToUrl } from "../../features/attribution/storage";
-import MarketchatLogo, { MARKETCHAT_LOGO_FOOTER_CLASS } from "../brand/MarketchatLogo";
+import { ANALYTICS_EVENTS, CTA_LOCATIONS } from "../../constants/analyticsEvents";
+import {
+  COMPANY_CNPJ,
+  COMPANY_LEGAL_NAME,
+  DPO_EMAIL,
+} from "../../constants/legalContent";
 import { INSTAGRAM_URL, WHATSAPP_SUPPORT_URL } from "../../constants/marketingUrls";
+import { trackEvent } from "../../utils/analytics";
+import { getAppUrl } from "../../utils/host";
+import MarketchatLogo, { MARKETCHAT_LOGO_FOOTER_CLASS } from "../brand/MarketchatLogo";
+import MarketingCtaLink from "./MarketingCtaLink";
 import { InstagramIcon, WhatsAppIcon } from "./MarketingSocialIcons";
 
 type SocialIcon = ComponentType<SVGProps<SVGSVGElement>>;
@@ -22,7 +29,9 @@ const NAV_LINKS = [
   { label: "Pilares", href: "#pilares" },
   { label: "Para o dono", href: "#para-o-dono" },
   { label: "Preços", href: "#precos" },
+  { label: "FAQ", href: "#faq" },
   { label: "Privacidade", href: "/privacidade" },
+  { label: "Termos de Uso", href: "/termos" },
 ] as const;
 
 
@@ -36,15 +45,18 @@ function FooterLink({
   href,
   children,
   external,
+  onClick,
 }: {
   href: string;
   children: ReactNode;
   external?: boolean;
+  onClick?: () => void;
 }) {
   return (
     <a
       href={href}
-      className="text-sm text-gray-300 transition-colors hover:text-white"
+      className="text-sm text-gray-300 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded-sm"
+      onClick={onClick}
       {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
     >
       {children}
@@ -52,13 +64,21 @@ function FooterLink({
   );
 }
 
+function trackWhatsAppClick(location: string) {
+  trackEvent(ANALYTICS_EVENTS.CLICK_WHATSAPP, { location });
+}
+
 export default function MarketingFooter() {
   const year = new Date().getFullYear();
 
   const productLinks = [
-    { label: "Começar 7 dias grátis", href: appendAttributionToUrl(getAppUrl("/auth/signup")) },
     { label: "Acessar o sistema", href: getAppUrl() },
-    { label: "Fale com nosso suporte", href: WHATSAPP_SUPPORT_URL, external: true },
+    {
+      label: "Fale com nosso suporte",
+      href: WHATSAPP_SUPPORT_URL,
+      external: true,
+      onClick: () => trackWhatsAppClick(CTA_LOCATIONS.FOOTER),
+    },
   ] as const;
 
   return (
@@ -113,9 +133,22 @@ export default function MarketingFooter() {
           <div className="lg:col-span-2">
             <FooterHeading>Produto</FooterHeading>
             <ul className="mt-4 space-y-3">
+              <li>
+                <MarketingCtaLink
+                  path="/auth/signup"
+                  className="text-sm text-gray-300 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded-sm"
+                  analyticsLocation={CTA_LOCATIONS.FOOTER}
+                >
+                  Começar 7 dias grátis
+                </MarketingCtaLink>
+              </li>
               {productLinks.map((link) => (
                 <li key={link.label}>
-                  <FooterLink href={link.href} external={"external" in link && link.external}>
+                  <FooterLink
+                    href={link.href}
+                    external={"external" in link && link.external}
+                    onClick={"onClick" in link ? link.onClick : undefined}
+                  >
                     {link.label}
                   </FooterLink>
                 </li>
@@ -128,12 +161,20 @@ export default function MarketingFooter() {
             <FooterHeading>Contato</FooterHeading>
             <ul className="mt-4 space-y-3">
               <li>
-                <FooterLink href={WHATSAPP_SUPPORT_URL} external>
+                <FooterLink
+                  href={WHATSAPP_SUPPORT_URL}
+                  external
+                  onClick={() => trackWhatsAppClick(CTA_LOCATIONS.FOOTER)}
+                >
                   WhatsApp: (14) 99168-3639
                 </FooterLink>
               </li>
               <li>
-                <FooterLink href={WHATSAPP_SUPPORT_URL} external>
+                <FooterLink
+                  href={WHATSAPP_SUPPORT_URL}
+                  external
+                  onClick={() => trackWhatsAppClick(CTA_LOCATIONS.FOOTER)}
+                >
                   Fale com nosso suporte
                 </FooterLink>
               </li>
@@ -152,15 +193,36 @@ export default function MarketingFooter() {
               </div>
               <div>
                 <FooterHeading>CNPJ</FooterHeading>
-                <p className="mt-3 text-sm text-gray-300">35.960.300/0001-05</p>
+                <p className="mt-3 text-sm text-gray-300">{COMPANY_CNPJ}</p>
+              </div>
+              <div>
+                <FooterHeading>Privacidade (DPO)</FooterHeading>
+                <p className="mt-3 text-sm text-gray-300">
+                  <FooterLink href={`mailto:${DPO_EMAIL}`} external>
+                    {DPO_EMAIL}
+                  </FooterLink>
+                </p>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="mt-12 border-t border-gray-800 pt-8">
-          <p className="text-center text-sm text-gray-500">
-            {year} | © Viva Software | Todos os Direitos Reservados.
+        <div className="mt-12 border-t border-gray-800 pt-8 text-center text-sm text-gray-500">
+          <p>
+            {year} | © {COMPANY_LEGAL_NAME} | CNPJ {COMPANY_CNPJ} | Todos os Direitos Reservados.
+          </p>
+          <p className="mt-2">
+            <FooterLink href="/privacidade">Política de Privacidade</FooterLink>
+            <span className="mx-2 text-gray-600" aria-hidden>
+              ·
+            </span>
+            <FooterLink href="/termos">Termos de Uso</FooterLink>
+            <span className="mx-2 text-gray-600" aria-hidden>
+              ·
+            </span>
+            <FooterLink href={`mailto:${DPO_EMAIL}`} external>
+              {DPO_EMAIL}
+            </FooterLink>
           </p>
         </div>
       </div>

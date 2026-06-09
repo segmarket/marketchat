@@ -8,27 +8,31 @@ import {
 const PILLARS = [
   {
     icon: ShoppingCart,
-    title: "Vendas sem Atrito e Trava por Foto",
+    gain: "Não perca a venda",
+    title: "Vendas sem atrito e Photo-Lock",
     description:
-      "Se a maquininha física falhar, não perca a venda. A IA assume, monta o carrinho no WhatsApp e gera o Pix instantâneo, exigindo a foto dos produtos para auditoria de segurança (Photo-Lock).",
+      "Se a maquininha falhar, a IA monta o carrinho no WhatsApp e gera o Pix, exigindo foto dos produtos para auditoria de segurança.",
   },
   {
     icon: PackageX,
-    title: "Fim do Estoque Zerado",
+    gain: "Fim do estoque zerado",
+    title: "Ruptura virando oportunidade",
     description:
-      'A IA entende quando o morador relata falta de produtos (ex: "Acabou o leite") ou validade vencida, sugerindo itens substitutos para salvar a venda e gerando um alerta imediato no seu painel.',
+      'A IA entende quando o morador relata falta de produtos ou validade vencida, sugere substitutos e alerta você no painel.',
   },
   {
     icon: AlertTriangle,
-    title: "Alertas de Equipamentos",
+    gain: "Proteja seu estoque",
+    title: "Alertas de equipamentos",
     description:
-      "O morador avisou que a geladeira de bebidas desligou ou o ar-condicionado quebrou? O bot agradece o feedback e notifica você imediatamente, evitando a perda de mercadorias perecíveis.",
+      "Geladeira desligada ou ar-condicionado quebrado? O bot agradece o aviso e notifica você antes da perda de mercadoria.",
   },
   {
     icon: MessageSquareCode,
-    title: "Atendimento e Blindagem",
+    gain: "Atendimento blindado",
+    title: "Suporte com tom certo",
     description:
-      "Respostas amigáveis para dúvidas reais e um escudo seco e profissional contra moradores fazendo provocações ou xingamentos. O robô coleta feedbacks de preços e guia o morador sempre para a conversão.",
+      "Respostas amigáveis para dúvidas reais e escudo profissional contra provocações — sempre guiando para a compra.",
   },
 ] as const;
 
@@ -46,16 +50,19 @@ export default function MarketingPillarsGrid() {
           </p>
         </div>
 
-        <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           {PILLARS.map((item) => (
             <article
               key={item.title}
-              className="rounded-xl border border-gray-200 bg-gray-25 p-6 transition-shadow hover:shadow-lg"
+              className="flex min-h-[220px] flex-col rounded-xl border border-gray-200 bg-gray-25 p-6 transition-shadow hover:shadow-lg"
             >
               <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
                 <item.icon className="h-6 w-6" aria-hidden />
               </div>
-              <h3 className="mt-4 text-lg font-semibold text-gray-900">{item.title}</h3>
+              <p className="mt-4 text-xs font-bold uppercase tracking-wide text-brand-600">
+                {item.gain}
+              </p>
+              <h3 className="mt-1 text-lg font-semibold text-gray-900">{item.title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-gray-600">{item.description}</p>
             </article>
           ))}

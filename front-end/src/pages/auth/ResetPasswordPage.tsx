@@ -76,6 +76,7 @@ export default function ResetPasswordPage() {
       <PageMeta
         title="Recuperar senha | MarketChat"
         description="Redefina sua senha MarketChat com o link enviado por e-mail."
+        noIndex
       />
       <AuthLayout>
         <div className="flex flex-col flex-1 w-full lg:w-1/2">

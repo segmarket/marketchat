@@ -9,7 +9,9 @@ import Input from "../form/input/InputField";
 import Checkbox from "../form/input/Checkbox";
 import Button from "../ui/button/Button";
 import { useAuth } from "../../context/AuthContext";
+import { ANALYTICS_EVENTS } from "../../constants/analyticsEvents";
 import { loginSchema, type LoginFormValues } from "../../features/auth/loginSchema";
+import { trackEvent } from "../../utils/analytics";
 
 export default function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
@@ -31,6 +33,7 @@ export default function SignInForm() {
   async function onSubmit(data: LoginFormValues) {
     try {
       await login(data.email, data.password);
+      trackEvent(ANALYTICS_EVENTS.LOGIN);
       toast.success("Login realizado.");
       navigate(from, { replace: true });
     } catch {

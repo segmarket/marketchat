@@ -3,6 +3,7 @@ import GridShape from "../../components/common/GridShape";
 import { Link } from "react-router";
 import MarketchatLogo from "../../components/brand/MarketchatLogo";
 import ThemeTogglerTwo from "../../components/common/ThemeTogglerTwo";
+import CookieConsentBanner from "../../components/marketing/CookieConsentBanner";
 
 export default function AuthLayout({
   children,
@@ -31,6 +32,7 @@ export default function AuthLayout({
           <ThemeTogglerTwo />
         </div>
       </div>
+      <CookieConsentBanner />
     </div>
   );
 }

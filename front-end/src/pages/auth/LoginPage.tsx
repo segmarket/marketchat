@@ -6,7 +6,11 @@ import SignInForm from "../../components/auth/SignInForm";
 export default function LoginPage() {
   return (
     <>
-      <PageMeta title="Entrar | MarketChat" description="Acesse sua conta MarketChat." />
+      <PageMeta
+        title="Entrar | MarketChat"
+        description="Acesse sua conta MarketChat."
+        noIndex
+      />
       <AuthLayout>
         <SignInForm />
       </AuthLayout>

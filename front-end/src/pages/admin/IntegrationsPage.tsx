@@ -24,6 +24,7 @@ export default function IntegrationsPage({ embedded = false }: Props) {
       <PageMeta
         title="Integrações"
         description="Configure a conexão do WhatsApp com o MarketChat."
+        noIndex
       />
       <PageBreadcrumb pageTitle="Integrações" />
       {content}

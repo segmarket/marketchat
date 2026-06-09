@@ -16,6 +16,8 @@ export type PageMetaProps = {
   path?: string;
   /** Caminho da imagem OG (padrão: og-marketchat.png). */
   imagePath?: string;
+  /** Impede indexação (login, admin, etc.). */
+  noIndex?: boolean;
 };
 
 const PageMeta = ({
@@ -23,6 +25,7 @@ const PageMeta = ({
   description,
   path = "/",
   imagePath = SOCIAL_SHARE_DEFAULT_IMAGE_PATH,
+  noIndex = false,
 }: PageMetaProps) => {
   const ogUrl = absoluteSharePageUrl(path);
   const ogImage = absoluteShareImageUrl(imagePath);
@@ -32,6 +35,7 @@ const PageMeta = ({
     <Helmet>
       <title>{title}</title>
       <meta name="description" content={description} />
+      {noIndex ? <meta name="robots" content="noindex, nofollow" /> : null}
       <link rel="canonical" href={ogUrl} />
 
       <meta property="og:type" content="website" />

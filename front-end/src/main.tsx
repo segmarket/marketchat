@@ -1,6 +1,9 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { initConsentDefaults } from "./utils/analytics";
 import "./index.css";
+
+initConsentDefaults();
 import "swiper/swiper-bundle.css";
 import "flatpickr/dist/flatpickr.css";
 import { Toaster } from "sonner";

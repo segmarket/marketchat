@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /signin
+Disallow: /login
+Disallow: /signup
+Disallow: /auth/
+Disallow: /reset-password
+
+Sitemap: https://marketchat.com.br/sitemap.xml

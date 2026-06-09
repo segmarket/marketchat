@@ -14,6 +14,7 @@ from apps.residents.services.condo_match import find_market_by_query
 from apps.residents.services.greeting import greeting_for_now
 from apps.residents.services.onboarding_flow import (
     REJECT_CONDO_MESSAGE,
+    build_onboarding_privacy_message,
     process_inbound_message,
     resident_has_completed_onboarding,
 )
@@ -47,6 +48,25 @@ def test_greeting_for_now(hour, expected):
     fixed = datetime(2026, 5, 17, hour, 0, tzinfo=SAO_PAULO)
     with mock.patch("apps.residents.services.greeting.timezone.localtime", return_value=fixed):
         assert greeting_for_now() == expected
+
+
+def test_onboarding_privacy_message_contains_policy_link():
+    message = build_onboarding_privacy_message()
+    assert "privacidade" in message.lower()
+    assert "concorda" in message.lower()
+
+
+@pytest.mark.django_db
+def test_onboarding_start_includes_privacy_notice():
+    tenant = TenantFactory()
+    instance = WhatsappInstanceFactory(tenant=tenant)
+    phone = "5511999887766"
+
+    with mock.patch("apps.residents.services.onboarding_flow.send_whatsapp_reply") as send:
+        with tenant_scope(tenant.id):
+            process_inbound_message(tenant.id, instance, phone, "oi")
+
+    assert "privacidade" in send.call_args[0][2].lower()
 
 
 @pytest.mark.django_db

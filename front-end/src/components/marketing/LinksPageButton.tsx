@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { Link } from "react-router";
 
 const baseTouch =
@@ -28,15 +28,23 @@ type LinksPageButtonExternalProps = {
   href: string;
   children: ReactNode;
   className?: string;
+  onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
 };
 
 export function LinksPageButtonExternal({
   href,
   children,
   className = linksSecondaryClass,
+  onClick,
 }: LinksPageButtonExternalProps) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={className}
+      onClick={onClick}
+    >
       {children}
     </a>
   );

@@ -82,6 +82,7 @@ def register_tenant_with_admin(
                 trial_started_at=now,
                 trial_ends_at=trial_end,
                 subscription_status=Tenant.SubscriptionStatus.TRIAL,
+                terms_accepted_at=now,
                 **_attribution_kwargs(attribution),
             )
             user = User.objects.create_user(
@@ -104,7 +105,7 @@ def register_tenant_with_admin(
             )
         except AsaasAPIError as exc:
             if exc.status_code == 401:
-                logger.warning("Asaas 401 no cadastro: %s", exc.payload or exc)
+                logger.warning("Asaas 401 no cadastro (sem dados de cartão no log)")
             else:
                 logger.exception("Falha Asaas no cadastro")
             if "ASAAS_API_KEY" in str(exc) and "não está definida" in str(exc):

@@ -53,6 +53,7 @@ export default function AdminPageLayout({
       <PageMeta
         title={metaTitle ?? `${pageTitle} | MarketChat`}
         description={metaDescription ?? pageTitle}
+        noIndex
       />
       <PageBreadcrumb pageTitle={pageTitle} />
       {descriptionOutsideCard ? (

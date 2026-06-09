@@ -16,16 +16,28 @@ import AuthLayout from "../AuthPages/AuthPageLayout";
 import SignupProgressBar from "../../components/auth/signup/SignupProgressBar";
 import PasswordStrengthMeter from "../../components/auth/signup/PasswordStrengthMeter";
 import TrialSummaryCard from "../../components/auth/signup/TrialSummaryCard";
+import Checkbox from "../../components/form/input/Checkbox";
 import { UF_SELECT_OPTIONS } from "../../constants/brazilUF";
-import { fullSignupSchema, type FullSignupValues } from "../../features/signup/schema";
+import {
+  fullSignupSchema,
+  step1Schema,
+  step2Schema,
+  type FullSignupValues,
+} from "../../features/signup/schema";
 import {
   hasAttributionParams,
   loadAttribution,
   parseAttributionFromSearch,
   saveAttribution,
 } from "../../features/attribution/storage";
+import {
+  CONSENT_CHANGE_EVENT,
+  hasMarketingConsent,
+  type CookieConsentPreferences,
+} from "../../features/marketing/cookieConsent";
+import { ANALYTICS_EVENTS } from "../../constants/analyticsEvents";
 import { api } from "../../services/api";
-import { pushToDataLayer } from "../../utils/analytics";
+import { trackEvent } from "../../utils/analytics";
 import { getAxiosErrorMessage } from "../../utils/apiError";
 import { digitsOnly } from "../../utils/cpfCnpj";
 
@@ -53,8 +65,24 @@ export default function SignupPage() {
   const [cepLookupFailed, setCepLookupFailed] = useState(false);
 
   useEffect(() => {
+    trackEvent(ANALYTICS_EVENTS.BEGIN_SIGNUP);
+  }, []);
+
+  useEffect(() => {
     const fromUrl = parseAttributionFromSearch(window.location.search);
-    saveAttribution(fromUrl);
+    if (hasMarketingConsent()) {
+      saveAttribution(fromUrl);
+    }
+
+    function onConsentChange(event: Event) {
+      const prefs = (event as CustomEvent<CookieConsentPreferences>).detail;
+      if (prefs?.marketing) {
+        saveAttribution(fromUrl);
+      }
+    }
+
+    window.addEventListener(CONSENT_CHANGE_EVENT, onConsentChange);
+    return () => window.removeEventListener(CONSENT_CHANGE_EVENT, onConsentChange);
   }, []);
 
   const form = useForm<FullSignupValues>({
@@ -76,6 +104,7 @@ export default function SignupPage() {
       cardName: "",
       cardExpiry: "",
       cardCvv: "",
+      acceptTerms: false,
     },
     mode: "onBlur",
     reValidateMode: "onBlur",
@@ -104,13 +133,32 @@ export default function SignupPage() {
     return () => window.clearTimeout(id);
   }, [step, clearErrors, setFocus]);
 
-  const password = watch("password");
+  const watchedValues = watch();
+  const password = watchedValues.password;
+  const canContinueStep =
+    step === 1
+      ? step1Schema.safeParse({
+          fullName: watchedValues.fullName,
+          email: watchedValues.email,
+          password: watchedValues.password,
+          acceptTerms: watchedValues.acceptTerms,
+        }).success
+      : step2Schema.safeParse({
+          company_name: watchedValues.company_name,
+          cpfCnpj: watchedValues.cpfCnpj,
+          phone: watchedValues.phone,
+          cep: watchedValues.cep,
+          address: watchedValues.address,
+          addressNumber: watchedValues.addressNumber,
+          complement: watchedValues.complement,
+          province: watchedValues.province,
+        }).success;
   const cardNumber = watch("cardNumber");
   const cardName = watch("cardName");
   const cardExpiry = watch("cardExpiry");
   const cardCvv = watch("cardCvv");
 
-  const step1Fields: (keyof FullSignupValues)[] = ["fullName", "email", "password"];
+  const step1Fields: (keyof FullSignupValues)[] = ["fullName", "email", "password", "acceptTerms"];
   const step2Fields: (keyof FullSignupValues)[] = [
     "company_name",
     "cpfCnpj",
@@ -196,11 +244,12 @@ export default function SignupPage() {
         province: data.province,
         phone: digitsOnly(data.phone),
       },
+      accept_terms: true,
     };
 
     try {
       await api.post("/api/auth/register/", payload);
-      pushToDataLayer("sign_up_complete", { ...attribution });
+      trackEvent(ANALYTICS_EVENTS.SIGN_UP, { method: "email" });
       toast.success("Conta criada! Faça login para continuar.");
       navigate("/signin", { replace: true });
     } catch (e: unknown) {
@@ -215,7 +264,11 @@ export default function SignupPage() {
 
   return (
     <>
-      <PageMeta title="Criar conta | MarketChat" description="Cadastro trial 7 dias com cartão." />
+      <PageMeta
+        title="Criar conta | MarketChat"
+        description="Cadastro trial 7 dias com cartão."
+        noIndex
+      />
       <AuthLayout>
         <div className="flex flex-col flex-1 w-full overflow-y-auto lg:w-1/2 no-scrollbar justify-center">
           <div className="w-full max-w-xl mx-auto py-10">
@@ -286,6 +339,44 @@ export default function SignupPage() {
                     <PasswordStrengthMeter password={password} />
                     {errors.password && (
                       <p className="mt-1 text-xs text-error-500">{errors.password.message}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Controller
+                      name="acceptTerms"
+                      control={control}
+                      render={({ field }) => (
+                        <Checkbox
+                          id="acceptTerms"
+                          checked={field.value === true}
+                          onChange={(checked) => field.onChange(checked ? true : false)}
+                          label=""
+                        />
+                      )}
+                    />
+                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                      Li e concordo com a{" "}
+                      <Link
+                        to="/privacidade"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-brand-600 hover:underline"
+                      >
+                        Política de Privacidade
+                      </Link>{" "}
+                      e os{" "}
+                      <Link
+                        to="/termos"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-brand-600 hover:underline"
+                      >
+                        Termos de Uso
+                      </Link>
+                      . <span className="text-error-500">*</span>
+                    </p>
+                    {errors.acceptTerms && (
+                      <p className="mt-1 text-xs text-error-500">{errors.acceptTerms.message}</p>
                     )}
                   </div>
                 </div>
@@ -576,11 +667,14 @@ export default function SignupPage() {
                   </Button>
                 )}
                 {step < 3 ? (
-                  <Button type="button" onClick={() => void goNext()}>
+                  <Button type="button" onClick={() => void goNext()} disabled={!canContinueStep}>
                     Continuar
                   </Button>
                 ) : (
-                  <Button type="submit" disabled={submitting}>
+                  <Button
+                    type="submit"
+                    disabled={submitting || !fullSignupSchema.safeParse(watchedValues).success}
+                  >
                     {submitting ? "Enviando..." : "Finalizar cadastro"}
                   </Button>
                 )}

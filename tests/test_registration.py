@@ -45,6 +45,7 @@ def test_register_client_success(api_client):
             "province": "SP",
             "phone": "11999999999",
         },
+        "accept_terms": True,
     }
     patcher, _ = _asaas_mock()
     try:
@@ -58,7 +59,41 @@ def test_register_client_success(api_client):
     tenant = Tenant.objects.get(slug="acme-test")
     assert tenant.cpf_cnpj == "24971563792"
     assert tenant.phone == "11999999999"
+    assert tenant.terms_accepted_at is not None
     assert Subscription.objects.filter(asaas_subscription_id="sub_test_1").exists()
+
+
+@pytest.mark.django_db
+def test_register_requires_accept_terms(api_client):
+    url = reverse("auth-register")
+    payload = {
+        "company_name": "No Terms Ltda",
+        "tenant_slug": "no-terms",
+        "admin_email": "noterms@acme.com",
+        "admin_password": "StrongPass123!",
+        "first_name": "No",
+        "last_name": "Terms",
+        "accept_terms": False,
+        "credit_card": {
+            "holderName": "NO TERMS",
+            "number": "5162306219378829",
+            "expiryMonth": "12",
+            "expiryYear": "2030",
+            "ccv": "123",
+        },
+        "credit_card_holder": {
+            "name": "No Terms",
+            "email": "noterms@acme.com",
+            "cpfCnpj": "24971563792",
+            "postalCode": "01311000",
+            "address": "Av Paulista",
+            "addressNumber": "1000",
+            "province": "SP",
+            "phone": "11999999999",
+        },
+    }
+    response = api_client.post(url, payload, format="json")
+    assert response.status_code == 400
 
 
 @pytest.mark.django_db
@@ -71,6 +106,7 @@ def test_register_persists_attribution(api_client):
         "admin_password": "StrongPass123!",
         "first_name": "Ana",
         "last_name": "Ads",
+        "accept_terms": True,
         "attribution": {
             "utm_source": "google",
             "utm_medium": "cpc",
@@ -117,6 +153,7 @@ def test_register_rejects_duplicate_email(api_client):
         "tenant_slug": "dup-a",
         "admin_email": "dup@example.com",
         "admin_password": "StrongPass123!",
+        "accept_terms": True,
         "credit_card": {
             "holderName": "X",
             "number": "5162306219378829",

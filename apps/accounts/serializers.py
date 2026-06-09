@@ -60,9 +60,17 @@ class RegisterSerializer(serializers.Serializer):
     admin_password = serializers.CharField(write_only=True, min_length=8)
     first_name = serializers.CharField(required=False, allow_blank=True, default="")
     last_name = serializers.CharField(required=False, allow_blank=True, default="")
+    accept_terms = serializers.BooleanField(required=True)
     credit_card = CreditCardSerializer()
     credit_card_holder = CreditCardHolderSerializer()
     attribution = AttributionSerializer(required=False)
+
+    def validate_accept_terms(self, value: bool) -> bool:
+        if not value:
+            raise serializers.ValidationError(
+                "É necessário aceitar a Política de Privacidade e os Termos de Uso."
+            )
+        return value
 
     def create(self, validated_data: dict) -> User:
         request = self.context["request"]
@@ -74,6 +82,7 @@ class RegisterSerializer(serializers.Serializer):
             holder.pop("cpfCnpj", None)
         slug = (validated_data.get("tenant_slug") or "").strip() or None
         attribution = validated_data.pop("attribution", None) or {}
+        validated_data.pop("accept_terms", None)
         try:
             tenant, user = register_tenant_with_admin(
                 company_name=validated_data["company_name"],
