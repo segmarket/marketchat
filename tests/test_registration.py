@@ -5,6 +5,7 @@ from django.urls import reverse
 
 from apps.accounts.models import User
 from apps.billing.models import Subscription
+from apps.billing.services.asaas_client import AsaasAPIError
 from apps.tenants.models import Tenant
 
 
@@ -182,3 +183,70 @@ def test_register_rejects_duplicate_email(api_client):
     finally:
         patcher.stop()
     assert r2.status_code == 400
+
+
+def _register_payload(**overrides):
+    payload = {
+        "company_name": "Card Fail Ltda",
+        "tenant_slug": "card-fail",
+        "admin_email": "cardfail@example.com",
+        "admin_password": "StrongPass123!",
+        "first_name": "Card",
+        "last_name": "Fail",
+        "accept_terms": True,
+        "credit_card": {
+            "holderName": "CARD FAIL",
+            "number": "4000000000000002",
+            "expiryMonth": "12",
+            "expiryYear": "2030",
+            "ccv": "123",
+        },
+        "credit_card_holder": {
+            "name": "Card Fail",
+            "email": "cardfail@example.com",
+            "cpfCnpj": "24971563792",
+            "postalCode": "01311000",
+            "address": "Av Paulista",
+            "addressNumber": "1000",
+            "province": "SP",
+            "phone": "11999999999",
+        },
+    }
+    payload.update(overrides)
+    return payload
+
+
+@pytest.mark.django_db
+def test_register_invalid_credit_card_returns_friendly_message(api_client):
+    url = reverse("auth-register")
+    payload = _register_payload()
+    patcher = mock.patch("apps.billing.services.subscription_flow.AsaasClient")
+    mock_cls = patcher.start()
+    inst = mock_cls.return_value
+    inst.create_customer.return_value = {"id": "cus_test_invalid"}
+    inst.tokenize_credit_card.side_effect = AsaasAPIError(
+        "Erro na API Asaas",
+        status_code=400,
+        payload={
+            "errors": [
+                {
+                    "code": "invalid_creditCard",
+                    "description": "Informações de cartão de crédito são inválidas",
+                }
+            ]
+        },
+    )
+    try:
+        response = api_client.post(url, payload, format="json")
+    finally:
+        patcher.stop()
+
+    assert response.status_code == 400
+    data = response.json()
+    assert "credit_card" in data
+    message = data["credit_card"][0]
+    assert "cartão" in message.lower()
+    assert "Erro na API Asaas" not in message
+    assert "Asaas" not in message
+    assert not User.objects.filter(email="cardfail@example.com").exists()
+    assert not Tenant.objects.filter(slug="card-fail").exists()

@@ -13,6 +13,7 @@ from django.utils.text import slugify
 
 from apps.accounts.models import User
 from apps.billing.services.asaas_client import AsaasAPIError
+from apps.billing.services.asaas_errors import format_asaas_card_error
 from apps.billing.services.subscription_flow import create_trial_subscription
 from apps.tenants.models import Tenant
 
@@ -21,6 +22,10 @@ logger = logging.getLogger(__name__)
 
 class RegistrationError(Exception):
     """Erro de negócio ou integração durante o cadastro."""
+
+    def __init__(self, message: str, *, field: str | None = None) -> None:
+        super().__init__(message)
+        self.field = field
 
 
 def _unique_slug(base_slug: str) -> str:
@@ -106,6 +111,8 @@ def register_tenant_with_admin(
         except AsaasAPIError as exc:
             if exc.status_code == 401:
                 logger.warning("Asaas 401 no cadastro (sem dados de cartão no log)")
+            elif exc.status_code and 400 <= exc.status_code < 500:
+                logger.warning("Asaas %s no cadastro: %s", exc.status_code, exc.payload)
             else:
                 logger.exception("Falha Asaas no cadastro")
             if "ASAAS_API_KEY" in str(exc) and "não está definida" in str(exc):
@@ -124,10 +131,14 @@ def register_tenant_with_admin(
                     "Confira também ASAAS_API_URL=https://api.asaas.com/v3 e chave de produção ($aact_prod_...)."
                 ) from exc
             raise RegistrationError(
-                f"Não foi possível concluir o cadastro no provedor de pagamentos: {exc}"
+                format_asaas_card_error(exc),
+                field="credit_card",
             ) from exc
         except ValueError as exc:
-            logger.exception("Falha Asaas no cadastro")
-            raise RegistrationError("Não foi possível concluir o cadastro no provedor de pagamentos.") from exc
+            logger.warning("Falha na tokenização do cartão no cadastro: %s", exc)
+            raise RegistrationError(
+                "Não foi possível validar o cartão. Verifique os dados e tente novamente.",
+                field="credit_card",
+            ) from exc
 
     return tenant, user

@@ -97,6 +97,8 @@ class RegisterSerializer(serializers.Serializer):
                 attribution=attribution,
             )
         except RegistrationError as exc:
+            if exc.field:
+                raise serializers.ValidationError({exc.field: [str(exc)]}) from exc
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         send_welcome_trial_email_safe(user, tenant)
         return user

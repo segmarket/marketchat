@@ -95,6 +95,7 @@ export default function MarketsPage({ embedded = false }: Props) {
   }
 
   const filtersActive = hasActiveMarketsFilters(appliedFilters);
+  const activeMarketsCount = markets.filter((market) => market.status === "active").length;
 
   const spotlightEligible =
     !loading &&
@@ -153,6 +154,7 @@ export default function MarketsPage({ embedded = false }: Props) {
         isOpen={formOpen}
         mode={formMode}
         market={editingMarket}
+        activeMarketsCount={activeMarketsCount}
         onClose={closeFormModal}
         onSaved={() => void loadMarkets(appliedFilters)}
       />
