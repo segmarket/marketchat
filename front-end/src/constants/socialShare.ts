@@ -1,10 +1,13 @@
 /** Textos e imagem padrão para preview em WhatsApp, LinkedIn, etc. (Open Graph). */
 export const SOCIAL_SHARE_SITE_NAME = "MarketChat";
 
-export const SOCIAL_SHARE_DEFAULT_TITLE = "MarketChat | Sistema para mercado autônomo";
+export const SOCIAL_SHARE_DEFAULT_TITLE = "MarketChat | Bot de WhatsApp para Mercado Autônomo";
 
 export const SOCIAL_SHARE_DEFAULT_DESCRIPTION =
-  "Mercado autônomo em condomínio com atendimento via WhatsApp: vendas Pix, alertas de estoque e painel operacional. Teste 7 dias grátis.";
+  "Reduza reclamações e venda mais com o MarketChat. O bot de atendimento via WhatsApp exclusivo para mercados autônomos e minimercados em condomínios.";
+
+export const SOCIAL_SHARE_DEFAULT_OG_DESCRIPTION =
+  "O assistente virtual perfeito para gerenciar o suporte, saques e pagamentos do seu minimercado de condomínio diretamente pelo WhatsApp.";
 
 /** Caminho público (absoluto na origem marketing após build). */
 export const SOCIAL_SHARE_DEFAULT_IMAGE_PATH = "/images/brand/og-marketchat-share.png";

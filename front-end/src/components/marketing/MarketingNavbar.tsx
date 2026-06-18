@@ -53,7 +53,7 @@ export default function MarketingNavbar() {
         <div className="flex items-center gap-2 sm:gap-3">
           <MarketingCtaLink
             path="/auth/signup"
-            className={`hidden sm:inline-flex ${CTA_PRIMARY_CLASS}`}
+            className={`${CTA_PRIMARY_CLASS} px-4 py-2.5 text-sm sm:px-6 sm:py-3`}
             analyticsLocation={CTA_LOCATIONS.NAVBAR}
           >
             {CTA_TRIAL_PRIMARY}
@@ -61,13 +61,6 @@ export default function MarketingNavbar() {
           <a href={getAppUrl()} className={`hidden md:inline-flex ${CTA_LOGIN_LINK_CLASS}`}>
             Acessar sistema
           </a>
-          <MarketingCtaLink
-            path="/auth/signup"
-            className={`sm:hidden ${CTA_PRIMARY_CLASS} px-4 py-2.5 text-sm`}
-            analyticsLocation={CTA_LOCATIONS.NAVBAR}
-          >
-            {CTA_TRIAL_PRIMARY}
-          </MarketingCtaLink>
           <button
             type="button"
             className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-gray-200 text-gray-700 md:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"

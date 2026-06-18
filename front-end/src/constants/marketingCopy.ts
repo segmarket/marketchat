@@ -1,8 +1,8 @@
 /** Textos centralizados da landing pública (revisão de copy). */
 
-export const MARKETING_BADGE = "Ecossistema para mercados autônomos";
+export const MARKETING_BADGE = "Bot de WhatsApp para mercados autônomos";
 
-export const HERO_HEADLINE = "Nunca mais perca uma venda quando a maquininha falhar.";
+export const HERO_HEADLINE = "O Primeiro Bot de WhatsApp Feito para Mercados Autônomos";
 
 export const HERO_SUBTITLE =
   "O morador compra pelo WhatsApp; você recebe alertas de estoque, infraestrutura e vendas em um único painel — sem ficar preso ao caixa físico.";

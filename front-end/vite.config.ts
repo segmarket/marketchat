@@ -4,6 +4,7 @@ import svgr from "vite-plugin-svgr";
 import {
   SOCIAL_SHARE_DEFAULT_DESCRIPTION,
   SOCIAL_SHARE_DEFAULT_IMAGE_PATH,
+  SOCIAL_SHARE_DEFAULT_OG_DESCRIPTION,
   SOCIAL_SHARE_DEFAULT_TITLE,
 } from "./src/constants/socialShare";
 
@@ -13,7 +14,8 @@ function socialShareHtmlPlugin(marketingOrigin: string, fbAppId: string): Plugin
   const ogImage = `${origin}${SOCIAL_SHARE_DEFAULT_IMAGE_PATH}`;
   const replacements: Record<string, string> = {
     __OG_TITLE__: SOCIAL_SHARE_DEFAULT_TITLE,
-    __OG_DESCRIPTION__: SOCIAL_SHARE_DEFAULT_DESCRIPTION,
+    __META_DESCRIPTION__: SOCIAL_SHARE_DEFAULT_DESCRIPTION,
+    __OG_DESCRIPTION__: SOCIAL_SHARE_DEFAULT_OG_DESCRIPTION,
     __OG_URL__: ogUrl,
     __OG_IMAGE__: ogImage,
   };

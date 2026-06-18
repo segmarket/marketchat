@@ -3,6 +3,8 @@ import PageMeta from "./common/PageMeta";
 export type SEOProps = {
   title: string;
   description: string;
+  ogTitle?: string;
+  ogDescription?: string;
   /** Caminho canônico relativo (ex.: `/`, `/links`). */
   canonicalUrl?: string;
   /** Caminho da imagem OG (ex.: `/images/brand/og-marketchat-share.png`). */
@@ -14,6 +16,8 @@ export type SEOProps = {
 export default function SEO({
   title,
   description,
+  ogTitle,
+  ogDescription,
   canonicalUrl = "/",
   ogImage,
   noIndex = false,
@@ -22,6 +26,8 @@ export default function SEO({
     <PageMeta
       title={title}
       description={description}
+      ogTitle={ogTitle}
+      ogDescription={ogDescription}
       path={canonicalUrl}
       imagePath={ogImage}
       noIndex={noIndex}

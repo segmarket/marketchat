@@ -26,6 +26,8 @@ export default function LandingPage() {
       <PageMeta
         title={defaultSocialMeta.title}
         description={defaultSocialMeta.description}
+        ogTitle={defaultSocialMeta.ogTitle}
+        ogDescription={defaultSocialMeta.ogDescription}
         path="/"
       />
       <MarketingNavbar />
