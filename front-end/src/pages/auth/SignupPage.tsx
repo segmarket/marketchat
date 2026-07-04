@@ -37,7 +37,13 @@ import {
 } from "../../features/marketing/cookieConsent";
 import { ANALYTICS_EVENTS } from "../../constants/analyticsEvents";
 import { api } from "../../services/api";
-import { hashEmail, hashPhone, trackEvent } from "../../utils/analytics";
+import {
+  buildSignupFunnelPayload,
+  getTrialPlanValue,
+  hashEmail,
+  hashPhone,
+  trackEvent,
+} from "../../utils/analytics";
 import { getAxiosErrorMessage } from "../../utils/apiError";
 import { digitsOnly } from "../../utils/cpfCnpj";
 
@@ -67,12 +73,6 @@ export default function SignupPage() {
   useEffect(() => {
     trackEvent(ANALYTICS_EVENTS.BEGIN_SIGNUP);
   }, []);
-
-  useEffect(() => {
-    if (step === 3) {
-      trackEvent(ANALYTICS_EVENTS.INITIATE_CHECKOUT);
-    }
-  }, [step]);
 
   useEffect(() => {
     const fromUrl = parseAttributionFromSearch(window.location.search);
@@ -128,6 +128,22 @@ export default function SignupPage() {
     clearErrors,
     formState: { errors },
   } = form;
+
+  useEffect(() => {
+    if (step !== 3) return;
+    void (async () => {
+      const email = getValues("email");
+      const phone = getValues("phone");
+      const [email_address, phone_number] = await Promise.all([
+        hashEmail(email),
+        hashPhone(phone),
+      ]);
+      trackEvent(
+        ANALYTICS_EVENTS.INITIATE_CHECKOUT,
+        buildSignupFunnelPayload(email_address, phone_number),
+      );
+    })();
+  }, [step, getValues]);
 
   useEffect(() => {
     if (step !== 3) return;
@@ -219,6 +235,15 @@ export default function SignupPage() {
   }
 
   async function submitRegister(data: FullSignupValues) {
+    const [hashedEmail, hashedPhone] = await Promise.all([
+      hashEmail(data.email),
+      hashPhone(data.phone),
+    ]);
+    trackEvent(
+      ANALYTICS_EVENTS.ADD_PAYMENT_INFO,
+      buildSignupFunnelPayload(hashedEmail, hashedPhone),
+    );
+
     setSubmitting(true);
     const parts = data.fullName.trim().split(/\s+/);
     const firstName = parts[0] ?? "";
@@ -259,21 +284,13 @@ export default function SignupPage() {
     try {
       await api.post("/api/auth/register/", payload);
       trackEvent(ANALYTICS_EVENTS.SIGN_UP, { method: "email" });
-      const [hashedEmail, hashedPhone] = await Promise.all([
-        hashEmail(data.email),
-        hashPhone(data.phone),
-      ]);
-      const trialPriceRaw =
-        import.meta.env.VITE_TRIAL_SUBSCRIPTION_PRICE?.trim() ||
-        import.meta.env.VITE_PLAN_PRICE?.trim() ||
-        "";
-      const trialValue = Number.parseFloat(trialPriceRaw.replace(",", "."));
+      const trialValue = getTrialPlanValue();
       const startTrialPayload: Record<string, unknown> = {
         currency: "BRL",
       };
       if (hashedEmail) startTrialPayload.hashed_email = hashedEmail;
       if (hashedPhone) startTrialPayload.hashed_phone = hashedPhone;
-      if (Number.isFinite(trialValue) && trialValue > 0) {
+      if (trialValue !== undefined) {
         startTrialPayload.value = trialValue;
       }
       trackEvent(ANALYTICS_EVENTS.START_TRIAL, startTrialPayload);

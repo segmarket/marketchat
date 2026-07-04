@@ -9,6 +9,7 @@ export const ANALYTICS_EVENTS = {
   /** Meio de funil — Custom Events no GTM (mapear para tags Meta/GA4). */
   LEAD_GENERATED: "lead_generated",
   INITIATE_CHECKOUT: "initiate_checkout",
+  ADD_PAYMENT_INFO: "add_payment_info",
   START_TRIAL: "start_trial",
 } as const;
 

@@ -74,6 +74,60 @@ export async function hashPhone(phone: string): Promise<string> {
   return sha256Hex(digits);
 }
 
+const SIGNUP_PLAN_ITEM_ID = "marketchat_monthly";
+const SIGNUP_PLAN_ITEM_NAME = "MarketChat — Assinatura mensal";
+
+/** Valor do plano trial/mensal a partir das env vars do Vite. */
+export function getTrialPlanValue(): number | undefined {
+  const raw =
+    import.meta.env.VITE_TRIAL_SUBSCRIPTION_PRICE?.trim() ||
+    import.meta.env.VITE_PLAN_PRICE?.trim() ||
+    "";
+  const value = Number.parseFloat(raw.replace(",", "."));
+  if (!Number.isFinite(value) || value <= 0) return undefined;
+  return value;
+}
+
+export function buildSignupEcommercePayload(): Record<string, unknown> {
+  const value = getTrialPlanValue();
+  const item: Record<string, unknown> = {
+    item_id: SIGNUP_PLAN_ITEM_ID,
+    item_name: SIGNUP_PLAN_ITEM_NAME,
+    quantity: 1,
+  };
+  if (value !== undefined) {
+    item.price = value;
+  }
+  const ecommerce: Record<string, unknown> = {
+    currency: "BRL",
+    items: [item],
+  };
+  if (value !== undefined) {
+    ecommerce.value = value;
+  }
+  return { ecommerce };
+}
+
+export function buildSignupUserData(
+  hashedEmail: string,
+  hashedPhone: string,
+): Record<string, unknown> {
+  const user_data: Record<string, unknown> = {};
+  if (hashedEmail) user_data.email_address = hashedEmail;
+  if (hashedPhone) user_data.phone_number = hashedPhone;
+  return Object.keys(user_data).length > 0 ? { user_data } : {};
+}
+
+export function buildSignupFunnelPayload(
+  hashedEmail: string,
+  hashedPhone: string,
+): Record<string, unknown> {
+  return {
+    ...buildSignupEcommercePayload(),
+    ...buildSignupUserData(hashedEmail, hashedPhone),
+  };
+}
+
 /** Google Consent Mode v2 — default denied antes de qualquer tag. */
 export function initConsentDefaults(): void {
   if (consentDefaultsInitialized || typeof window === "undefined") return;
