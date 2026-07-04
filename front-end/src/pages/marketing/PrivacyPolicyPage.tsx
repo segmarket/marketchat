@@ -1,8 +1,7 @@
 import { Link } from "react-router";
 import LegalDocumentLayout from "../../components/marketing/LegalDocumentLayout";
 import {
-  COMPANY_CNPJ,
-  COMPANY_LEGAL_NAME,
+  COMPANY_LEGAL_INTRO,
   DPO_EMAIL,
   LEGAL_LAST_UPDATED,
 } from "../../constants/legalContent";
@@ -19,11 +18,10 @@ export default function PrivacyPolicyPage() {
 
       <div className="mt-8 space-y-8 text-sm leading-relaxed text-gray-700">
         <p>
-          A MarketChat (razão social {COMPANY_LEGAL_NAME}, CNPJ {COMPANY_CNPJ}) valoriza a
-          privacidade de seus usuários. Esta Política descreve como coletamos, usamos e protegemos
-          os dados pessoais de nossos Clientes (Operadores de Mercado) e dos Consumidores finais
-          (Moradores), em conformidade com a Lei Geral de Proteção de Dados (LGPD — Lei nº
-          13.709/2018).
+          {COMPANY_LEGAL_INTRO} valoriza a privacidade de seus usuários. Esta Política descreve como
+          coletamos, usamos e protegemos os dados pessoais de nossos Clientes (Operadores de Mercado)
+          e dos Consumidores finais (Moradores), em conformidade com a Lei Geral de Proteção de Dados
+          (LGPD — Lei nº 13.709/2018).
         </p>
 
         <section>

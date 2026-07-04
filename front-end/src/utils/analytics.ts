@@ -7,14 +7,11 @@ import { isAppHost } from "./host";
 declare global {
   interface Window {
     dataLayer?: Record<string, unknown>[];
-    fbq?: (...args: unknown[]) => void;
-    _fbq?: (...args: unknown[]) => void;
   }
 }
 
 const GTM_SCRIPT_ID = "marketchat-gtm-script";
 const GTM_NOSCRIPT_ID = "marketchat-gtm-noscript";
-const META_PIXEL_SCRIPT_ID = "marketchat-meta-pixel-script";
 
 let consentDefaultsInitialized = false;
 
@@ -31,8 +28,9 @@ function canTrackEvents(): boolean {
 }
 
 /**
- * Dispara evento customizado no dataLayer (GTM/GA4).
- * Não envie PII (e-mail, CPF, telefone, senha) em eventData.
+ * Emite evento apenas no dataLayer (GTM). Tags Meta Pixel / GA4 ficam no container GTM.
+ * Não envie PII em claro (e-mail, telefone, CPF, senha). Hashes SHA-256
+ * (`hashed_email` / `hashed_phone`) são ok para Advanced Matching via GTM.
  */
 export function trackEvent(eventName: string, eventData?: Record<string, unknown>): void {
   try {
@@ -46,6 +44,34 @@ export function trackEvent(eventName: string, eventData?: Record<string, unknown
 /** @deprecated Prefer {@link trackEvent} */
 export function pushToDataLayer(event: string, payload?: Record<string, unknown>): void {
   trackEvent(event, payload);
+}
+
+/** SHA-256 hex (lowercase) para Advanced Matching via GTM. */
+export async function sha256Hex(value: string): Promise<string> {
+  const data = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/** Normaliza e hasheia e-mail (trim + lowercase). */
+export async function hashEmail(email: string): Promise<string> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return "";
+  return sha256Hex(normalized);
+}
+
+/**
+ * Normaliza telefone BR (só dígitos; prefixa 55 se 10–11 dígitos) e hasheia.
+ */
+export async function hashPhone(phone: string): Promise<string> {
+  let digits = phone.replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.length === 10 || digits.length === 11) {
+    digits = `55${digits}`;
+  }
+  return sha256Hex(digits);
 }
 
 /** Google Consent Mode v2 — default denied antes de qualquer tag. */
@@ -100,52 +126,13 @@ export function loadGtm(containerId: string): void {
   }
 }
 
-export function loadMetaPixel(pixelId: string): void {
-  if (!pixelId || typeof document === "undefined") return;
-  if (document.getElementById(META_PIXEL_SCRIPT_ID)) return;
-
-  const fbq = function (...args: unknown[]) {
-    if (fbq.callMethod) {
-      fbq.callMethod(...args);
-    } else {
-      fbq.queue.push(args);
-    }
-  } as typeof window.fbq & {
-    callMethod?: (...args: unknown[]) => void;
-    queue: unknown[][];
-    loaded?: boolean;
-    version?: string;
-    push?: (...args: unknown[]) => void;
-  };
-
-  if (!window._fbq) window._fbq = fbq;
-  window.fbq = fbq;
-  fbq.push = fbq;
-  fbq.loaded = true;
-  fbq.version = "2.0";
-  fbq.queue = [];
-
-  const script = document.createElement("script");
-  script.id = META_PIXEL_SCRIPT_ID;
-  script.async = true;
-  script.src = "https://connect.facebook.net/en_US/fbevents.js";
-  document.head.appendChild(script);
-
-  window.fbq?.("init", pixelId);
-  window.fbq?.("track", "PageView");
-}
-
+/** Carrega apenas o GTM; Pixel e GA4 devem ser tags dentro do container. */
 export function enableMarketingTracking(): void {
   pushConsentUpdate(true);
 
   const gtmId = getGtmContainerId();
   if (gtmId) {
     loadGtm(gtmId);
-  }
-
-  const pixelId = getMetaPixelId();
-  if (pixelId) {
-    loadMetaPixel(pixelId);
   }
 }
 
@@ -160,10 +147,5 @@ export function revokeGtmConsent(): void {
 
 export function getGtmContainerId(): string | undefined {
   const id = import.meta.env.VITE_GTM_ID?.trim();
-  return id || undefined;
-}
-
-export function getMetaPixelId(): string | undefined {
-  const id = import.meta.env.VITE_META_PIXEL_ID?.trim();
   return id || undefined;
 }

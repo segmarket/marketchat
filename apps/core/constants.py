@@ -1,13 +1,13 @@
 """Dados corporativos para rodapé de e-mails transacionais."""
 
-COMPANY_LEGAL_NAME = "Viva Software"
-CNPJ = "35.960.300/0001-05"
+COMPANY_LEGAL_NAME = "SMS SISTEMAS"
+CNPJ = "67.682.023/0001-02"
 SUPPORT_EMAIL = "suporte@marketchat.com.br"
-SUPPORT_PHONE = "(14) 99168-3639"
-SUPPORT_WHATSAPP_URL = "https://wa.me/5514991683639"
+SUPPORT_PHONE = "(18) 99672-6163"
+SUPPORT_WHATSAPP_URL = "https://wa.me/5518996726163"
 
 ADDRESS_LINES = [
-    "Avenida Doutor Altino Arantes 131, Andar 13, Sala 136",
-    "Centro — Ourinhos, SP",
-    "CEP 19900-030",
+    "Av. Guilherme de Paula Xavier, 2956",
+    "Jardim São Sebastião, Campo Mourão - PR",
+    "CEP 87303-309",
 ]

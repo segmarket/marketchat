@@ -6,6 +6,10 @@ export const ANALYTICS_EVENTS = {
   LOGIN: "login",
   REQUEST_WITHDRAWAL: "request_withdrawal",
   LINKS_PAGE_VIEW: "links_page_view",
+  /** Meio de funil — Custom Events no GTM (mapear para tags Meta/GA4). */
+  LEAD_GENERATED: "lead_generated",
+  INITIATE_CHECKOUT: "initiate_checkout",
+  START_TRIAL: "start_trial",
 } as const;
 
 export const CTA_LOCATIONS = {

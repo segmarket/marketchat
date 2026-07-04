@@ -5,8 +5,10 @@ from typing import Any
 
 from django.utils import timezone
 
+from apps.accounts.models import User
 from apps.billing.models import Subscription
 from apps.billing.services.asaas_webhook_payload import normalize_asaas_webhook
+from apps.billing.services.meta_capi import schedule_meta_purchase_event
 from apps.financial.services.asaas_transfer_webhook import process_transfer_asaas_event
 from apps.sales.services.asaas_payment_webhook import process_cart_asaas_event
 from apps.tenants.models import Tenant
@@ -73,6 +75,40 @@ def _mark_tenant_overdue(tenant: Tenant, sub: Subscription) -> None:
     tenant.save(update_fields=update_fields)
 
 
+def _schedule_purchase_for_tenant(tenant: Tenant, payment: dict[str, Any]) -> None:
+    """Dispara Purchase (Meta CAPI) em background após pagamento de assinatura confirmado."""
+    admin = (
+        User.objects.filter(tenant=tenant, is_tenant_admin=True)
+        .order_by("id")
+        .first()
+    )
+    email = (admin.email if admin else "") or ""
+    phone = ""
+    if admin and (admin.phone or "").strip():
+        phone = admin.phone.strip()
+    elif (tenant.phone or "").strip():
+        phone = tenant.phone.strip()
+
+    raw_value = payment.get("value")
+    try:
+        value = float(raw_value) if raw_value is not None else 0.0
+    except (TypeError, ValueError):
+        value = 0.0
+    if value <= 0:
+        value = tenant.computed_subscription_value()
+
+    payment_id = payment.get("id")
+    event_id = str(payment_id) if payment_id else None
+
+    schedule_meta_purchase_event(
+        email,
+        phone,
+        value,
+        currency="BRL",
+        event_id=event_id,
+    )
+
+
 def _handle_subscription_cancellation_event(tenant: Tenant, sub: Subscription) -> None:
     """
     Cancelamento definitivo só se o tenant já foi cancelado manualmente.
@@ -113,6 +149,7 @@ def _process_subscription_webhook(*, event: str, payment: dict[str, Any], payloa
 
     if event in PAYMENT_SUCCESS_EVENTS:
         _activate_tenant_subscription(tenant, sub)
+        _schedule_purchase_for_tenant(tenant, payment)
         return
 
     if event in PAYMENT_FAILURE_EVENTS:

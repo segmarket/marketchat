@@ -1,11 +1,13 @@
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import { ANALYTICS_EVENTS, CTA_LOCATIONS } from "../../constants/analyticsEvents";
 import {
+  COMPANY_ADDRESS_LINES,
   COMPANY_CNPJ,
   COMPANY_LEGAL_NAME,
   DPO_EMAIL,
+  PRODUCT_NAME,
 } from "../../constants/legalContent";
-import { INSTAGRAM_URL, WHATSAPP_SUPPORT_URL } from "../../constants/marketingUrls";
+import { INSTAGRAM_URL, WHATSAPP_SUPPORT_PHONE_DISPLAY, WHATSAPP_SUPPORT_URL } from "../../constants/marketingUrls";
 import { trackEvent } from "../../utils/analytics";
 import { getAppUrl } from "../../utils/host";
 import MarketchatLogo, { MARKETCHAT_LOGO_FOOTER_CLASS } from "../brand/MarketchatLogo";
@@ -166,7 +168,7 @@ export default function MarketingFooter() {
                   external
                   onClick={() => trackWhatsAppClick(CTA_LOCATIONS.FOOTER)}
                 >
-                  WhatsApp: (14) 99168-3639
+                  WhatsApp: {WHATSAPP_SUPPORT_PHONE_DISPLAY}
                 </FooterLink>
               </li>
               <li>
@@ -184,11 +186,12 @@ export default function MarketingFooter() {
               <div>
                 <FooterHeading>Endereço</FooterHeading>
                 <address className="mt-3 text-sm not-italic leading-relaxed text-gray-400">
-                  Avenida Doutor Altino Arantes 131, Andar 13, Sala 136
-                  <br />
-                  Centro — Ourinhos, SP
-                  <br />
-                  CEP 19900-030
+                  {COMPANY_ADDRESS_LINES.map((line, index) => (
+                    <span key={line}>
+                      {line}
+                      {index < COMPANY_ADDRESS_LINES.length - 1 ? <br /> : null}
+                    </span>
+                  ))}
                 </address>
               </div>
               <div>
@@ -209,7 +212,7 @@ export default function MarketingFooter() {
 
         <div className="mt-12 border-t border-gray-800 pt-8 text-center text-sm text-gray-500">
           <p>
-            {year} | © {COMPANY_LEGAL_NAME} | CNPJ {COMPANY_CNPJ} | Todos os Direitos Reservados.
+            {year} | © {COMPANY_LEGAL_NAME} · {PRODUCT_NAME} | CNPJ {COMPANY_CNPJ} | Todos os Direitos Reservados.
           </p>
           <p className="mt-2">
             <FooterLink href="/privacidade">Política de Privacidade</FooterLink>

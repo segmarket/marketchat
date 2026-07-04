@@ -7,7 +7,6 @@ interface ImportMetaEnv {
   readonly VITE_MARKETING_ORIGIN?: string;
   readonly VITE_FB_APP_ID?: string;
   readonly VITE_GTM_ID?: string;
-  readonly VITE_META_PIXEL_ID?: string;
 }
 
 interface ImportMeta {

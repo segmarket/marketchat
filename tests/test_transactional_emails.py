@@ -18,6 +18,7 @@ from apps.core.emails import (
     PASSWORD_RESET_SUBJECT,
     SUBSCRIPTION_SUSPENDED_SUBJECT,
     WELCOME_SUBJECT,
+    build_email_context,
     send_market_transactional_email,
     send_password_reset_email,
     send_subscription_suspended_email,
@@ -46,6 +47,17 @@ def sample_user(db):
     )
 
 
+def test_build_email_context_company_legal_data():
+    context = build_email_context()
+    assert context["company_legal_name"] == "SMS SISTEMAS"
+    assert context["cnpj"] == "67.682.023/0001-02"
+    assert context["address_lines"] == [
+        "Av. Guilherme de Paula Xavier, 2956",
+        "Jardim São Sebastião, Campo Mourão - PR",
+        "CEP 87303-309",
+    ]
+
+
 @pytest.mark.django_db
 def test_send_market_transactional_email_multipart(sample_user):
     mail.outbox.clear()
@@ -58,11 +70,11 @@ def test_send_market_transactional_email_multipart(sample_user):
             "trial_days": 7,
             "action_url": "http://localhost:5173/signin",
             "logo_url": "http://localhost:5173/images/brand/logotipo_marketchat_completo_PRETO.gif",
-            "company_legal_name": "Viva Software",
-            "cnpj": "35.960.300/0001-05",
+            "company_legal_name": "SMS SISTEMAS",
+            "cnpj": "67.682.023/0001-02",
             "support_email": "suporte@marketchat.com.br",
-            "support_phone": "(14) 99168-3639",
-            "support_whatsapp_url": "https://wa.me/5514991683639",
+            "support_phone": "(18) 99672-6163",
+            "support_whatsapp_url": "https://wa.me/5518996726163",
             "address_lines": ["Linha 1", "Linha 2"],
             "current_year": 2026,
         },

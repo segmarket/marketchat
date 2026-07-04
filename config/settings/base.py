@@ -248,6 +248,10 @@ ASAAS_WEBHOOK_VERIFY = env.bool("ASAAS_WEBHOOK_VERIFY", default=True)
 TRIAL_DAYS = env.int("TRIAL_DAYS", default=7)
 DEFAULT_SUBSCRIPTION_VALUE = env.float("DEFAULT_SUBSCRIPTION_VALUE", default=29.9)
 MARKET_MONTHLY_PRICE = env.float("MARKET_MONTHLY_PRICE", default=59.90)
+
+# Meta Conversions API (CAPI) — Purchase server-side. Pixel browser fica no GTM.
+META_PIXEL_ID = os.environ.get("META_PIXEL_ID", "")
+META_ACCESS_TOKEN = os.environ.get("META_ACCESS_TOKEN", "")
 BILLING_GRACE_DAYS = env.int("BILLING_GRACE_DAYS", default=3)
 # CPF usado ao criar cliente Asaas do morador (sandbox); use um CPF válido de teste.
 ASAAS_RESIDENT_DEFAULT_CPF = env("ASAAS_RESIDENT_DEFAULT_CPF", default="11144477735")

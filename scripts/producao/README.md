@@ -185,12 +185,13 @@ No painel Asaas → Integrações → Webhooks:
 
 6. Teste manual (substitua `SEU_TOKEN`):
    ```bash
-   curl -sI -X POST https://app.marketchat.com.br/api/billing/webhooks/asaas/ \
+   curl -sS -o /dev/null -w "HTTP %{http_code}\n" -X POST \
+     https://app.marketchat.com.br/api/billing/webhooks/asaas/ \
      -H 'asaas-access-token: SEU_TOKEN' \
      -H 'Content-Type: application/json' \
      -d '{"event":"PAYMENT_RECEIVED","payment":{"id":"pay_test"}}'
    ```
-   Esperado: HTTP **200** (corpo vazio).
+   Esperado: `HTTP 200` (corpo vazio). **Não use `-I`** com POST — o curl trata como HEAD e não mostra resposta.
 
 ## Infra esperada no servidor
 

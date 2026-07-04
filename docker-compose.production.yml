@@ -18,6 +18,11 @@ services:
       DJANGO_SETTINGS_MODULE: config.settings.production
       DEBUG: "False"
       GUNICORN_TIMEOUT: "120"
+      # Cada worker pode manter 1 conexão com o Postgres (se DB_CONN_MAX_AGE > 0).
+      GUNICORN_WORKERS: "${GUNICORN_WORKERS:-2}"
+      DB_CONN_MAX_AGE: "${DB_CONN_MAX_AGE:-0}"
+      DB_BOOT_MAX_ATTEMPTS: "${DB_BOOT_MAX_ATTEMPTS:-12}"
+      DB_BOOT_RETRY_SECONDS: "${DB_BOOT_RETRY_SECONDS:-5}"
     volumes:
       - marketchat_media_prd:/app/media
 

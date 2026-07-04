@@ -37,7 +37,7 @@ import {
 } from "../../features/marketing/cookieConsent";
 import { ANALYTICS_EVENTS } from "../../constants/analyticsEvents";
 import { api } from "../../services/api";
-import { trackEvent } from "../../utils/analytics";
+import { hashEmail, hashPhone, trackEvent } from "../../utils/analytics";
 import { getAxiosErrorMessage } from "../../utils/apiError";
 import { digitsOnly } from "../../utils/cpfCnpj";
 
@@ -67,6 +67,12 @@ export default function SignupPage() {
   useEffect(() => {
     trackEvent(ANALYTICS_EVENTS.BEGIN_SIGNUP);
   }, []);
+
+  useEffect(() => {
+    if (step === 3) {
+      trackEvent(ANALYTICS_EVENTS.INITIATE_CHECKOUT);
+    }
+  }, [step]);
 
   useEffect(() => {
     const fromUrl = parseAttributionFromSearch(window.location.search);
@@ -174,6 +180,9 @@ export default function SignupPage() {
     const fields = step === 1 ? step1Fields : step2Fields;
     const ok = await trigger(fields);
     if (!ok) return;
+    if (step === 1) {
+      trackEvent(ANALYTICS_EVENTS.LEAD_GENERATED);
+    }
     setStep((s) => (s + 1) as 1 | 2 | 3);
   }
 
@@ -250,6 +259,24 @@ export default function SignupPage() {
     try {
       await api.post("/api/auth/register/", payload);
       trackEvent(ANALYTICS_EVENTS.SIGN_UP, { method: "email" });
+      const [hashedEmail, hashedPhone] = await Promise.all([
+        hashEmail(data.email),
+        hashPhone(data.phone),
+      ]);
+      const trialPriceRaw =
+        import.meta.env.VITE_TRIAL_SUBSCRIPTION_PRICE?.trim() ||
+        import.meta.env.VITE_PLAN_PRICE?.trim() ||
+        "";
+      const trialValue = Number.parseFloat(trialPriceRaw.replace(",", "."));
+      const startTrialPayload: Record<string, unknown> = {
+        currency: "BRL",
+      };
+      if (hashedEmail) startTrialPayload.hashed_email = hashedEmail;
+      if (hashedPhone) startTrialPayload.hashed_phone = hashedPhone;
+      if (Number.isFinite(trialValue) && trialValue > 0) {
+        startTrialPayload.value = trialValue;
+      }
+      trackEvent(ANALYTICS_EVENTS.START_TRIAL, startTrialPayload);
       toast.success("Conta criada! Faça login para continuar.");
       navigate("/signin", { replace: true });
     } catch (e: unknown) {

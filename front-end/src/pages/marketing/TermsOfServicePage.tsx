@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import LegalDocumentLayout from "../../components/marketing/LegalDocumentLayout";
 import {
+  COMPANY_LEGAL_INTRO,
   LEGAL_CONTACT_EMAIL,
   LEGAL_LAST_UPDATED,
   platformFeePercentLabel,
@@ -20,7 +21,7 @@ export default function TermsOfServicePage() {
 
       <div className="mt-8 space-y-8 text-sm leading-relaxed text-gray-700">
         <p>
-          Bem-vindo ao MarketChat. Ao acessar nosso painel e utilizar nossa tecnologia, você
+          {COMPANY_LEGAL_INTRO}. Ao acessar nosso painel e utilizar nossa tecnologia, você
           (Cliente/Operador) concorda com as condições abaixo e com nossa{" "}
           <Link to="/privacidade" className="font-medium text-brand-600 hover:underline">
             Política de Privacidade
