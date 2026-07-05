@@ -293,6 +293,13 @@ export default function SignupPage() {
       if (trialValue !== undefined) {
         startTrialPayload.value = trialValue;
       }
+      /*
+       * GUARDRAIL — start_trial (Meta StartTrial via GTM):
+       * Disparar SOMENTE aqui, após POST /api/auth/register/ bem-sucedido.
+       * NÃO mover para useEffect de montagem, clique no CTA da landing, goNext()
+       * ou Passo 3 — eventos precoces inflam conversões no Ads.
+       * Mapeamento GTM: docs/GTM_FUNNEL.md
+       */
       trackEvent(ANALYTICS_EVENTS.START_TRIAL, startTrialPayload);
       toast.success("Conta criada! Faça login para continuar.");
       navigate("/signin", { replace: true });

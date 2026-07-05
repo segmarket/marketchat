@@ -14,6 +14,7 @@ from django.utils.text import slugify
 from apps.accounts.models import User
 from apps.billing.services.asaas_client import AsaasAPIError
 from apps.billing.services.asaas_errors import format_asaas_card_error
+from apps.billing.services.facebook_capi import schedule_facebook_capi_event
 from apps.billing.services.subscription_flow import create_trial_subscription
 from apps.tenants.models import Tenant
 
@@ -140,5 +141,16 @@ def register_tenant_with_admin(
                 "Não foi possível validar o cartão. Verifique os dados e tente novamente.",
                 field="credit_card",
             ) from exc
+
+    schedule_facebook_capi_event(
+        event_name="StartTrial",
+        user_email=admin_email,
+        user_phone=str(credit_card_holder_info.get("phone") or ""),
+        custom_data={
+            "value": float(settings.DEFAULT_SUBSCRIPTION_VALUE),
+            "currency": "BRL",
+        },
+        event_id=f"start_trial_tenant_{tenant.id}",
+    )
 
     return tenant, user

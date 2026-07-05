@@ -71,62 +71,61 @@ class AsaasClient:
             return None
         return response.json()
 
+    @staticmethod
+    def _require_dict_response(data: Any, *, context: str) -> dict[str, Any]:
+        if isinstance(data, dict):
+            return data
+        raise AsaasAPIError(
+            f"Resposta inválida do Asaas ({context})",
+            payload=data,
+        )
+
     def create_customer(self, body: Mapping[str, Any]) -> dict[str, Any]:
         data = self._request("POST", "/customers", dict(body))
-        assert isinstance(data, dict)
-        return data
+        return self._require_dict_response(data, context="create_customer")
 
     def get_customer(self, customer_id: str) -> dict[str, Any]:
         data = self._request("GET", f"/customers/{customer_id}")
-        assert isinstance(data, dict)
-        return data
+        return self._require_dict_response(data, context="get_customer")
 
     def create_payment(self, body: Mapping[str, Any]) -> dict[str, Any]:
         data = self._request("POST", "/payments", dict(body))
-        assert isinstance(data, dict)
-        return data
+        return self._require_dict_response(data, context="create_payment")
 
     def get_payment(self, payment_id: str) -> dict[str, Any]:
         data = self._request("GET", f"/payments/{payment_id}")
         if data is None:
             return {}
-        assert isinstance(data, dict)
-        return data
+        return self._require_dict_response(data, context="get_payment")
 
     def get_payment_pix_qrcode(self, payment_id: str) -> dict[str, Any]:
         """QR Code Pix dinâmico (payload copia e cola) — chamada separada após criar cobrança."""
         data = self._request("GET", f"/payments/{payment_id}/pixQrCode")
         if data is None:
             return {}
-        assert isinstance(data, dict)
-        return data
+        return self._require_dict_response(data, context="get_payment_pix_qrcode")
 
     def tokenize_credit_card(self, body: Mapping[str, Any]) -> dict[str, Any]:
         data = self._request("POST", "/creditCard/tokenizeCreditCard", dict(body))
-        assert isinstance(data, dict)
-        return data
+        return self._require_dict_response(data, context="tokenize_credit_card")
 
     def create_subscription(self, body: Mapping[str, Any]) -> dict[str, Any]:
         data = self._request("POST", "/subscriptions", dict(body))
-        assert isinstance(data, dict)
-        return data
+        return self._require_dict_response(data, context="create_subscription")
 
     def list_payments(self, **params: Any) -> dict[str, Any]:
         data = self._request("GET", "/payments", params=params)
-        assert isinstance(data, dict)
-        return data
+        return self._require_dict_response(data, context="list_payments")
 
     def get_subscription(self, subscription_id: str) -> dict[str, Any]:
         data = self._request("GET", f"/subscriptions/{subscription_id}")
-        assert isinstance(data, dict)
-        return data
+        return self._require_dict_response(data, context="get_subscription")
 
     def cancel_subscription(self, subscription_id: str) -> dict[str, Any]:
         data = self._request("DELETE", f"/subscriptions/{subscription_id}")
         if data is None:
             return {"deleted": True, "id": subscription_id}
-        assert isinstance(data, dict)
-        return data
+        return self._require_dict_response(data, context="cancel_subscription")
 
     def update_subscription(
         self,
@@ -136,13 +135,11 @@ class AsaasClient:
         data = self._request("PUT", f"/subscriptions/{subscription_id}", dict(body))
         if data is None:
             return {}
-        assert isinstance(data, dict)
-        return data
+        return self._require_dict_response(data, context="update_subscription")
 
     def create_transfer(self, body: Mapping[str, Any]) -> dict[str, Any]:
         data = self._request("POST", "/transfers", dict(body))
-        assert isinstance(data, dict)
-        return data
+        return self._require_dict_response(data, context="create_transfer")
 
     def update_subscription_credit_card(
         self,
@@ -156,5 +153,4 @@ class AsaasClient:
         )
         if data is None:
             return {}
-        assert isinstance(data, dict)
-        return data
+        return self._require_dict_response(data, context="update_subscription_credit_card")

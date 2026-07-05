@@ -5,7 +5,8 @@ from unittest import mock
 
 import pytest
 
-from apps.billing.services import meta_capi
+from apps.billing.services import facebook_capi
+from apps.billing.services.facebook_capi import FacebookCAPI
 from apps.billing.services.meta_capi import (
     schedule_meta_purchase_event,
     send_meta_purchase_event,
@@ -18,7 +19,7 @@ from tests.factories import SubscriptionFactory, TenantFactory, UserFactory
 def test_send_meta_purchase_noop_without_credentials(settings):
     settings.META_PIXEL_ID = ""
     settings.META_ACCESS_TOKEN = ""
-    with mock.patch("apps.billing.services.meta_capi.requests.post") as post:
+    with mock.patch("apps.billing.services.facebook_capi.requests.post") as post:
         send_meta_purchase_event("a@b.com", "11999999999", 59.9, event_id="pay_1")
     post.assert_not_called()
 
@@ -36,12 +37,15 @@ def test_send_meta_purchase_posts_hashed_user_data(settings):
     mock_resp.status_code = 200
     mock_resp.text = "{}"
 
-    with mock.patch("apps.billing.services.meta_capi.requests.post", return_value=mock_resp) as post:
+    with mock.patch(
+        "apps.billing.services.facebook_capi.requests.post",
+        return_value=mock_resp,
+    ) as post:
         send_meta_purchase_event(email, phone, 119.8, currency="BRL", event_id="pay_abc")
 
     post.assert_called_once()
     args, kwargs = post.call_args
-    assert "pixel_test/events" in args[0]
+    assert "v20.0/pixel_test/events" in args[0]
     assert kwargs["params"]["access_token"] == "token_test"
     payload = kwargs["json"]["data"][0]
     assert payload["event_name"] == "Purchase"
@@ -56,8 +60,8 @@ def test_send_meta_purchase_swallows_network_errors(settings):
     settings.META_PIXEL_ID = "pixel_test"
     settings.META_ACCESS_TOKEN = "token_test"
     with mock.patch(
-        "apps.billing.services.meta_capi.requests.post",
-        side_effect=meta_capi.requests.RequestException("timeout"),
+        "apps.billing.services.facebook_capi.requests.post",
+        side_effect=facebook_capi.requests.RequestException("timeout"),
     ):
         send_meta_purchase_event("a@b.com", "11999999999", 10.0)
 
@@ -66,15 +70,25 @@ def test_schedule_meta_purchase_does_not_raise(settings):
     settings.META_PIXEL_ID = "pixel_test"
     settings.META_ACCESS_TOKEN = "token_test"
 
-    with mock.patch("apps.billing.services.meta_capi.send_meta_purchase_event") as send:
-        with mock.patch("apps.billing.services.meta_capi.transaction.on_commit", side_effect=lambda fn: fn()):
-            with mock.patch("apps.billing.services.meta_capi.threading.Thread") as thread_cls:
+    with mock.patch.object(FacebookCAPI, "send_event") as send:
+        with mock.patch(
+            "apps.billing.services.facebook_capi.transaction.on_commit",
+            side_effect=lambda fn: fn(),
+        ):
+            with mock.patch("apps.billing.services.facebook_capi.threading.Thread") as thread_cls:
                 thread_cls.return_value.start = mock.Mock()
                 schedule_meta_purchase_event("a@b.com", "11999999999", 59.9, event_id="pay_x")
                 thread_cls.assert_called_once()
                 target = thread_cls.call_args.kwargs["target"]
                 target()
-                send.assert_called_once()
+                send.assert_called_once_with(
+                    "Purchase",
+                    "a@b.com",
+                    "11999999999",
+                    {"value": 59.9, "currency": "BRL"},
+                    event_id="pay_x",
+                    action_source="website",
+                )
 
 
 @pytest.mark.django_db

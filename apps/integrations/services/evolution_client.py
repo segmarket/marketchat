@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import logging
 import re
@@ -9,9 +10,9 @@ import time
 import uuid as uuid_module
 import urllib.error
 import urllib.parse
-import urllib.request
 from typing import Any, Iterable
 
+import requests
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -117,6 +118,14 @@ class EvolutionClient:
             )
         self._request("GET", "/instance/all", apikey=self.global_api_key, timeout=15)
 
+    @staticmethod
+    def _validate_http_url(url: str) -> None:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError(
+                f"URL Evolution inválida: esquema {parsed.scheme!r} não permitido"
+            )
+
     def _request(
         self,
         method: str,
@@ -129,37 +138,47 @@ class EvolutionClient:
         if not self.base_url:
             raise RuntimeError("EVOLUTION_API_BASE_URL não configurado.")
         url = f"{self.base_url}{path}"
-        data = json.dumps(body).encode("utf-8") if body is not None else None
+        self._validate_http_url(url)
         headers: dict[str, str] = {}
         if apikey:
             headers["apikey"] = apikey
-        if data is not None:
-            headers["Content-Type"] = "application/json"
-        req = urllib.request.Request(url, data=data, method=method, headers=headers)
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                raw = resp.read().decode("utf-8")
-                if not raw:
-                    return {}
-                parsed = json.loads(raw)
-                return parsed if isinstance(parsed, dict) else {"data": parsed}
-        except urllib.error.HTTPError as e:
-            body_bytes = b""
-            try:
-                body_bytes = e.read()
-            except Exception:
-                pass
-            level = logging.WARNING if 400 <= e.code < 500 else logging.ERROR
+            response = requests.request(
+                method,
+                url,
+                json=body,
+                headers=headers,
+                timeout=timeout,
+            )
+        except requests.RequestException as exc:
+            raise RuntimeError(f"Falha de rede Evolution: {exc}") from exc
+
+        if response.status_code >= 400:
+            body_bytes = response.content
+            http_exc = urllib.error.HTTPError(
+                url,
+                response.status_code,
+                response.reason or "",
+                response.headers,
+                io.BytesIO(body_bytes),
+            )
+            http_exc._body_preview = body_bytes  # type: ignore[attr-defined]
+            level = logging.WARNING if 400 <= response.status_code < 500 else logging.ERROR
             logger.log(
                 level,
                 "Evolution HTTP %s em %s %s: %r",
-                e.code,
+                response.status_code,
                 method,
                 path,
                 body_bytes[:500],
             )
-            e._body_preview = body_bytes  # type: ignore[attr-defined]
-            raise
+            raise http_exc
+
+        raw = response.text
+        if not raw:
+            return {}
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, dict) else {"data": parsed}
 
     @staticmethod
     def build_webhook_url(base_url: str, secret: str | None = None) -> str:

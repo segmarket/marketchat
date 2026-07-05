@@ -1,0 +1,11 @@
+exclude_dirs:
+  - tests
+  - front-end
+  - node_modules
+  - .venv
+  - test_media
+
+skips:
+  - B101
+  - B105
+  - B106
