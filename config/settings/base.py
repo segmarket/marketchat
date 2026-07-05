@@ -244,6 +244,8 @@ ASAAS_API_KEY = os.environ.get("ASAAS_API_KEY", "")
 ASAAS_WEBHOOK_TOKEN = env("ASAAS_WEBHOOK_TOKEN", default="")
 # Em produção mantenha True e defina ASAAS_WEBHOOK_TOKEN. Em dev pode ser False (ver .env.development).
 ASAAS_WEBHOOK_VERIFY = env.bool("ASAAS_WEBHOOK_VERIFY", default=True)
+# Token do mecanismo "Validação de saque via Webhook" (Integrações > Mecanismos de segurança).
+ASAAS_WITHDRAWAL_TOKEN = env("ASAAS_WITHDRAWAL_TOKEN", default="")
 
 TRIAL_DAYS = env.int("TRIAL_DAYS", default=7)
 DEFAULT_SUBSCRIPTION_VALUE = env.float("DEFAULT_SUBSCRIPTION_VALUE", default=29.9)
