@@ -14,6 +14,7 @@ from django.utils.text import slugify
 from apps.accounts.models import User
 from apps.billing.services.asaas_client import AsaasAPIError
 from apps.billing.services.asaas_errors import format_asaas_card_error
+from apps.accounts.services.leads import mark_lead_converted
 from apps.billing.services.facebook_capi import schedule_facebook_capi_event
 from apps.billing.services.subscription_flow import create_trial_subscription
 from apps.tenants.models import Tenant
@@ -152,5 +153,7 @@ def register_tenant_with_admin(
         },
         event_id=f"start_trial_tenant_{tenant.id}",
     )
+
+    mark_lead_converted(admin_email)
 
     return tenant, user

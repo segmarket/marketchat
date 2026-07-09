@@ -161,6 +161,7 @@ export default function SignupPage() {
     step === 1
       ? step1Schema.safeParse({
           fullName: watchedValues.fullName,
+          phone: watchedValues.phone,
           email: watchedValues.email,
           password: watchedValues.password,
           acceptTerms: watchedValues.acceptTerms,
@@ -168,7 +169,6 @@ export default function SignupPage() {
       : step2Schema.safeParse({
           company_name: watchedValues.company_name,
           cpfCnpj: watchedValues.cpfCnpj,
-          phone: watchedValues.phone,
           cep: watchedValues.cep,
           address: watchedValues.address,
           addressNumber: watchedValues.addressNumber,
@@ -180,11 +180,16 @@ export default function SignupPage() {
   const cardExpiry = watch("cardExpiry");
   const cardCvv = watch("cardCvv");
 
-  const step1Fields: (keyof FullSignupValues)[] = ["fullName", "email", "password", "acceptTerms"];
+  const step1Fields: (keyof FullSignupValues)[] = [
+    "fullName",
+    "phone",
+    "email",
+    "password",
+    "acceptTerms",
+  ];
   const step2Fields: (keyof FullSignupValues)[] = [
     "company_name",
     "cpfCnpj",
-    "phone",
     "cep",
     "address",
     "addressNumber",
@@ -198,6 +203,32 @@ export default function SignupPage() {
     if (!ok) return;
     if (step === 1) {
       trackEvent(ANALYTICS_EVENTS.LEAD_GENERATED);
+      try {
+        await api.post("/api/auth/signup-lead/", {
+          lead_type: "F1",
+          full_name: getValues("fullName"),
+          email: getValues("email"),
+          phone: digitsOnly(getValues("phone")),
+        });
+      } catch {
+        // Lead é recuperação de vendas — não bloqueia o funil.
+      }
+    }
+    if (step === 2) {
+      try {
+        await api.post("/api/auth/signup-lead/", {
+          lead_type: "F2",
+          email: getValues("email"),
+          company_name: getValues("company_name"),
+          address: getValues("address"),
+          address_number: getValues("addressNumber"),
+          complement: getValues("complement") || "",
+          cep: digitsOnly(getValues("cep")),
+          state: getValues("province"),
+        });
+      } catch {
+        // Lead é recuperação de vendas — não bloqueia o funil.
+      }
     }
     setStep((s) => (s + 1) as 1 | 2 | 3);
   }
@@ -359,6 +390,32 @@ export default function SignupPage() {
                   </div>
                   <div>
                     <Label>
+                      Telefone (WhatsApp) <span className="text-error-500">*</span>
+                    </Label>
+                    <Controller
+                      name="phone"
+                      control={control}
+                      render={({ field }) => (
+                        <IMaskInput
+                          mask="(00) 00000-0000"
+                          value={field.value}
+                          unmask={false}
+                          onAccept={(value: string) => field.onChange(value)}
+                          onBlur={field.onBlur}
+                          inputRef={field.ref}
+                          className={`h-11 w-full rounded-lg border bg-transparent px-4 py-2.5 text-sm shadow-theme-xs dark:text-white/90 ${
+                            errors.phone
+                              ? "border-error-500 focus:border-error-500 focus:ring-error-500/20"
+                              : "border-gray-300 dark:border-gray-700"
+                          }`}
+                          placeholder="(11) 99999-9999"
+                        />
+                      )}
+                    />
+                    {errors.phone && <p className="mt-1 text-xs text-error-500">{errors.phone.message}</p>}
+                  </div>
+                  <div>
+                    <Label>
                       E-mail <span className="text-error-500">*</span>
                     </Label>
                     <Input type="email" placeholder="voce@empresa.com" {...register("email")} error={!!errors.email} />
@@ -479,28 +536,6 @@ export default function SignupPage() {
                       )}
                     />
                     {errors.cpfCnpj && <p className="mt-1 text-xs text-error-500">{errors.cpfCnpj.message}</p>}
-                  </div>
-                  <div>
-                    <Label>
-                      Telefone <span className="text-error-500">*</span>
-                    </Label>
-                    <Controller
-                      name="phone"
-                      control={control}
-                      render={({ field }) => (
-                        <IMaskInput
-                          mask="(00) 00000-0000"
-                          value={field.value}
-                          unmask={false}
-                          onAccept={(value: string) => field.onChange(value)}
-                          onBlur={field.onBlur}
-                          inputRef={field.ref}
-                          className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm shadow-theme-xs dark:border-gray-700 dark:text-white/90"
-                          placeholder="(11) 99999-9999"
-                        />
-                      )}
-                    />
-                    {errors.phone && <p className="mt-1 text-xs text-error-500">{errors.phone.message}</p>}
                   </div>
                   <div>
                     <Label>

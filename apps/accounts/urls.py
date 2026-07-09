@@ -7,11 +7,13 @@ from apps.accounts.views import (
     PasswordResetConfirmView,
     PasswordResetRequestView,
     RegisterView,
+    SignupLeadView,
     TenantTokenObtainPairView,
 )
 
 urlpatterns = [
     path("me/", MeView.as_view(), name="auth-me"),
+    path("signup-lead/", SignupLeadView.as_view(), name="auth-signup-lead"),
     path("register/", RegisterView.as_view(), name="auth-register"),
     path("token/", TenantTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),

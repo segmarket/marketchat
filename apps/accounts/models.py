@@ -47,3 +47,45 @@ class User(AbstractUser):
 
     def __str__(self) -> str:
         return self.email
+
+
+class Lead(models.Model):
+    """Lead capturado no cadastro para recuperação de vendas (funil F1/F2)."""
+
+    class LeadType(models.TextChoices):
+        F1 = "F1", "F1"
+        F2 = "F2", "F2"
+
+    class Status(models.TextChoices):
+        NOVO = "NOVO", "Novo"
+        EM_CONTATO = "EM_CONTATO", "Em Contato"
+        SEM_INTERESSE = "SEM_INTERESSE", "Sem Interesse"
+        AGUARDANDO_RETORNO = "AGUARDANDO_RETORNO", "Aguardando Retorno"
+        CONVERTIDO = "CONVERTIDO", "Convertido"
+
+    full_name = models.CharField(max_length=255)
+    email = models.EmailField(unique=True, db_index=True)
+    phone = models.CharField(max_length=20)
+    lead_type = models.CharField(
+        max_length=2,
+        choices=LeadType.choices,
+        default=LeadType.F1,
+    )
+    company_name = models.CharField(max_length=255, blank=True, default="")
+    company_address = models.CharField(max_length=512, blank=True, default="")
+    city = models.CharField(max_length=120, blank=True, default="")
+    state = models.CharField(max_length=2, blank=True, default="")
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.NOVO,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    converted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:
+        return f"{self.full_name} <{self.email}>"

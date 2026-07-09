@@ -53,6 +53,43 @@ class AttributionSerializer(serializers.Serializer):
     fbclid = serializers.CharField(required=False, allow_blank=True, default="")
 
 
+class SignupLeadSerializer(serializers.Serializer):
+    lead_type = serializers.ChoiceField(choices=["F1", "F2"], default="F1")
+    full_name = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
+    email = serializers.EmailField()
+    phone = serializers.CharField(max_length=32, required=False, allow_blank=True, default="")
+    company_name = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
+    address = serializers.CharField(max_length=512, required=False, allow_blank=True, default="")
+    address_number = serializers.CharField(max_length=32, required=False, allow_blank=True, default="")
+    complement = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
+    cep = serializers.CharField(max_length=16, required=False, allow_blank=True, default="")
+    state = serializers.CharField(max_length=2, required=False, allow_blank=True, default="")
+
+    def validate(self, attrs: dict) -> dict:
+        lead_type = attrs.get("lead_type", "F1")
+        if lead_type == "F1":
+            if not (attrs.get("full_name") or "").strip():
+                raise serializers.ValidationError({"full_name": ["Nome completo é obrigatório."]})
+            if not (attrs.get("phone") or "").strip():
+                raise serializers.ValidationError({"phone": ["Telefone é obrigatório."]})
+        elif lead_type == "F2":
+            missing = {}
+            if not (attrs.get("company_name") or "").strip():
+                missing["company_name"] = ["Nome da empresa é obrigatório."]
+            if not (attrs.get("address") or "").strip():
+                missing["address"] = ["Endereço é obrigatório."]
+            if not (attrs.get("address_number") or "").strip():
+                missing["address_number"] = ["Número é obrigatório."]
+            cep_digits = "".join(c for c in (attrs.get("cep") or "") if c.isdigit())
+            if len(cep_digits) != 8:
+                missing["cep"] = ["CEP deve ter 8 dígitos."]
+            if not (attrs.get("state") or "").strip():
+                missing["state"] = ["UF é obrigatória."]
+            if missing:
+                raise serializers.ValidationError(missing)
+        return attrs
+
+
 class RegisterSerializer(serializers.Serializer):
     company_name = serializers.CharField(max_length=255)
     tenant_slug = serializers.SlugField(required=False, allow_blank=True, max_length=80)

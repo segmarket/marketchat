@@ -14,7 +14,13 @@ from apps.accounts.serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     RegisterSerializer,
+    SignupLeadSerializer,
     TenantTokenObtainPairSerializer,
+)
+from apps.accounts.services.leads import (
+    format_company_address,
+    upsert_signup_lead_f1,
+    upsert_signup_lead_f2,
 )
 from apps.core.emails import send_password_reset_email_safe
 from apps.core.throttling import LoginRateThrottle
@@ -78,6 +84,39 @@ class MeView(APIView):
                 "is_in_grace_period": is_in_grace_period,
                 "days_overdue": days_overdue,
             }
+        )
+
+
+class SignupLeadView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = SignupLeadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        lead_type = data["lead_type"]
+        if lead_type == "F2":
+            company_address = format_company_address(
+                address=data["address"],
+                address_number=data["address_number"],
+                complement=data.get("complement") or "",
+                cep=data.get("cep") or "",
+            )
+            lead = upsert_signup_lead_f2(
+                email=data["email"],
+                company_name=data["company_name"],
+                company_address=company_address,
+                state=data["state"],
+            )
+        else:
+            lead = upsert_signup_lead_f1(
+                full_name=data["full_name"],
+                email=data["email"],
+                phone=data["phone"],
+            )
+        return Response(
+            {"id": lead.id, "status": lead.status, "lead_type": lead.lead_type},
+            status=status.HTTP_201_CREATED,
         )
 
 

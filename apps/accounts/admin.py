@@ -1,7 +1,8 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+from django.utils.html import format_html
 
-from apps.accounts.models import User
+from apps.accounts.models import Lead, User
 
 
 @admin.register(User)
@@ -28,3 +29,49 @@ class UserAdmin(DjangoUserAdmin):
     )
 
     filter_horizontal = ("groups", "user_permissions")
+
+
+@admin.action(description="Marcar como Em Contato")
+def marcar_como_contatado(modeladmin, request, queryset):
+    updated = queryset.exclude(status=Lead.Status.CONVERTIDO).update(
+        status=Lead.Status.EM_CONTATO,
+    )
+    modeladmin.message_user(
+        request,
+        f"{updated} lead(s) marcado(s) como Em Contato.",
+        messages.SUCCESS,
+    )
+
+
+@admin.register(Lead)
+class LeadAdmin(admin.ModelAdmin):
+    list_display = (
+        "full_name",
+        "email",
+        "phone",
+        "lead_type",
+        "status",
+        "created_at",
+        "display_whatsapp",
+    )
+    list_filter = ("lead_type", "status", "created_at")
+    search_fields = ("full_name", "email", "phone", "company_name", "company_address", "state")
+    readonly_fields = ("created_at", "updated_at", "converted_at", "display_whatsapp")
+    list_editable = ("status",)
+    actions = [marcar_como_contatado]
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if not request.GET.get("status__exact"):
+            qs = qs.exclude(status=Lead.Status.CONVERTIDO)
+        return qs
+
+    @admin.display(description="WhatsApp")
+    def display_whatsapp(self, obj: Lead) -> str:
+        digits = (obj.phone or "").strip()
+        if not digits:
+            return "—"
+        return format_html(
+            '<a href="https://wa.me/{}" target="_blank" rel="noopener noreferrer">WhatsApp</a>',
+            digits,
+        )
