@@ -36,21 +36,39 @@ const PILLARS = [
   },
 ] as const;
 
-export default function MarketingPillarsGrid() {
+type MarketingPillarsGridProps = {
+  variant?: "default" | "consultative";
+};
+
+export default function MarketingPillarsGrid({ variant = "default" }: MarketingPillarsGridProps) {
+  const isConsultative = variant === "consultative";
+
   return (
-    <section id="pilares" className="scroll-mt-24 bg-white px-4 py-20 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
+    <section
+      id="pilares"
+      className={`scroll-mt-24 bg-white px-4 sm:px-6 lg:px-8 ${
+        isConsultative ? "py-12 sm:py-14" : "py-20"
+      }`}
+    >
+      <div className={`mx-auto ${isConsultative ? "max-w-6xl" : "max-w-7xl"}`}>
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold text-gray-900 sm:text-4xl">
-            Quatro inteligências operando o seu mercado
+            {isConsultative
+              ? "O que você vai conhecer na consultoria"
+              : "Quatro inteligências operando o seu mercado"}
           </h2>
           <p className="mt-4 text-lg text-gray-600">
-            Vendas, estoque, infraestrutura e suporte — o gerente virtual cuida do morador e te
-            avisa quando sua atenção importa.
+            {isConsultative
+              ? "Entenda como o MarketChat organiza vendas, estoque, infraestrutura e suporte no dia a dia do seu mercado."
+              : "Vendas, estoque, infraestrutura e suporte — o gerente virtual cuida do morador e te avisa quando sua atenção importa."}
           </p>
         </div>
 
-        <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div
+          className={`grid grid-cols-1 md:grid-cols-2 ${
+            isConsultative ? "mt-10 gap-5 lg:grid-cols-2" : "mt-14 gap-6 lg:grid-cols-4"
+          }`}
+        >
           {PILLARS.map((item) => (
             <article
               key={item.title}

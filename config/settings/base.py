@@ -206,6 +206,9 @@ elif DEFAULT_FROM_EMAIL and "<" not in DEFAULT_FROM_EMAIL:
 else:
     TRANSACTIONAL_FROM_EMAIL = DEFAULT_FROM_EMAIL
 
+# Alerta de vendas quando um lead F1 é capturado (LP consultoria, etc.)
+LEAD_SALES_ALERT_EMAIL = env("LEAD_SALES_ALERT_EMAIL", default="").strip()
+
 MARKETING_PUBLIC_ORIGIN = env("MARKETING_PUBLIC_ORIGIN", default="http://localhost:5173").rstrip("/")
 # Painel React (rotas /signin, /reset-password). Em dev use app.localhost (mesma porta do Vite).
 FRONTEND_APP_ORIGIN = env("FRONTEND_APP_ORIGIN", default="http://app.localhost:5173").rstrip("/")

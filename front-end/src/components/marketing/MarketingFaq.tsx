@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Minus, Plus } from "lucide-react";
-import { FAQ_ITEMS } from "../../constants/marketingCopy";
+import { CONSULTATIVE_FAQ_ITEMS, FAQ_ITEMS } from "../../constants/marketingCopy";
 
 function FaqItem({ question, answer }: { question: string; answer: string }) {
   const [open, setOpen] = useState(false);
@@ -27,18 +27,23 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
   );
 }
 
-export default function MarketingFaq() {
+export default function MarketingFaq({ variant = "default" }: { variant?: "default" | "consultative" }) {
+  const isConsultative = variant === "consultative";
+  const items = isConsultative ? CONSULTATIVE_FAQ_ITEMS : FAQ_ITEMS;
+
   return (
     <section id="faq" className="scroll-mt-24 bg-white px-4 py-20 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-3xl">
         <div className="text-center">
           <h2 className="text-3xl font-bold text-gray-900 sm:text-4xl">Perguntas frequentes</h2>
           <p className="mt-4 text-lg text-gray-600">
-            Respostas diretas para as dúvidas que mais travam a decisão de testar.
+            {isConsultative
+              ? "Tire suas dúvidas antes de falar com nosso especialista."
+              : "Respostas diretas para as dúvidas que mais travam a decisão de testar."}
           </p>
         </div>
         <div className="mt-10 space-y-3">
-          {FAQ_ITEMS.map((item) => (
+          {items.map((item) => (
             <FaqItem key={item.question} question={item.question} answer={item.answer} />
           ))}
         </div>

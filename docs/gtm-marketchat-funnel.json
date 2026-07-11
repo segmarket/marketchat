@@ -1,0 +1,783 @@
+{
+  "meta": {
+    "project": "MarketChat",
+    "version": "1.2.0",
+    "generatedAt": "2026-07-09",
+    "description": "Referência completa de dataLayer, funil de cadastro (F1/F2/cartão), APIs de lead e mapeamento GTM → Meta Pixel / GA4. O React NÃO chama fbq/gtag diretamente.",
+    "documentation": "docs/GTM_FUNNEL.md",
+    "envVars": {
+      "gtmContainerId": "VITE_GTM_ID",
+      "metaPixelId": "META_PIXEL_ID",
+      "trialPlanValue": "VITE_TRIAL_SUBSCRIPTION_PRICE ou VITE_PLAN_PRICE (default 59,90)"
+    }
+  },
+  "architecture": {
+    "browser": "React → window.dataLayer.push → GTM → Meta Pixel (browser) + GA4",
+    "server": "Django → Facebook CAPI (StartTrial no register, Purchase no webhook Asaas)",
+    "consent": "Tags só disparam após consentimento marketing (Consent Mode v2: consent_default / consent_granted)"
+  },
+  "landingPage": {
+    "url": "/",
+    "file": "front-end/src/pages/marketing/LandingPage.tsx",
+    "sections": [
+      { "id": "hero", "component": "MarketingHero", "anchor": null },
+      { "id": "trust", "component": "MarketingTrustBand", "anchor": null },
+      { "id": "pilares", "component": "MarketingPillarsGrid", "anchor": "#pilares" },
+      { "id": "para-o-dono", "component": "MarketingOwnerFlow", "anchor": "#para-o-dono" },
+      { "id": "precos", "component": "MarketingPricing", "anchor": "#precos" },
+      { "id": "faq", "component": "MarketingFaq", "anchor": "#faq" },
+      { "id": "footer", "component": "MarketingFooter", "anchor": null },
+      { "id": "sticky-cta", "component": "MarketingStickyCtaBar", "anchor": null },
+      { "id": "cookie-banner", "component": "CookieConsentBanner", "anchor": null }
+    ],
+    "currentlyTracked": {
+      "description": "O que o JSON v1.1 considerou da landing — apenas eventos que JÁ existem no código React",
+      "events": [
+        {
+          "event": "click_cta_trial",
+          "component": "MarketingCtaLink",
+          "locationsOnLanding": [
+            { "location": "hero_section", "component": "MarketingHero" },
+            { "location": "navbar", "component": "MarketingNavbar" },
+            { "location": "pricing", "component": "MarketingPricing" },
+            { "location": "sticky_bar", "component": "MarketingStickyCtaBar" },
+            { "location": "footer", "component": "MarketingFooter" }
+          ],
+          "payloadFields": ["location", "utm_*", "gclid", "fbclid"],
+          "gtmStatus": "Trigger existe, 0 tags ligadas",
+          "metaRecommendation": "ViewContent ou custom — NÃO StartTrial"
+        },
+        {
+          "event": "click_whatsapp_contact",
+          "component": "MarketingFooter",
+          "locationsOnLanding": [{ "location": "footer", "component": "MarketingFooter" }],
+          "gtmStatus": "Trigger existe, 0 tags ligadas",
+          "metaRecommendation": "Contact (evento padrão Meta para WhatsApp)"
+        },
+        {
+          "event": "consent_granted / consent_default",
+          "component": "analytics.ts + CookieConsentBanner",
+          "when": "Aceitar/recusar cookies — GTM só carrega após marketing consent",
+          "metaRecommendation": "Consent Mode v2 (já no dataLayer)"
+        }
+      ],
+      "attribution": {
+        "hook": "useUTM() na LandingPage",
+        "behavior": "Salva utm_* e fbclid no localStorage; repassa na URL ao clicar no CTA via MarketingCtaLink",
+        "note": "Atribuição vai no payload de click_cta_trial e na URL do signup — não gera evento próprio"
+      }
+    },
+    "notTrackedToday": {
+      "description": "Interações da landing SEM evento no código — lacunas para conversão Meta",
+      "gaps": [
+        { "interaction": "PageView da landing (/)", "metaEvent": "PageView", "source": "Tag base GTM All Pages — não é custom event" },
+        { "interaction": "Scroll / visualização de seção (#pilares, #precos, etc.)", "metaEvent": "ViewContent", "priority": "alta" },
+        { "interaction": "Clique em âncoras do menu (Pilares, Preços, FAQ)", "metaEvent": "ViewContent ou custom view_section", "priority": "média" },
+        { "interaction": "Abrir pergunta no FAQ", "metaEvent": "custom faq_expand", "priority": "média" },
+        { "interaction": "Clique 'Acessar sistema' (login)", "metaEvent": "custom click_login", "priority": "baixa" },
+        { "interaction": "Landing montada (mount)", "metaEvent": "ViewContent", "priority": "alta — explica os 42 ViewContent no Events Manager" },
+        { "interaction": "Tempo na página / scroll 50% / 75%", "metaEvent": "custom engagement", "priority": "média — otimização de público" },
+        { "interaction": "Cookie banner: aceitar vs recusar", "metaEvent": "custom cookie_consent_choice", "priority": "baixa — qualidade de tráfego" }
+      ]
+    }
+  },
+  "recommendedEventsForMetaConversion": {
+    "description": "Eventos sugeridos para implementar no React + mapear no GTM. Priorizados para funil Meta Ads (tráfego frio → trial).",
+    "priorityOrder": [
+      "landing_view",
+      "view_section",
+      "click_cta_trial → Meta ViewContent + GA4",
+      "click_whatsapp_contact → Meta Contact",
+      "begin_signup → Meta ViewContent (página signup)",
+      "lead_generated → Meta Lead (já existe)",
+      "initiate_checkout → Meta InitiateCheckout (já existe)",
+      "add_payment_info → Meta AddPaymentInfo (já existe)",
+      "sign_up → Meta CompleteRegistration",
+      "start_trial → Meta StartTrial (já existe)"
+    ],
+    "proposedNewEvents": [
+      {
+        "event": "landing_view",
+        "status": "proposed",
+        "when": "Mount de LandingPage.tsx (1x por sessão)",
+        "metaPixel": "ViewContent",
+        "ga4": "view_item ou page_view enriquecido",
+        "samplePayload": {
+          "event": "landing_view",
+          "content_name": "MarketChat Landing",
+          "content_category": "saas_trial",
+          "page_path": "/"
+        },
+        "gtmTrigger": "Custom Event landing_view",
+        "benefit": "Substitui ViewContent genérico de All Pages; permite value/currency do plano"
+      },
+      {
+        "event": "view_section",
+        "status": "proposed",
+        "when": "Intersection Observer quando seção entra no viewport (pilares, precos, faq)",
+        "metaPixel": "ViewContent",
+        "ga4": "view_section (custom)",
+        "samplePayload": {
+          "event": "view_section",
+          "section_id": "precos | pilares | para-o-dono | faq",
+          "visibility_ratio": 0.5
+        },
+        "gtmTrigger": "Custom Event view_section",
+        "benefit": "Públicos de remarketing: viu preços mas não clicou CTA"
+      },
+      {
+        "event": "click_cta_trial",
+        "status": "exists — ligar tags GTM",
+        "when": "Já implementado",
+        "metaPixel": "ViewContent (intenção) ou Subscribe — NÃO StartTrial",
+        "ga4": "click_cta_trial",
+        "actionRequired": "Ligar trigger existente a tag Meta + GA4; incluir location no parâmetro content_name",
+        "samplePayloadEnhanced": {
+          "event": "click_cta_trial",
+          "location": "hero_section",
+          "content_name": "cta_trial_hero_section",
+          "fbclid": "opcional"
+        }
+      },
+      {
+        "event": "click_whatsapp_contact",
+        "status": "exists — ligar tags GTM",
+        "when": "Já implementado no footer",
+        "metaPixel": "Contact",
+        "ga4": "click_whatsapp_contact",
+        "actionRequired": "Ligar trigger a Meta Contact — lead alternativo fora do funil signup"
+      },
+      {
+        "event": "faq_expand",
+        "status": "proposed",
+        "when": "Toggle de pergunta em MarketingFaq.tsx",
+        "metaPixel": null,
+        "ga4": "faq_expand (custom)",
+        "samplePayload": {
+          "event": "faq_expand",
+          "question_id": "slug da pergunta"
+        },
+        "benefit": "Sinal de objeção / interesse — público 'quente' para remarketing"
+      },
+      {
+        "event": "scroll_depth",
+        "status": "proposed",
+        "when": "25%, 50%, 75%, 100% da landing",
+        "metaPixel": null,
+        "ga4": "scroll (custom)",
+        "samplePayload": {
+          "event": "scroll_depth",
+          "percent": 50
+        },
+        "benefit": "Filtrar cliques acidentais; otimizar criativos para quem engaja"
+      }
+    ],
+    "metaStandardEventFunnel": {
+      "topOfFunnel": [
+        { "meta": "PageView", "source": "Pixel base" },
+        { "meta": "ViewContent", "source": "landing_view + view_section + click_cta_trial (proposed)" }
+      ],
+      "midFunnel": [
+        { "meta": "Lead", "source": "lead_generated — Passo 1 signup" },
+        { "meta": "Contact", "source": "click_whatsapp_contact" }
+      ],
+      "bottomFunnel": [
+        { "meta": "InitiateCheckout", "source": "initiate_checkout — Passo 3" },
+        { "meta": "AddPaymentInfo", "source": "add_payment_info — clique pagar" },
+        { "meta": "CompleteRegistration", "source": "sign_up — ligar tag" },
+        { "meta": "StartTrial", "source": "start_trial + CAPI server" }
+      ],
+      "postConversion": [
+        { "meta": "Purchase", "source": "CAPI webhook Asaas apenas" }
+      ]
+    },
+    "quickWinsWithoutCode": [
+      "Ligar tag Meta ViewContent ao trigger click_cta_trial (já dispara 5+ locais na landing)",
+      "Ligar tag Meta Contact ao trigger click_whatsapp_contact",
+      "Ligar tag Meta CompleteRegistration ao trigger sign_up",
+      "Corrigir tag que envia AddToCart (deve ser AddPaymentInfo ou InitiateCheckout)",
+      "Criar tag ViewContent All Pages apenas em staging.marketchat.com.br/ (host = landing)"
+    ],
+    "quickWinsWithCode": [
+      "Adicionar landing_view no mount de LandingPage.tsx",
+      "Adicionar view_section com Intersection Observer nas seções #precos e #pilares",
+      "Enriquecer click_cta_trial com content_name derivado de location"
+    ]
+  },
+  "signupFunnel": {
+    "url": "/auth/signup",
+    "steps": [
+      {
+        "step": 1,
+        "name": "Contato (F1)",
+        "uiFields": ["fullName", "phone", "email", "password", "acceptTerms"],
+        "onContinue": {
+          "dataLayer": {
+            "event": "lead_generated",
+            "note": "Dispara ANTES do POST de lead; falha de API não bloqueia avanço"
+          },
+          "api": {
+            "method": "POST",
+            "endpoint": "/api/auth/signup-lead/",
+            "auth": "AllowAny",
+            "payload": {
+              "lead_type": "F1",
+              "full_name": "string — nome completo",
+              "email": "string — e-mail",
+              "phone": "string — só dígitos (DDD + número)"
+            },
+            "response201": {
+              "id": "number",
+              "status": "NOVO",
+              "lead_type": "F1"
+            },
+            "crmEffect": "Upsert Lead por e-mail; lead_type=F1; status=Novo"
+          },
+          "metaPixel": "Lead",
+          "ga4": "generate_lead"
+        }
+      },
+      {
+        "step": 2,
+        "name": "Empresa (F2)",
+        "uiFields": [
+          "company_name",
+          "cpfCnpj",
+          "cep",
+          "address",
+          "addressNumber",
+          "complement",
+          "province"
+        ],
+        "onContinue": {
+          "dataLayer": null,
+          "api": {
+            "method": "POST",
+            "endpoint": "/api/auth/signup-lead/",
+            "auth": "AllowAny",
+            "payload": {
+              "lead_type": "F2",
+              "email": "string — mesmo e-mail do passo 1",
+              "company_name": "string",
+              "address": "string — logradouro e cidade (ViaCEP concatena)",
+              "address_number": "string",
+              "complement": "string — opcional",
+              "cep": "string — 8 dígitos",
+              "state": "string — UF (province, ex: SP)"
+            },
+            "response201": {
+              "id": "number",
+              "status": "NOVO | EM_CONTATO | ...",
+              "lead_type": "F2"
+            },
+            "crmEffect": "Atualiza Lead existente; lead_type=F2; preenche company_name, company_address, state"
+          },
+          "metaPixel": null,
+          "ga4": null,
+          "note": "Sem evento dataLayer neste passo — intenção F2 fica só no CRM Django Admin"
+        }
+      },
+      {
+        "step": 3,
+        "name": "Cartão de crédito + trial",
+        "uiFields": ["cardNumber", "cardName", "cardExpiry", "cardCvv"],
+        "onMount": {
+          "dataLayer": {
+            "event": "initiate_checkout",
+            "includes": ["ecommerce", "user_data (hashes SHA-256)"]
+          },
+          "metaPixel": "InitiateCheckout",
+          "ga4": "begin_checkout + ecommerce"
+        },
+        "onSubmitClick": {
+          "order": [
+            "1. dataLayer add_payment_info",
+            "2. POST /api/auth/register/",
+            "3. dataLayer sign_up (se OK)",
+            "4. dataLayer start_trial (se OK)"
+          ],
+          "dataLayerBeforePost": {
+            "event": "add_payment_info",
+            "includes": ["ecommerce", "user_data (hashes SHA-256)"]
+          },
+          "api": {
+            "method": "POST",
+            "endpoint": "/api/auth/register/",
+            "auth": "AllowAny",
+            "payload": {
+              "company_name": "string",
+              "tenant_slug": "string — slugify(company_name)",
+              "admin_email": "string",
+              "admin_password": "string",
+              "first_name": "string",
+              "last_name": "string",
+              "accept_terms": true,
+              "attribution": {
+                "utm_source": "opcional",
+                "utm_medium": "opcional",
+                "utm_campaign": "opcional",
+                "utm_term": "opcional",
+                "utm_content": "opcional",
+                "gclid": "opcional",
+                "fbclid": "opcional"
+              },
+              "credit_card": {
+                "holderName": "string — nome no cartão",
+                "number": "string — só dígitos",
+                "expiryMonth": "string — MM",
+                "expiryYear": "string — YYYY",
+                "ccv": "string — 3 ou 4 dígitos"
+              },
+              "credit_card_holder": {
+                "name": "string — nome completo",
+                "email": "string",
+                "cpfCnpj": "string — só dígitos",
+                "postalCode": "string — CEP só dígitos",
+                "address": "string",
+                "addressNumber": "string",
+                "complement": "string — opcional",
+                "province": "string — UF",
+                "phone": "string — só dígitos"
+              }
+            },
+            "response201": {
+              "id": "user id",
+              "email": "string",
+              "tenant_id": "number"
+            },
+            "serverSideEffects": [
+              "create_trial_subscription (Asaas tokenização + assinatura)",
+              "Facebook CAPI StartTrial (event_id: start_trial_tenant_{tenant_id})",
+              "mark_lead_converted → Lead.status=CONVERTIDO"
+            ]
+          },
+          "dataLayerAfterSuccess": [
+            {
+              "event": "sign_up",
+              "payload": { "method": "email" },
+              "metaPixel": "CompleteRegistration (opcional — ligar tag ao trigger sign_up)",
+              "ga4": "sign_up"
+            },
+            {
+              "event": "start_trial",
+              "payload": {
+                "currency": "BRL",
+                "value": 59.9,
+                "hashed_email": "sha256 hex lowercase",
+                "hashed_phone": "sha256 hex com prefixo 55 se BR"
+              },
+              "metaPixel": "StartTrial",
+              "ga4": "start_trial (custom)",
+              "guardrail": "ÚNICO gatilho browser para StartTrial — só após register OK"
+            }
+          ],
+          "metaPixel": "AddPaymentInfo (no clique, antes do POST)",
+          "ga4": "add_payment_info + ecommerce"
+        }
+      }
+    ]
+  },
+  "dataLayerEvents": [
+    {
+      "event": "consent_default",
+      "source": "front-end/src/utils/analytics.ts",
+      "when": "Antes de carregar GTM",
+      "gtmTrigger": "Custom Event consent_default",
+      "metaPixel": null,
+      "ga4": null,
+      "samplePayload": {
+        "event": "consent_default",
+        "analytics_storage": "denied",
+        "ad_storage": "denied",
+        "ad_user_data": "denied",
+        "ad_personalization": "denied"
+      }
+    },
+    {
+      "event": "consent_granted",
+      "source": "front-end/src/utils/analytics.ts",
+      "when": "Usuário aceita cookies marketing",
+      "gtmTrigger": "Custom Event consent_granted",
+      "metaPixel": null,
+      "ga4": null
+    },
+    {
+      "event": "click_cta_trial",
+      "source": "front-end/src/components/marketing/MarketingCtaLink.tsx",
+      "when": "Clique em CTA Teste grátis na landing",
+      "gtmTrigger": "Custom Event click_cta_trial",
+      "metaPixel": null,
+      "ga4": "click_cta_trial (custom)",
+      "samplePayload": {
+        "event": "click_cta_trial",
+        "location": "hero_section | sticky_bar | pricing | navbar | footer | links_bio",
+        "utm_source": "opcional",
+        "fbclid": "opcional"
+      }
+    },
+    {
+      "event": "click_whatsapp_contact",
+      "source": "MarketingFooter.tsx, LinksPage.tsx",
+      "when": "Clique no link WhatsApp",
+      "gtmTrigger": "Custom Event click_whatsapp_contact",
+      "metaPixel": null,
+      "ga4": "click_whatsapp_contact (custom)",
+      "samplePayload": {
+        "event": "click_whatsapp_contact",
+        "location": "footer | links_bio"
+      }
+    },
+    {
+      "event": "begin_signup",
+      "source": "front-end/src/pages/auth/SignupPage.tsx",
+      "when": "Montagem da página /auth/signup",
+      "gtmTrigger": "Custom Event begin_signup (criar se ausente)",
+      "metaPixel": "NÃO mapear StartTrial aqui",
+      "ga4": "begin_checkout ou custom",
+      "samplePayload": { "event": "begin_signup" }
+    },
+    {
+      "event": "lead_generated",
+      "source": "SignupPage.tsx — Passo 1 Continuar",
+      "when": "Passo 1 validado (F1)",
+      "gtmTrigger": "Evento - lead_generated",
+      "metaPixel": "Lead",
+      "ga4": "generate_lead",
+      "samplePayload": { "event": "lead_generated" }
+    },
+    {
+      "event": "initiate_checkout",
+      "source": "SignupPage.tsx — Passo 3 montado",
+      "when": "Usuário entra na tela do cartão",
+      "gtmTrigger": "Evento - initiate_checkout",
+      "metaPixel": "InitiateCheckout",
+      "ga4": "begin_checkout",
+      "samplePayload": {
+        "event": "initiate_checkout",
+        "ecommerce": {
+          "currency": "BRL",
+          "value": 59.9,
+          "items": [
+            {
+              "item_id": "marketchat_monthly",
+              "item_name": "MarketChat — Assinatura mensal",
+              "price": 59.9,
+              "quantity": 1
+            }
+          ]
+        },
+        "user_data": {
+          "email_address": "sha256 hex",
+          "phone_number": "sha256 hex"
+        }
+      }
+    },
+    {
+      "event": "add_payment_info",
+      "source": "SignupPage.tsx — submitRegister, ANTES do POST",
+      "when": "Clique em finalizar cadastro / pagar",
+      "gtmTrigger": "Evento - add_payment_info",
+      "metaPixel": "AddPaymentInfo",
+      "ga4": "add_payment_info",
+      "samplePayload": {
+        "event": "add_payment_info",
+        "ecommerce": {
+          "currency": "BRL",
+          "value": 59.9,
+          "items": [
+            {
+              "item_id": "marketchat_monthly",
+              "item_name": "MarketChat — Assinatura mensal",
+              "price": 59.9,
+              "quantity": 1
+            }
+          ]
+        },
+        "user_data": {
+          "email_address": "sha256 hex",
+          "phone_number": "sha256 hex"
+        }
+      },
+      "warning": "NÃO usar AddToCart — evento inexistente no código"
+    },
+    {
+      "event": "sign_up",
+      "source": "SignupPage.tsx — após register OK",
+      "when": "POST /api/auth/register/ 201",
+      "gtmTrigger": "Custom Event sign_up",
+      "metaPixel": "CompleteRegistration (recomendado ligar tag)",
+      "ga4": "sign_up",
+      "samplePayload": {
+        "event": "sign_up",
+        "method": "email"
+      }
+    },
+    {
+      "event": "start_trial",
+      "source": "SignupPage.tsx — após register OK",
+      "when": "Imediatamente após sign_up no mesmo fluxo de sucesso",
+      "gtmTrigger": "Evento - start_trial",
+      "metaPixel": "StartTrial",
+      "ga4": "start_trial (custom)",
+      "samplePayload": {
+        "event": "start_trial",
+        "currency": "BRL",
+        "value": 59.9,
+        "hashed_email": "sha256 hex",
+        "hashed_phone": "sha256 hex"
+      },
+      "guardrail": "Nunca mapear para begin_signup, lead_generated, click_cta_trial ou PageView"
+    },
+    {
+      "event": "login",
+      "source": "front-end/src/components/auth/SignInForm.tsx",
+      "when": "Login bem-sucedido",
+      "gtmTrigger": "Custom Event login",
+      "metaPixel": null,
+      "ga4": "login",
+      "samplePayload": { "event": "login" }
+    },
+    {
+      "event": "links_page_view",
+      "source": "front-end/src/pages/marketing/LinksPage.tsx",
+      "when": "Montagem /links",
+      "gtmTrigger": "Custom Event links_page_view",
+      "metaPixel": "ViewContent (opcional)",
+      "ga4": "page_view ou custom",
+      "samplePayload": { "event": "links_page_view" }
+    },
+    {
+      "event": "request_withdrawal",
+      "source": "front-end/src/components/financial/FinancialSummaryCards.tsx",
+      "when": "Solicitação de saque no painel",
+      "gtmTrigger": "Custom Event request_withdrawal",
+      "metaPixel": null,
+      "ga4": "request_withdrawal (custom)",
+      "samplePayload": { "event": "request_withdrawal" }
+    }
+  ],
+  "serverSideEvents": [
+    {
+      "event": "StartTrial",
+      "source": "apps/accounts/services/registration.py → FacebookCAPI",
+      "when": "Após create_trial_subscription OK",
+      "dedupeEventId": "start_trial_tenant_{tenant_id}",
+      "channel": "Meta Conversions API (server)"
+    },
+    {
+      "event": "Purchase",
+      "source": "Webhook Asaas pagamento confirmado",
+      "when": "Primeira cobrança pós-trial",
+      "channel": "Meta Conversions API (server)",
+      "note": "NÃO configurar Purchase no browser/GTM"
+    }
+  ],
+  "gtmConfiguration": {
+    "triggers": [
+      {
+        "name": "Evento - lead_generated",
+        "type": "Custom Event",
+        "eventName": "lead_generated",
+        "tagsLinked": ["Meta Pixel - Lead", "GA4 - generate_lead"]
+      },
+      {
+        "name": "Evento - initiate_checkout",
+        "type": "Custom Event",
+        "eventName": "initiate_checkout",
+        "tagsLinked": ["Meta Pixel - InitiateCheckout", "GA4 - begin_checkout"]
+      },
+      {
+        "name": "Evento - add_payment_info",
+        "type": "Custom Event",
+        "eventName": "add_payment_info",
+        "tagsLinked": ["Meta Pixel - AddPaymentInfo", "GA4 - add_payment_info"]
+      },
+      {
+        "name": "Evento - start_trial",
+        "type": "Custom Event",
+        "eventName": "start_trial",
+        "tagsLinked": ["Meta Pixel - StartTrial", "GA4 - start_trial"]
+      },
+      {
+        "name": "click_cta_trial",
+        "type": "Custom Event",
+        "eventName": "click_cta_trial",
+        "tagsLinked": ["GA4 - click_cta_trial (recomendado)"]
+      },
+      {
+        "name": "click_whatsapp_contact",
+        "type": "Custom Event",
+        "eventName": "click_whatsapp_contact",
+        "tagsLinked": []
+      },
+      {
+        "name": "sign_up",
+        "type": "Custom Event",
+        "eventName": "sign_up",
+        "tagsLinked": ["Meta Pixel - CompleteRegistration (recomendado)", "GA4 - sign_up"]
+      },
+      {
+        "name": "begin_signup",
+        "type": "Custom Event",
+        "eventName": "begin_signup",
+        "tagsLinked": ["GA4 custom — NÃO StartTrial"]
+      }
+    ],
+    "variables": [
+      {
+        "name": "DL - ecommerce.value",
+        "type": "Data Layer Variable",
+        "key": "ecommerce.value"
+      },
+      {
+        "name": "DL - ecommerce.currency",
+        "type": "Data Layer Variable",
+        "key": "ecommerce.currency"
+      },
+      {
+        "name": "DL - user_data.email_address",
+        "type": "Data Layer Variable",
+        "key": "user_data.email_address"
+      },
+      {
+        "name": "DL - user_data.phone_number",
+        "type": "Data Layer Variable",
+        "key": "user_data.phone_number"
+      },
+      {
+        "name": "DL - hashed_email",
+        "type": "Data Layer Variable",
+        "key": "hashed_email"
+      },
+      {
+        "name": "DL - hashed_phone",
+        "type": "Data Layer Variable",
+        "key": "hashed_phone"
+      },
+      {
+        "name": "DL - value (start_trial)",
+        "type": "Data Layer Variable",
+        "key": "value"
+      },
+      {
+        "name": "DL - currency",
+        "type": "Data Layer Variable",
+        "key": "currency"
+      }
+    ],
+    "tags": [
+      {
+        "name": "Meta Pixel - Base",
+        "type": "Meta Pixel",
+        "trigger": "All Pages (após consent_granted)",
+        "eventName": "PageView",
+        "notes": "Origem dos PageView no Events Manager"
+      },
+      {
+        "name": "Meta Pixel - Lead",
+        "type": "Meta Pixel",
+        "trigger": "Evento - lead_generated",
+        "eventName": "Lead",
+        "parameters": {
+          "value": "{{DL - ecommerce.value}}",
+          "currency": "{{DL - ecommerce.currency}}"
+        }
+      },
+      {
+        "name": "Meta Pixel - InitiateCheckout",
+        "type": "Meta Pixel",
+        "trigger": "Evento - initiate_checkout",
+        "eventName": "InitiateCheckout",
+        "parameters": {
+          "value": "{{DL - ecommerce.value}}",
+          "currency": "{{DL - ecommerce.currency}}"
+        },
+        "advancedMatching": ["email_address", "phone_number from user_data hashes"]
+      },
+      {
+        "name": "Meta Pixel - AddPaymentInfo",
+        "type": "Meta Pixel",
+        "trigger": "Evento - add_payment_info",
+        "eventName": "AddPaymentInfo",
+        "parameters": {
+          "value": "{{DL - ecommerce.value}}",
+          "currency": "{{DL - ecommerce.currency}}"
+        },
+        "warning": "Event name DEVE ser AddPaymentInfo, NÃO AddToCart"
+      },
+      {
+        "name": "Meta Pixel - StartTrial",
+        "type": "Meta Pixel",
+        "trigger": "Evento - start_trial",
+        "eventName": "StartTrial",
+        "parameters": {
+          "value": "{{DL - value}}",
+          "currency": "{{DL - currency}}"
+        },
+        "advancedMatching": ["hashed_email", "hashed_phone"]
+      },
+      {
+        "name": "Meta Pixel - CompleteRegistration",
+        "type": "Meta Pixel",
+        "trigger": "sign_up",
+        "eventName": "CompleteRegistration",
+        "status": "recomendado — trigger existia com 0 tags"
+      },
+      {
+        "name": "GA4 - generate_lead",
+        "type": "Google Analytics: GA4 Event",
+        "trigger": "Evento - lead_generated",
+        "eventName": "generate_lead"
+      },
+      {
+        "name": "GA4 - begin_checkout",
+        "type": "Google Analytics: GA4 Event",
+        "trigger": "Evento - initiate_checkout",
+        "eventName": "begin_checkout",
+        "ecommerce": true
+      },
+      {
+        "name": "GA4 - add_payment_info",
+        "type": "Google Analytics: GA4 Event",
+        "trigger": "Evento - add_payment_info",
+        "eventName": "add_payment_info",
+        "ecommerce": true
+      },
+      {
+        "name": "GA4 - sign_up",
+        "type": "Google Analytics: GA4 Event",
+        "trigger": "sign_up",
+        "eventName": "sign_up"
+      },
+      {
+        "name": "GA4 - start_trial",
+        "type": "Google Analytics: GA4 Event",
+        "trigger": "Evento - start_trial",
+        "eventName": "start_trial"
+      }
+    ]
+  },
+  "facebookEventsManagerMapping": {
+    "PageView": "Meta Pixel - Base (All Pages)",
+    "ViewContent": "Verificar tag All Pages ou begin_signup — não há evento view_content no código",
+    "Lead": "Evento - lead_generated → Passo 1 F1",
+    "InitiateCheckout": "Evento - initiate_checkout → Passo 3 montado",
+    "AddPaymentInfo": "Evento - add_payment_info → clique pagar (antes do POST)",
+    "AddToCart": "ANOMALIA — não existe no código; revisar tags duplicadas no GTM",
+    "StartTrial": "Evento - start_trial → após register OK (+ CAPI server-side)",
+    "CompleteRegistration": "sign_up → tag ainda não ligada (0 tags hoje)",
+    "Purchase": "Somente CAPI server-side (webhook Asaas)"
+  },
+  "debugConsole": {
+    "listFunnelEvents": "window.dataLayer.filter(e => ['click_cta_trial','begin_signup','lead_generated','initiate_checkout','add_payment_info','sign_up','start_trial'].includes(e.event))",
+    "expectedOrderOnSuccessfulSignup": [
+      "begin_signup",
+      "lead_generated",
+      "initiate_checkout",
+      "add_payment_info",
+      "sign_up",
+      "start_trial"
+    ],
+    "note": "start_trial deve ser o último; lead_generated ocorre no Passo 1, initiate_checkout no Passo 3"
+  }
+}

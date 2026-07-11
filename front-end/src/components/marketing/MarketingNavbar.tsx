@@ -3,6 +3,7 @@ import { Menu, X } from "lucide-react";
 import { getAppUrl } from "../../utils/host";
 import { CTA_LOCATIONS } from "../../constants/analyticsEvents";
 import {
+  CONSULTATIVE_NAV_ANCHORS,
   CTA_LOGIN_LINK_CLASS,
   CTA_PRIMARY_CLASS,
   CTA_TRIAL_PRIMARY,
@@ -10,9 +11,16 @@ import {
 } from "../../constants/marketingCopy";
 import MarketingBrandLogo, { MARKETING_LOGO_CLASS } from "./MarketingBrandLogo";
 import MarketingCtaLink from "./MarketingCtaLink";
+import MarketingConsultativeCta from "./MarketingConsultativeCta";
 
-export default function MarketingNavbar() {
+type MarketingNavbarProps = {
+  variant?: "default" | "consultative";
+};
+
+export default function MarketingNavbar({ variant = "default" }: MarketingNavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const isConsultative = variant === "consultative";
+  const anchors = isConsultative ? CONSULTATIVE_NAV_ANCHORS : NAV_ANCHORS;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -39,7 +47,7 @@ export default function MarketingNavbar() {
         </a>
 
         <nav className="hidden items-center gap-8 md:flex" aria-label="Principal">
-          {NAV_ANCHORS.map((link) => (
+          {anchors.map((link) => (
             <a
               key={link.href}
               href={link.href}
@@ -51,13 +59,20 @@ export default function MarketingNavbar() {
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <MarketingCtaLink
-            path="/auth/signup"
-            className={`${CTA_PRIMARY_CLASS} px-4 py-2.5 text-sm sm:px-6 sm:py-3`}
-            analyticsLocation={CTA_LOCATIONS.NAVBAR}
-          >
-            {CTA_TRIAL_PRIMARY}
-          </MarketingCtaLink>
+          {isConsultative ? (
+            <MarketingConsultativeCta
+              className={`${CTA_PRIMARY_CLASS} px-4 py-2.5 text-sm sm:px-6 sm:py-3`}
+              analyticsLocation={CTA_LOCATIONS.NAVBAR}
+            />
+          ) : (
+            <MarketingCtaLink
+              path="/auth/signup"
+              className={`${CTA_PRIMARY_CLASS} px-4 py-2.5 text-sm sm:px-6 sm:py-3`}
+              analyticsLocation={CTA_LOCATIONS.NAVBAR}
+            >
+              {CTA_TRIAL_PRIMARY}
+            </MarketingCtaLink>
+          )}
           <a href={getAppUrl()} className={`hidden md:inline-flex ${CTA_LOGIN_LINK_CLASS}`}>
             Acessar sistema
           </a>
@@ -76,7 +91,7 @@ export default function MarketingNavbar() {
       {menuOpen ? (
         <div className="border-t border-gray-200 bg-white md:hidden">
           <nav className="mx-auto flex max-w-7xl flex-col px-4 py-4" aria-label="Menu mobile">
-            {NAV_ANCHORS.map((link) => (
+            {anchors.map((link) => (
               <a
                 key={link.href}
                 href={link.href}

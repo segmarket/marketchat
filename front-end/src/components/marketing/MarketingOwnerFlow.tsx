@@ -61,14 +61,18 @@ function alertStyles(tone: "error" | "warning" | "brand") {
   return "border-brand-200 bg-brand-50";
 }
 
-export default function MarketingOwnerFlow() {
+export default function MarketingOwnerFlow({ variant = "default" }: { variant?: "default" | "consultative" }) {
+  const isConsultative = variant === "consultative";
+
   return (
     <section
       id="para-o-dono"
-      className="scroll-mt-24 bg-slate-50 px-4 py-20 sm:px-6 lg:px-8"
+      className={`scroll-mt-24 px-4 sm:px-6 lg:px-8 ${
+        isConsultative ? "bg-white py-12 sm:py-14" : "bg-slate-50 py-20"
+      }`}
     >
-      <div className="mx-auto max-w-7xl">
-        <div className="flex flex-col gap-12 lg:grid lg:grid-cols-2 lg:items-start lg:gap-16">
+      <div className={`mx-auto ${isConsultative ? "max-w-6xl" : "max-w-7xl"}`}>
+        <div className="flex flex-col gap-10 lg:grid lg:grid-cols-2 lg:items-start lg:gap-12">
           <div className="order-1">
             <h2 className="text-3xl font-bold text-gray-900 sm:text-4xl">
               Seus olhos e ouvidos dentro de cada condomínio.

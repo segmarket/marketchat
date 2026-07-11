@@ -3,6 +3,7 @@ import {
   hasMarketingConsent,
 } from "../features/marketing/cookieConsent";
 import { isAppHost } from "./host";
+import { initMetaPixel } from "./metaPixel";
 
 declare global {
   interface Window {
@@ -180,9 +181,11 @@ export function loadGtm(containerId: string): void {
   }
 }
 
-/** Carrega apenas o GTM; Pixel e GA4 devem ser tags dentro do container. */
+/** Carrega Meta Pixel (PageView) e GTM após consentimento LGPD. */
 export function enableMarketingTracking(): void {
   pushConsentUpdate(true);
+
+  initMetaPixel();
 
   const gtmId = getGtmContainerId();
   if (gtmId) {

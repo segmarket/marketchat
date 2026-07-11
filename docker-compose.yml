@@ -41,6 +41,8 @@ services:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://staging-app.marketchat.com.br}
         VITE_APP_ORIGIN: ${VITE_APP_ORIGIN:-https://staging-app.marketchat.com.br}
         VITE_MARKETING_ORIGIN: ${VITE_MARKETING_ORIGIN:-https://staging.marketchat.com.br}
+        VITE_GTM_ID: ${VITE_GTM_ID:-}
+        VITE_META_PIXEL_ID: ${VITE_META_PIXEL_ID:-}
         VITE_PLAN_PRICE: ${VITE_PLAN_PRICE:-59,90}
         VITE_TRIAL_SUBSCRIPTION_PRICE: ${VITE_TRIAL_SUBSCRIPTION_PRICE:-59,90}
     container_name: marketchat_frontend_staging

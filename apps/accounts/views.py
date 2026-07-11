@@ -11,12 +11,14 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 
 from apps.accounts.serializers import (
     ChangePasswordSerializer,
+    ConsultativeLeadSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     RegisterSerializer,
     SignupLeadSerializer,
     TenantTokenObtainPairSerializer,
 )
+from apps.accounts.services.lead_alerts import notify_sales_new_lead_f1
 from apps.accounts.services.leads import (
     format_company_address,
     upsert_signup_lead_f1,
@@ -84,6 +86,25 @@ class MeView(APIView):
                 "is_in_grace_period": is_in_grace_period,
                 "days_overdue": days_overdue,
             }
+        )
+
+
+class ConsultativeLeadView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = ConsultativeLeadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        lead = upsert_signup_lead_f1(
+            full_name=data["full_name"],
+            email=data["email"],
+            phone=data["phone"],
+        )
+        notify_sales_new_lead_f1(lead)
+        return Response(
+            {"id": lead.id, "status": lead.status, "lead_type": lead.lead_type},
+            status=status.HTTP_201_CREATED,
         )
 
 

@@ -3,7 +3,9 @@ import ChatMockup from "./ChatMockup";
 import DashboardMockup from "./DashboardMockup";
 import { CTA_LOCATIONS } from "../../constants/analyticsEvents";
 import MarketingCtaLink from "./MarketingCtaLink";
+import MarketingConsultativeCta from "./MarketingConsultativeCta";
 import {
+  CONSULTATIVE_HERO_MICROCOPY,
   CTA_HOW_IT_WORKS,
   CTA_PRIMARY_LARGE_CLASS,
   CTA_SECONDARY_CLASS,
@@ -14,7 +16,14 @@ import {
   MARKETING_BADGE,
 } from "../../constants/marketingCopy";
 
-export default function MarketingHero() {
+type MarketingHeroProps = {
+  variant?: "default" | "consultative";
+};
+
+export default function MarketingHero({ variant = "default" }: MarketingHeroProps) {
+  const isConsultative = variant === "consultative";
+  const microcopy = isConsultative ? CONSULTATIVE_HERO_MICROCOPY : HERO_MICROCOPY;
+
   return (
     <section
       id="marketing-hero"
@@ -30,12 +39,19 @@ export default function MarketingHero() {
           </h1>
           <p className="mt-6 text-lg leading-relaxed text-gray-600">{HERO_SUBTITLE}</p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-            <MarketingCtaLink
-              className={CTA_PRIMARY_LARGE_CLASS}
-              analyticsLocation={CTA_LOCATIONS.HERO}
-            >
-              {CTA_TRIAL_PRIMARY}
-            </MarketingCtaLink>
+            {isConsultative ? (
+              <MarketingConsultativeCta
+                className={CTA_PRIMARY_LARGE_CLASS}
+                analyticsLocation={CTA_LOCATIONS.HERO}
+              />
+            ) : (
+              <MarketingCtaLink
+                className={CTA_PRIMARY_LARGE_CLASS}
+                analyticsLocation={CTA_LOCATIONS.HERO}
+              >
+                {CTA_TRIAL_PRIMARY}
+              </MarketingCtaLink>
+            )}
             <a href="#para-o-dono" className={CTA_SECONDARY_CLASS}>
               {CTA_HOW_IT_WORKS}
             </a>
@@ -43,15 +59,15 @@ export default function MarketingHero() {
           <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600">
             <span className="inline-flex items-center gap-1.5">
               <Lock className="size-3.5 shrink-0 text-brand-500" aria-hidden />
-              {HERO_MICROCOPY[0]}
+              {microcopy[0]}
             </span>
             <span aria-hidden>•</span>
             <span className="inline-flex items-center gap-1.5">
               <Check className="size-3.5 shrink-0 text-green-600" aria-hidden />
-              {HERO_MICROCOPY[1]}
+              {microcopy[1]}
             </span>
             <span aria-hidden>•</span>
-            <span>{HERO_MICROCOPY[2]}</span>
+            <span>{microcopy[2]}</span>
           </p>
         </div>
 

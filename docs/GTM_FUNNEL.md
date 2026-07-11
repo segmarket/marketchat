@@ -1,6 +1,18 @@
 # Funil de conversão — dataLayer e GTM (MarketChat)
 
-O frontend React **não** chama Meta Pixel (`fbq`) nem GA4 (`gtag`) diretamente. Todos os eventos passam por `window.dataLayer.push` via [`front-end/src/utils/analytics.ts`](../front-end/src/utils/analytics.ts). Tags Meta Pixel e GA4 devem ser configuradas **no Google Tag Manager**.
+**PageView (Meta Pixel)** é disparado **diretamente no React** via [`front-end/src/utils/metaPixel.ts`](../front-end/src/utils/metaPixel.ts) após consentimento LGPD:
+
+```javascript
+fbq('init', VITE_META_PIXEL_ID);
+fbq('track', 'PageView');
+```
+
+- Variável: `VITE_META_PIXEL_ID` (ex.: `1009539298726554`).
+- Páginas públicas: landing, termos, privacidade, links, signup e login.
+- Navegação SPA: novo `PageView` em mudança de rota (sem re-init).
+- **GTM:** desative PageView na tag Meta "All Pages" para evitar duplicata.
+
+Os demais eventos de funil passam por `window.dataLayer.push` via [`front-end/src/utils/analytics.ts`](../front-end/src/utils/analytics.ts). Tags Meta (Lead, StartTrial, etc.) e GA4 ficam no **Google Tag Manager**.
 
 Purchase (pagamento confirmado) é enviado **server-side** via Meta Conversions API (Django + webhook Asaas) — não mapear Purchase no GTM a partir do browser.
 
@@ -140,6 +152,9 @@ Definidas em [`front-end/src/constants/analyticsEvents.ts`](../front-end/src/con
 
 ## Checklist GTM (configuração manual)
 
+- [ ] **Meta Pixel PageView:** desligado na tag GTM "All Pages" (PageView vem do React — `metaPixel.ts`)
+- [ ] `VITE_META_PIXEL_ID` definido no build do frontend (produção/staging)
+- [ ] Meta Pixel Helper: após aceitar cookies → **PageView — Pixel ID** visível
 - [ ] Trigger Meta StartTrial → Custom Event `start_trial` apenas
 - [ ] Trigger Meta Lead → Custom Event `lead_generated`
 - [ ] Trigger Meta InitiateCheckout → Custom Event `initiate_checkout`

@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router";
 import RedirectToAppHost from "../components/marketing/RedirectToAppHost";
+import ConsultativeLP from "../pages/marketing/ConsultativeLP";
 import LandingPage from "../pages/marketing/LandingPage";
 import LinksPage from "../pages/marketing/LinksPage";
 import PrivacyPolicyPage from "../pages/marketing/PrivacyPolicyPage";
@@ -9,6 +10,7 @@ export default function MarketingRoutes() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/consultoria" element={<ConsultativeLP />} />
       <Route path="/privacidade" element={<PrivacyPolicyPage />} />
       <Route path="/termos" element={<TermsOfServicePage />} />
       <Route path="/links" element={<LinksPage />} />

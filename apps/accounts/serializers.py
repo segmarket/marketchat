@@ -53,6 +53,12 @@ class AttributionSerializer(serializers.Serializer):
     fbclid = serializers.CharField(required=False, allow_blank=True, default="")
 
 
+class ConsultativeLeadSerializer(serializers.Serializer):
+    full_name = serializers.CharField(max_length=255)
+    email = serializers.EmailField()
+    phone = serializers.CharField(max_length=32)
+
+
 class SignupLeadSerializer(serializers.Serializer):
     lead_type = serializers.ChoiceField(choices=["F1", "F2"], default="F1")
     full_name = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")

@@ -1,16 +1,25 @@
 import { Headphones, Layers, ShieldCheck, Sparkles } from "lucide-react";
-import { TRUST_GUARANTEES } from "../../constants/marketingCopy";
+import {
+  CONSULTATIVE_TRUST_GUARANTEES,
+  TRUST_GUARANTEES,
+} from "../../constants/marketingCopy";
 
 const ICONS = [Sparkles, ShieldCheck, Layers, Headphones] as const;
 
-export default function MarketingTrustBand() {
+type MarketingTrustBandProps = {
+  variant?: "default" | "consultative";
+};
+
+export default function MarketingTrustBand({ variant = "default" }: MarketingTrustBandProps) {
+  const items = variant === "consultative" ? CONSULTATIVE_TRUST_GUARANTEES : TRUST_GUARANTEES;
+
   return (
     <section
       aria-label="Garantias do MarketChat"
       className="border-y border-gray-200 bg-white px-4 py-10 sm:px-6 lg:px-8"
     >
       <div className="mx-auto grid max-w-7xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {TRUST_GUARANTEES.map((item, index) => {
+        {items.map((item, index) => {
           const Icon = ICONS[index] ?? ShieldCheck;
           return (
             <article

@@ -1,7 +1,10 @@
 import { Check } from "lucide-react";
 import { CTA_LOCATIONS } from "../../constants/analyticsEvents";
 import MarketingCtaLink from "./MarketingCtaLink";
+import MarketingConsultativeCta from "./MarketingConsultativeCta";
 import {
+  CONSULTATIVE_PRICING_BODY,
+  CONSULTATIVE_PRICING_FOOTER,
   CTA_PRIMARY_CLASS,
   CTA_TRIAL_LONG,
   PRICING_ANCHOR_SUFFIX,
@@ -19,7 +22,12 @@ const FEATURES = [
   "Gestão de Múltiplos Mercados",
 ] as const;
 
-export default function MarketingPricing() {
+type MarketingPricingProps = {
+  variant?: "default" | "consultative";
+};
+
+export default function MarketingPricing({ variant = "default" }: MarketingPricingProps) {
+  const isConsultative = variant === "consultative";
   const planPrice = planPriceDisplay();
   const dailyPrice = planDailyPriceLabel();
 
@@ -43,10 +51,16 @@ export default function MarketingPricing() {
           <p className="mt-2 text-sm font-medium text-brand-700">{dailyPrice}</p>
           <p className="mt-1 text-sm text-gray-600">{PRICING_ANCHOR_SUFFIX}</p>
           <p className="mt-6 text-sm leading-relaxed text-gray-600">
-            Acesso total ao ecossistema: gerente virtual no WhatsApp, Photo-Lock, central de
-            alertas em tempo real e gestão de vários condomínios. Comece com{" "}
-            <span className="font-semibold text-gray-900">7 dias de teste totalmente gratuitos</span>
-            .
+            {isConsultative ? (
+              CONSULTATIVE_PRICING_BODY
+            ) : (
+              <>
+                Acesso total ao ecossistema: gerente virtual no WhatsApp, Photo-Lock, central de
+                alertas em tempo real e gestão de vários condomínios. Comece com{" "}
+                <span className="font-semibold text-gray-900">7 dias de teste totalmente gratuitos</span>
+                .
+              </>
+            )}
           </p>
           <ul className="mt-8 space-y-3">
             {FEATURES.map((feature) => (
@@ -56,13 +70,22 @@ export default function MarketingPricing() {
               </li>
             ))}
           </ul>
-          <MarketingCtaLink
-            className={`mt-8 block w-full text-center ${CTA_PRIMARY_CLASS}`}
-            analyticsLocation={CTA_LOCATIONS.PRICING}
-          >
-            {CTA_TRIAL_LONG}
-          </MarketingCtaLink>
-          <p className="mt-4 text-center text-sm leading-relaxed text-gray-600">{PRICING_ANTI_FEAR}</p>
+          {isConsultative ? (
+            <MarketingConsultativeCta
+              className={`mt-8 block w-full text-center ${CTA_PRIMARY_CLASS}`}
+              analyticsLocation={CTA_LOCATIONS.PRICING}
+            />
+          ) : (
+            <MarketingCtaLink
+              className={`mt-8 block w-full text-center ${CTA_PRIMARY_CLASS}`}
+              analyticsLocation={CTA_LOCATIONS.PRICING}
+            >
+              {CTA_TRIAL_LONG}
+            </MarketingCtaLink>
+          )}
+          <p className="mt-4 text-center text-sm leading-relaxed text-gray-600">
+            {isConsultative ? CONSULTATIVE_PRICING_FOOTER : PRICING_ANTI_FEAR}
+          </p>
         </article>
       </div>
     </section>

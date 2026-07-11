@@ -1,20 +1,29 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { useLocation } from "react-router";
 import {
   CONSENT_CHANGE_EVENT,
   hasAnalyticsConsent,
   hasMarketingConsent,
   type CookieConsentPreferences,
 } from "../features/marketing/cookieConsent";
-import { isAppHost } from "../utils/host";
 import { enableMarketingTracking, disableMarketingTracking } from "../utils/analytics";
+import { isAppHost } from "../utils/host";
+import {
+  isMetaPixelInitialized,
+  isPublicPagePath,
+  trackMetaPageView,
+} from "../utils/metaPixel";
 
 function shouldEnableTracking(): boolean {
   if (hasMarketingConsent()) return true;
   return isAppHost() && hasAnalyticsConsent();
 }
 
-/** Ativa GTM/Meta Pixel somente após consentimento LGPD. */
+/** Ativa Meta Pixel + GTM somente após consentimento LGPD. */
 export function useAnalytics(): void {
+  const { pathname } = useLocation();
+  const isFirstPathEffect = useRef(true);
+
   useEffect(() => {
     if (shouldEnableTracking()) {
       enableMarketingTracking();
@@ -33,4 +42,16 @@ export function useAnalytics(): void {
     window.addEventListener(CONSENT_CHANGE_EVENT, onConsentChange);
     return () => window.removeEventListener(CONSENT_CHANGE_EVENT, onConsentChange);
   }, []);
+
+  useEffect(() => {
+    if (!shouldEnableTracking() || !isMetaPixelInitialized()) return;
+    if (!isPublicPagePath(pathname, isAppHost())) return;
+
+    if (isFirstPathEffect.current) {
+      isFirstPathEffect.current = false;
+      return;
+    }
+
+    trackMetaPageView();
+  }, [pathname]);
 }

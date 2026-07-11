@@ -3,6 +3,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from apps.accounts.views import (
     ChangePasswordView,
+    ConsultativeLeadView,
     MeView,
     PasswordResetConfirmView,
     PasswordResetRequestView,
@@ -13,6 +14,7 @@ from apps.accounts.views import (
 
 urlpatterns = [
     path("me/", MeView.as_view(), name="auth-me"),
+    path("consultative-lead/", ConsultativeLeadView.as_view(), name="auth-consultative-lead"),
     path("signup-lead/", SignupLeadView.as_view(), name="auth-signup-lead"),
     path("register/", RegisterView.as_view(), name="auth-register"),
     path("token/", TenantTokenObtainPairView.as_view(), name="token_obtain_pair"),

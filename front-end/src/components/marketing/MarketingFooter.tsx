@@ -12,6 +12,7 @@ import { trackEvent } from "../../utils/analytics";
 import { getAppUrl } from "../../utils/host";
 import MarketchatLogo, { MARKETCHAT_LOGO_FOOTER_CLASS } from "../brand/MarketchatLogo";
 import MarketingCtaLink from "./MarketingCtaLink";
+import MarketingConsultativeCta from "./MarketingConsultativeCta";
 import { InstagramIcon, WhatsAppIcon } from "./MarketingSocialIcons";
 
 type SocialIcon = ComponentType<SVGProps<SVGSVGElement>>;
@@ -32,6 +33,14 @@ const NAV_LINKS = [
   { label: "Para o dono", href: "#para-o-dono" },
   { label: "Preços", href: "#precos" },
   { label: "FAQ", href: "#faq" },
+  { label: "Privacidade", href: "/privacidade" },
+  { label: "Termos de Uso", href: "/termos" },
+] as const;
+
+const CONSULTATIVE_FOOTER_LINKS = [
+  { label: "Soluções", href: "#pilares" },
+  { label: "Como funciona", href: "#para-o-dono" },
+  { label: "Dúvidas", href: "#faq" },
   { label: "Privacidade", href: "/privacidade" },
   { label: "Termos de Uso", href: "/termos" },
 ] as const;
@@ -70,8 +79,10 @@ function trackWhatsAppClick(location: string) {
   trackEvent(ANALYTICS_EVENTS.CLICK_WHATSAPP, { location });
 }
 
-export default function MarketingFooter() {
+export default function MarketingFooter({ variant = "default" }: { variant?: "default" | "consultative" }) {
   const year = new Date().getFullYear();
+  const isConsultative = variant === "consultative";
+  const navLinks = isConsultative ? CONSULTATIVE_FOOTER_LINKS : NAV_LINKS;
 
   const productLinks = [
     { label: "Acessar o sistema", href: getAppUrl() },
@@ -123,7 +134,7 @@ export default function MarketingFooter() {
           <div className="lg:col-span-2">
             <FooterHeading>Institucional</FooterHeading>
             <ul className="mt-4 space-y-3">
-              {NAV_LINKS.map((link) => (
+              {navLinks.map((link) => (
                 <li key={link.href}>
                   <FooterLink href={link.href}>{link.label}</FooterLink>
                 </li>
@@ -135,15 +146,26 @@ export default function MarketingFooter() {
           <div className="lg:col-span-2">
             <FooterHeading>Produto</FooterHeading>
             <ul className="mt-4 space-y-3">
-              <li>
-                <MarketingCtaLink
-                  path="/auth/signup"
-                  className="text-sm text-gray-300 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded-sm"
-                  analyticsLocation={CTA_LOCATIONS.FOOTER}
-                >
-                  Começar 7 dias grátis
-                </MarketingCtaLink>
-              </li>
+              {isConsultative ? (
+                <li>
+                  <MarketingConsultativeCta
+                    className="text-sm text-gray-300 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded-sm"
+                    analyticsLocation={CTA_LOCATIONS.FOOTER}
+                  >
+                    Solicitar consultoria
+                  </MarketingConsultativeCta>
+                </li>
+              ) : (
+                <li>
+                  <MarketingCtaLink
+                    path="/auth/signup"
+                    className="text-sm text-gray-300 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 rounded-sm"
+                    analyticsLocation={CTA_LOCATIONS.FOOTER}
+                  >
+                    Começar 7 dias grátis
+                  </MarketingCtaLink>
+                </li>
+              )}
               {productLinks.map((link) => (
                 <li key={link.label}>
                   <FooterLink

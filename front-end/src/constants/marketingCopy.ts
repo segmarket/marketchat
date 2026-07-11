@@ -11,6 +11,84 @@ export const CTA_TRIAL_PRIMARY = "Testar 7 dias grátis";
 export const CTA_TRIAL_LONG = "Começar meus 7 dias grátis";
 export const CTA_HOW_IT_WORKS = "Ver como funciona";
 
+export const CONSULTATIVE_BADGE = "Consultoria gratuita para mercados autônomos";
+export const CONSULTATIVE_HEADLINE = "Descubra como automatizar seu mercado autônomo";
+export const CONSULTATIVE_SUBTITLE =
+  "Fale com nossa equipe e receba uma orientação personalizada sobre bot de WhatsApp, estoque e operação — sem compromisso.";
+export const CONSULTATIVE_FORM_TITLE = "Ganhe 7 dias grátis";
+export const CONSULTATIVE_FORM_DESCRIPTION =
+  "Preencha seus dados que logo um de nossos consultores irá te chamar no WhatsApp para você ganhar seus 7 dias grátis.";
+export const CONSULTATIVE_FORM_CTA = "Quero meus 7 dias grátis";
+export const CONSULTATIVE_SUCCESS_TITLE = "Recebemos seu interesse!";
+export const CONSULTATIVE_SUCCESS_BODY =
+  "Um consultor entrará em contato via WhatsApp em breve";
+export const CONSULTATIVE_WHATSAPP_CTA = "Falar no WhatsApp";
+
+export const CONSULTATIVE_HERO_MICROCOPY = [
+  "Consultoria gratuita",
+  "Sem compromisso",
+  "Resposta em até 1 dia útil",
+] as const;
+
+export const CONSULTATIVE_PRICING_BODY =
+  "Acesso total ao ecossistema: gerente virtual no WhatsApp, Photo-Lock, central de alertas em tempo real e gestão de vários condomínios. Fale com um especialista para entender o melhor caminho para sua operação.";
+
+export const CONSULTATIVE_PRICING_FOOTER =
+  "Nossa equipe orienta você sobre implementação, cronograma e investimento — sem pressão comercial.";
+
+export const CONSULTATIVE_NAV_ANCHORS = [
+  { label: "Soluções", href: "#pilares" },
+  { label: "Como funciona", href: "#para-o-dono" },
+  { label: "Dúvidas", href: "#faq" },
+] as const;
+
+export const CONSULTATIVE_TRUST_GUARANTEES = [
+  {
+    title: "Consultoria sem compromisso",
+    description: "Entenda como o MarketChat se encaixa na sua operação antes de qualquer decisão.",
+  },
+  {
+    title: "Especialista no seu segmento",
+    description: "Orientação prática para mercados autônomos em condomínios e operações multi-unidade.",
+  },
+  {
+    title: "Vários mercados, um painel",
+    description: "Veja como centralizar alertas, vendas e moradores em um único lugar.",
+  },
+  {
+    title: "Suporte humano",
+    description: "Nossa equipe acompanha você pelo WhatsApp durante toda a jornada.",
+  },
+] as const;
+
+export const CONSULTATIVE_FAQ_ITEMS = [
+  {
+    question: "Como funciona a consultoria?",
+    answer:
+      "Você preenche o formulário e nossa equipe entra em contato para entender sua operação, volume de mercados e principais desafios. A partir daí, indicamos o melhor caminho de implementação.",
+  },
+  {
+    question: "Preciso instalar algum equipamento?",
+    answer:
+      "Não. O morador usa o WhatsApp que já tem no celular. Você configura o mercado no painel e conecta o número do estabelecimento.",
+  },
+  {
+    question: "Funciona com vários mercados?",
+    answer:
+      "Sim. Um único painel para acompanhar vendas, alertas e moradores em todos os condomínios da sua operação.",
+  },
+  {
+    question: "A IA conversa bem com o morador?",
+    answer:
+      "Sim. O tom é amigável para compras e dúvidas reais, e firme e profissional em situações de provocação ou abuso.",
+  },
+  {
+    question: "Quanto tempo leva para começar?",
+    answer:
+      "Na consultoria explicamos o cronograma típico: configuração do painel, conexão do WhatsApp e primeiros fluxos de atendimento — geralmente em poucos dias.",
+  },
+] as const;
+
 export const HERO_MICROCOPY = [
   "7 dias grátis",
   "Cancele quando quiser",
