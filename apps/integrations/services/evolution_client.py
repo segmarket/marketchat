@@ -82,7 +82,7 @@ def _parse_fetch_instances_payload(payload: Any) -> list[dict[str, Any]]:
 class EvolutionClient:
     """Cliente para Evolution GO. Não confundir com Evolution API (Node)."""
 
-    DEFAULT_EVENTS = ("MESSAGE", "CONNECTION", "QRCODE")
+    DEFAULT_EVENTS = ("MESSAGE", "CONNECTION", "QRCODE", "PRESENCE")
 
     def __init__(self, base_url: str | None = None, global_api_key: str | None = None):
         self.base_url = (

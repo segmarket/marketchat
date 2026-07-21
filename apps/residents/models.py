@@ -101,6 +101,17 @@ class ChatSession(models.Model):
         db_index=True,
         help_text="Evita envio duplicado do encerramento por inatividade.",
     )
+    is_bot_active = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text="Se False, o chatbot não responde automaticamente (atendimento humano).",
+    )
+    last_human_interaction_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Horário da última mensagem ou toggle do atendente humano.",
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

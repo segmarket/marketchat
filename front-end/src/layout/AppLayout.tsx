@@ -11,7 +11,9 @@ import AppHeader from "./AppHeader";
 import Backdrop from "./Backdrop";
 import AppSidebar from "./AppSidebar";
 
-const FULLSCREEN_ROUTES = ["/admin/chatbot-flows"];
+const FULLSCREEN_ROUTES = ["/admin/chatbot-flows", "/admin/chat-logs"];
+/** Rotas que pausam o poll global de notificações (canvas pesado). */
+const PAUSE_NOTIFICATION_POLL_ROUTES = ["/admin/chatbot-flows"];
 
 const LayoutContent: React.FC = () => {
   const { isExpanded, isHovered, isMobileOpen, closeMobileSidebar } = useSidebar();
@@ -27,6 +29,9 @@ const LayoutContent: React.FC = () => {
     }
   }, [pathname, search, closeMobileSidebar]);
   const isFullscreen = FULLSCREEN_ROUTES.some((route) => pathname.startsWith(route));
+  const pauseNotificationPoll = PAUSE_NOTIFICATION_POLL_ROUTES.some((route) =>
+    pathname.startsWith(route),
+  );
   const onBillingSettings = pathname.startsWith("/admin/settings");
   const onBillingBlocked = pathname.startsWith("/admin/billing-blocked");
 
@@ -39,14 +44,16 @@ const LayoutContent: React.FC = () => {
   }
 
   return (
-    <NotificationsProvider pollingEnabled={!isFullscreen}>
-      <div className="min-h-screen xl:flex">
+    <NotificationsProvider pollingEnabled={!pauseNotificationPoll}>
+      <div className={`${isFullscreen ? "h-dvh overflow-hidden" : "min-h-screen"} xl:flex`}>
         <div>
           <AppSidebar />
           <Backdrop />
         </div>
         <div
           className={`flex min-h-0 min-w-0 w-full flex-1 flex-col transition-all duration-300 ease-in-out ${
+            isFullscreen ? "h-full overflow-hidden" : ""
+          } ${
             isExpanded || isHovered ? "lg:ml-[290px]" : "lg:ml-[90px]"
           } ${isMobileOpen ? "ml-0" : ""}`}
         >

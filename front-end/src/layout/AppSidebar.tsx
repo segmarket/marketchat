@@ -37,7 +37,7 @@ const primaryNavItems: NavItem[] = [
     icon: <LayoutDashboard className="size-5" strokeWidth={2} />,
   },
   {
-    name: "Histórico de Chamados",
+    name: "Atendimento",
     path: "/admin/chat-logs",
     icon: <MessagesSquare className="size-5" strokeWidth={2} />,
   },

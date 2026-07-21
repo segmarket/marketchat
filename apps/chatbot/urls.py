@@ -9,6 +9,11 @@ from apps.chatbot.views import (
 )
 from apps.chatbot.views_analytics import ChatbotAnalyticsView
 from apps.chatbot.views_chat_logs import ChatLogsConversationView, ChatLogsListView
+from apps.chatbot.views_handover import (
+    ChatSessionAgentMessageView,
+    ChatSessionToggleBotView,
+)
+from apps.chatbot.views_inbox import ChatSessionInboxListView
 
 urlpatterns = [
     path("analytics/", ChatbotAnalyticsView.as_view(), name="chatbot-analytics"),
@@ -17,6 +22,21 @@ urlpatterns = [
         "logs/conversation/",
         ChatLogsConversationView.as_view(),
         name="chatbot-logs-conversation",
+    ),
+    path(
+        "sessions/",
+        ChatSessionInboxListView.as_view(),
+        name="chatbot-sessions-inbox",
+    ),
+    path(
+        "sessions/<int:pk>/toggle-bot/",
+        ChatSessionToggleBotView.as_view(),
+        name="chatbot-session-toggle-bot",
+    ),
+    path(
+        "sessions/<int:pk>/messages/",
+        ChatSessionAgentMessageView.as_view(),
+        name="chatbot-session-agent-message",
     ),
     path("workflows/", ChatbotWorkflowListView.as_view(), name="chatbot-workflows-list"),
     path(

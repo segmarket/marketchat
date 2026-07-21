@@ -33,6 +33,8 @@ type PageLayoutProps = {
   description?: string;
   /** Classes extras no card principal (ex.: `!p-0` para layout mestre-detalhe). */
   panelClassName?: string;
+  /** Classes extras no root (ex.: `h-full min-h-0 flex-1` em rotas fullscreen). */
+  className?: string;
   children: ReactNode;
 };
 
@@ -43,13 +45,14 @@ export default function AdminPageLayout({
   metaDescription,
   description,
   panelClassName = "",
+  className = "",
   children,
 }: PageLayoutProps) {
   const descriptionOutsideCard =
     Boolean(description) && (panelClassName.includes("!p-0") || panelClassName.includes(" p-0"));
 
   return (
-    <div className={adminPageRootClassName}>
+    <div className={`${adminPageRootClassName} ${className}`.trim()}>
       <PageMeta
         title={metaTitle ?? `${pageTitle} | MarketChat`}
         description={metaDescription ?? pageTitle}
@@ -57,7 +60,7 @@ export default function AdminPageLayout({
       />
       <PageBreadcrumb pageTitle={pageTitle} />
       {descriptionOutsideCard ? (
-        <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">{description}</p>
+        <p className="mb-4 shrink-0 text-sm text-gray-500 dark:text-gray-400">{description}</p>
       ) : null}
       <AdminPanelCard
         description={descriptionOutsideCard ? undefined : description}

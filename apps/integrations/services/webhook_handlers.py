@@ -8,6 +8,7 @@ from django.core.cache import cache
 
 from apps.chatbot.models import ChatMessageLog
 from apps.chatbot.services.chat_logging import get_or_create_chat_session, log_inbound
+from apps.chatbot.services.typing_presence import clear_typing, mark_typing
 from apps.residents.services.session_activity import touch_chat_session_activity
 from apps.residents.services.session_lazy_expiration import maybe_reset_stale_chat_session
 from apps.integrations.models import WhatsappInstance
@@ -40,6 +41,9 @@ from apps.tenants.context import tenant_scope
 
 logger = logging.getLogger(__name__)
 
+_TYPING_ACTIVE = frozenset({"composing", "typing", "recording"})
+_TYPING_CLEAR = frozenset({"paused", "available", "unavailable", "online", "offline"})
+
 
 def handle_evolution_webhook(event: EvolutionWebhookEvent, instance: WhatsappInstance) -> None:
     with tenant_scope(instance.tenant_id):
@@ -49,6 +53,14 @@ def handle_evolution_webhook(event: EvolutionWebhookEvent, instance: WhatsappIns
             _handle_connected(event, instance)
         elif event_name in ("DISCONNECTED", "LOGOUT"):
             _handle_disconnected(instance)
+        elif (
+            "PRESENCE" in event_name
+            or event_name in ("COMPOSING", "TYPING", "RECORDING", "PAUSED")
+            or event.presence in _TYPING_ACTIVE | _TYPING_CLEAR
+        ):
+            # Antes de CONNECTION: payloads de presença usam status/state e não devem
+            # ser interpretados como mudança de conexão WhatsApp.
+            _handle_presence(event, instance)
         elif "CONNECTION" in event_name or event.connection_state:
             _handle_connection(event, instance)
         elif "QRCODE" in event_name or "QR" in event_name:
@@ -61,6 +73,37 @@ def handle_evolution_webhook(event: EvolutionWebhookEvent, instance: WhatsappIns
                 event_name,
                 instance.instance_name,
             )
+
+
+def _handle_presence(event: EvolutionWebhookEvent, instance: WhatsappInstance) -> None:
+    if event.from_me or (event.remote_jid and event.remote_jid.endswith("@g.us")):
+        return
+
+    phone = jid_to_phone(event.remote_jid)
+    if not phone:
+        return
+
+    presence = (event.presence or "").strip().lower()
+    if not presence:
+        # Alguns payloads usam o próprio event_type como status.
+        presence = event.event_type.strip().lower()
+        if presence.startswith("presence"):
+            presence = ""
+
+    if not presence:
+        return
+
+    session = get_or_create_chat_session(instance.tenant_id, phone)
+    if presence in _TYPING_ACTIVE:
+        mark_typing(instance.tenant_id, session.id)
+        logger.debug(
+            "Presence typing: tenant=%s session=%s presence=%s",
+            instance.tenant_id,
+            session.id,
+            presence,
+        )
+    elif presence in _TYPING_CLEAR:
+        clear_typing(instance.tenant_id, session.id)
 
 
 def _handle_connected(event: EvolutionWebhookEvent, instance: WhatsappInstance) -> None:
@@ -194,6 +237,8 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
     )
     session = get_or_create_chat_session(instance.tenant_id, phone)
 
+    clear_typing(instance.tenant_id, session.id)
+
     resident_for_lazy = (
         Resident.objects.filter(
             tenant_id=instance.tenant_id,
@@ -210,8 +255,13 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
     touch_chat_session_activity(session)
     onboarded = resident_has_completed_onboarding(instance.tenant_id, phone)
 
+    from apps.chatbot.services.human_handover import ensure_bot_active_or_timeout
+
+    bot_should_reply = ensure_bot_active_or_timeout(session)
+
     if (
-        onboarded
+        bot_should_reply
+        and onboarded
         and has_image
         and session.state != ChatSession.State.AWAITING_PHOTO
     ):
@@ -225,7 +275,7 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
         )
         return
 
-    if onboarded and text:
+    if onboarded and text and bot_should_reply:
         from apps.chatbot.services.chat_context_cache import append_message
 
         append_message(
@@ -236,7 +286,7 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
         )
 
     intent_type = ""
-    if onboarded and text and session.state == ChatSession.State.IDLE:
+    if bot_should_reply and onboarded and text and session.state == ChatSession.State.IDLE:
         intent_type = classify_user_intent(
             text,
             tenant_id=instance.tenant_id,
@@ -262,6 +312,14 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
             message_kind=message_kind,
             evolution_message_id=event.message_id or "",
         )
+
+    if not bot_should_reply:
+        logger.info(
+            "WhatsApp MESSAGE em atendimento humano (bot pausado): tenant=%s phone=%s",
+            instance.tenant_id,
+            phone,
+        )
+        return
 
     if not onboarded:
         if not text:

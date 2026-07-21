@@ -58,6 +58,52 @@ class EvolutionWebhookEvent:
     message_kind: str = "text"
     interactive_id: str = ""
     raw_message: dict | None = None
+    presence: str = ""
+
+
+def _extract_presence_status(data: dict[str, Any]) -> str:
+    """Extrai status de presença (composing/typing/paused/…)."""
+    for key in ("presence", "Presence", "presences", "status", "State", "state"):
+        val = _ci_get(data, key)
+        if isinstance(val, str) and val.strip():
+            return val.strip().lower()
+        if isinstance(val, dict):
+            nested = _ci_get(val, "presence", "Presence", "status", "State", "state", "type")
+            if isinstance(nested, str) and nested.strip():
+                return nested.strip().lower()
+    info = _ci_get(data, "Info", "info")
+    if isinstance(info, dict):
+        nested = _ci_get(info, "Presence", "presence", "Status", "status")
+        if isinstance(nested, str) and nested.strip():
+            return nested.strip().lower()
+    return ""
+
+
+def _extract_presence_jid(data: dict[str, Any]) -> str:
+    """JID do contato em payloads de presença (nem sempre vêm em key/Info)."""
+    remote, _, _ = _extract_message_meta(data)
+    if remote:
+        return remote
+    for key in (
+        "remoteJid",
+        "RemoteJid",
+        "chat",
+        "Chat",
+        "from",
+        "From",
+        "jid",
+        "Jid",
+        "participant",
+        "Participant",
+    ):
+        val = _ci_get(data, key)
+        if isinstance(val, str) and "@" in val:
+            return val
+        if isinstance(val, dict):
+            nested = _ci_get(val, "remoteJid", "RemoteJid", "id", "Id")
+            if isinstance(nested, str) and "@" in nested:
+                return nested
+    return ""
 
 
 def parse_evolution_payload(body: dict[str, Any]) -> EvolutionWebhookEvent | None:
@@ -82,10 +128,27 @@ def parse_evolution_payload(body: dict[str, Any]) -> EvolutionWebhookEvent | Non
     for key in ("state", "status", "connection", "connectionStatus"):
         val = _ci_get(data, key)
         if isinstance(val, str):
-            connection_state = val.lower()
+            raw_state = val.lower().strip()
+            # Não confundir status de presença com estado de conexão.
+            if raw_state in (
+                "composing",
+                "typing",
+                "recording",
+                "paused",
+                "available",
+                "unavailable",
+                "online",
+                "offline",
+            ):
+                break
+            connection_state = raw_state
             break
 
     remote_jid, message_id, from_me = _extract_message_meta(data)
+    presence = _extract_presence_status(data) if isinstance(data, dict) else ""
+    if not remote_jid and isinstance(data, dict):
+        remote_jid = _extract_presence_jid(data)
+
     message_text = extract_message_text(data) if isinstance(data, dict) else ""
     interactive_id = extract_interactive_id(data) if isinstance(data, dict) else ""
     raw_message = extract_raw_message_dict(data) if isinstance(data, dict) else {}
@@ -119,6 +182,7 @@ def parse_evolution_payload(body: dict[str, Any]) -> EvolutionWebhookEvent | Non
         message_kind=message_kind,
         interactive_id=interactive_id,
         raw_message=raw_message or None,
+        presence=presence,
     )
 
 

@@ -48,4 +48,6 @@ class ChatConversationSerializer(serializers.Serializer):
     resident_phone = serializers.CharField()
     market_name = serializers.CharField()
     attendance_date = serializers.CharField()
+    is_bot_active = serializers.BooleanField()
+    last_human_interaction_at = serializers.DateTimeField(allow_null=True)
     messages = ChatLogMessageSerializer(many=True)

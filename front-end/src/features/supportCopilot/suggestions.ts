@@ -35,9 +35,9 @@ const SUGGESTIONS: Record<string, string[]> = {
     "O que são sessões automatizadas?",
   ],
   "chat-logs": [
-    "Como abrir a conversa completa?",
-    "Diferença entre inbound e outbound",
-    "Como filtrar por data?",
+    "Como pausar o bot e atender manualmente?",
+    "O que significa a aba Aguardando?",
+    "Por que a lista atualiza sozinha?",
   ],
   sales: [
     "O que é ticket médio?",

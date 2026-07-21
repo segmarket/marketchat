@@ -18,6 +18,7 @@ from apps.chatbot.services.chat_logs_query import (
     parse_list_params,
 )
 from apps.chatbot.services.chat_logs_query import _parse_date as parse_date_param
+from apps.chatbot.services.typing_presence import is_client_typing
 from apps.tenants.context import tenant_scope
 
 
@@ -87,11 +88,20 @@ class ChatLogsConversationView(APIView):
             return Response({"detail": "session_id inválido."}, status=400)
 
         attendance_date = parse_date_param(request.query_params.get("date"))
+        after_id: int | None = None
+        after_raw = request.query_params.get("after_id")
+        if after_raw not in (None, ""):
+            try:
+                after_id = int(after_raw)
+            except (TypeError, ValueError):
+                return Response({"detail": "after_id inválido."}, status=400)
+
         with tenant_scope(int(tenant_id)):
             header, logs = conversation_messages(
                 int(tenant_id),
                 session_id=session_id,
                 attendance_date=attendance_date,
+                after_id=after_id,
             )
         if not header:
             return Response({"detail": "Atendimento não encontrado."}, status=404)
@@ -99,6 +109,7 @@ class ChatLogsConversationView(APIView):
         return Response(
             {
                 **header,
+                "client_is_typing": is_client_typing(int(tenant_id), session_id),
                 "messages": ChatLogMessageSerializer(
                     logs,
                     many=True,

@@ -37,6 +37,7 @@ class ChatMessageLog(TenantAwareModel):
     class Direction(models.TextChoices):
         INBOUND = "INBOUND", "Morador"
         OUTBOUND = "OUTBOUND", "Bot"
+        AGENT = "AGENT", "Atendente"
 
     class IntentType(models.TextChoices):
         PURCHASE = "PURCHASE", "Compra"

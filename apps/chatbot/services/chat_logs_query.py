@@ -268,7 +268,8 @@ def conversation_messages(
     *,
     session_id: int,
     attendance_date: date | None = None,
-    limit: int = 100,
+    after_id: int | None = None,
+    limit: int = 200,
 ) -> tuple[dict[str, Any], list[ChatMessageLog]]:
     qs = ChatMessageLog.all_objects.filter(
         tenant_id=tenant_id,
@@ -276,8 +277,15 @@ def conversation_messages(
     ).select_related("resident", "market", "cart", "session")
     if attendance_date:
         qs = qs.filter(created_at__date=attendance_date)
+    if after_id is not None and after_id > 0:
+        qs = qs.filter(id__gt=after_id)
 
-    logs = list(qs.order_by("created_at")[:limit])
+    if after_id is not None and after_id > 0:
+        logs = list(qs.order_by("created_at", "id")[:limit])
+    else:
+        # Últimas N mensagens em ordem cronológica.
+        recent = list(qs.order_by("-created_at", "-id")[:limit])
+        logs = list(reversed(recent))
 
     session = logs[0].session if logs else None
     if session is None:
@@ -301,7 +309,23 @@ def conversation_messages(
                     market_name = log.market.name
                 break
     if not resident_name:
-        resident_name = session.temporary_name or ""
+        # Busca nome no histórico completo / residente quando after_id não traz logs.
+        name_log = (
+            ChatMessageLog.all_objects.filter(
+                tenant_id=tenant_id,
+                session_id=session_id,
+                resident__isnull=False,
+            )
+            .select_related("resident", "market")
+            .order_by("-created_at")
+            .first()
+        )
+        if name_log and name_log.resident:
+            resident_name = name_log.resident.name or ""
+            if name_log.market:
+                market_name = name_log.market.name
+        if not resident_name:
+            resident_name = session.temporary_name or ""
 
     header = {
         "session_id": session_id,
@@ -309,5 +333,11 @@ def conversation_messages(
         "resident_phone": session.phone_number,
         "market_name": market_name,
         "attendance_date": header_date.isoformat() if header_date else "",
+        "is_bot_active": session.is_bot_active,
+        "last_human_interaction_at": (
+            session.last_human_interaction_at.isoformat()
+            if session.last_human_interaction_at
+            else None
+        ),
     }
     return header, logs

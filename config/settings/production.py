@@ -20,9 +20,13 @@ _db["CONN_MAX_AGE"] = env.int("DB_CONN_MAX_AGE", default=0)  # noqa: F405
 _db["CONN_HEALTH_CHECKS"] = env.bool("DB_CONN_HEALTH_CHECKS", default=True)  # noqa: F405
 _db.setdefault("OPTIONS", {})
 _db["OPTIONS"]["connect_timeout"] = env.int("DB_CONNECT_TIMEOUT", default=10)  # noqa: F405
+_db["OPTIONS"]["application_name"] = env(  # noqa: F405
+    "DB_APPLICATION_NAME", default="marketchat"
+)
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    "apps.core.middleware.CloseDbConnectionsOnErrorMiddleware",
     *MIDDLEWARE[1:],
 ]

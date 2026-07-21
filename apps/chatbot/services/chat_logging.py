@@ -156,6 +156,29 @@ def log_outbound(
     )
 
 
+def log_agent_outbound(
+    *,
+    instance: WhatsappInstance,
+    phone: str,
+    message_text: str,
+    session: ChatSession | None = None,
+) -> ChatMessageLog | None:
+    """Registra mensagem enviada pelo atendente humano no painel."""
+    if not phone or not (message_text or "").strip():
+        return None
+    tenant_id = instance.tenant_id
+    session = session or get_or_create_chat_session(tenant_id, phone)
+    from apps.residents.services.session_activity import touch_chat_session_activity
+
+    touch_chat_session_activity(session)
+    return _create_log(
+        tenant_id=tenant_id,
+        session=session,
+        direction=ChatMessageLog.Direction.AGENT,
+        message_text=message_text,
+    )
+
+
 def log_inbound_image_from_cart(
     *,
     tenant_id: int,

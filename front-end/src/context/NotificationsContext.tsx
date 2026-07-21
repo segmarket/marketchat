@@ -18,13 +18,14 @@ import type { NotificationItem } from "../features/notifications/types";
 import { getAxiosErrorMessage } from "../utils/apiError";
 import { useAuth } from "./AuthContext";
 
-const POLL_INTERVAL_MS = 15_000;
+const POLL_INTERVAL_MS = 30_000;
+const POLL_BACKOFF_MS = 60_000;
 
 type NotificationsContextValue = {
   items: NotificationItem[];
   unreadCount: number;
   loading: boolean;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<boolean | void>;
   markRead: (id: number) => Promise<void>;
   markAllRead: () => Promise<void>;
 };
@@ -116,8 +117,10 @@ export function NotificationsProvider({
       setItems(results);
       setUnreadCount(typeof data.unread_count === "number" ? data.unread_count : 0);
       processNewNotifications(results);
+      return true;
     } catch (err) {
       console.error(getAxiosErrorMessage(err));
+      return false;
     } finally {
       setLoading(false);
     }
@@ -130,12 +133,27 @@ export function NotificationsProvider({
       return;
     }
 
-    void refresh();
-    const timer = window.setInterval(() => {
-      void refresh();
-    }, POLL_INTERVAL_MS);
+    let cancelled = false;
+    let timer: number | undefined;
 
-    return () => window.clearInterval(timer);
+    const schedule = (delay: number) => {
+      timer = window.setTimeout(async () => {
+        if (cancelled) return;
+        const ok = await refresh();
+        if (cancelled) return;
+        schedule(ok === false ? POLL_BACKOFF_MS : POLL_INTERVAL_MS);
+      }, delay);
+    };
+
+    void refresh().then((ok) => {
+      if (cancelled) return;
+      schedule(ok === false ? POLL_BACKOFF_MS : POLL_INTERVAL_MS);
+    });
+
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
   }, [pollingEnabled, tenantId, isAuthenticated, refresh]);
 
   const markRead = useCallback(
