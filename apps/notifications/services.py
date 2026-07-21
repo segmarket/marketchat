@@ -163,3 +163,43 @@ def create_occurrence_notification(
         is_read=False,
         intent_type=tag,
     )
+
+
+def create_product_suggestion_notification(
+    *,
+    tenant_id: int,
+    resident: Resident,
+    product_label: str,
+    original_message: str,
+) -> Notification | None:
+    """Notificação INFO no painel para sugestão de produto."""
+    market = resident.market if resident.market_id else None
+    since = timezone.now() - DEDUP_WINDOW
+    duplicate = Notification.all_objects.filter(
+        tenant_id=tenant_id,
+        is_read=False,
+        intent_type="PRODUCT_SUGGESTION",
+        market_id=resident.market_id,
+        created_at__gte=since,
+    ).exists()
+    if duplicate:
+        return None
+
+    name = resident_display_name(resident)
+    market_name = resident_market_name(resident)
+    product = (product_label or "").strip() or "produto"
+    excerpt = _truncate_message(original_message)
+    message = (
+        f"{name} sugeriu incluir {product} no mercado {market_name}."
+        + (f' Mensagem: "{excerpt}"' if excerpt else "")
+    )
+
+    return Notification.all_objects.create(
+        tenant_id=tenant_id,
+        market=market,
+        title="Sugestão de produto",
+        message=message,
+        severity=Notification.Severity.INFO,
+        is_read=False,
+        intent_type="PRODUCT_SUGGESTION",
+    )

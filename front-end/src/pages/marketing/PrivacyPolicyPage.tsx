@@ -58,12 +58,12 @@ export default function PrivacyPolicyPage() {
           </p>
           <ul className="mt-3 list-disc space-y-2 pl-5">
             <li>
-              <strong>Gateways de Pagamento (Asaas):</strong> Para processamento de assinaturas,
+              <strong>Gateways de pagamento:</strong> Para processamento de assinaturas,
               geração de cobranças Pix e transferências bancárias.
             </li>
             <li>
-              <strong>Provedores de Comunicação (Meta/Evolution API):</strong> Para tráfego de
-              mensagens no WhatsApp.
+              <strong>Provedores de comunicação:</strong> Para tráfego de mensagens no WhatsApp
+              (incluindo a infraestrutura oficial do WhatsApp Business).
             </li>
             <li>
               <strong>Hospedagem em Nuvem:</strong> Para armazenamento seguro do banco de dados e

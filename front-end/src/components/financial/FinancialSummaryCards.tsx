@@ -75,7 +75,7 @@ export default function FinancialSummaryCards({
               {formatBRL(balanceProcessing)}
             </p>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Saques Pix aguardando confirmação bancária no Asaas.
+              Saques Pix aguardando confirmação bancária.
             </p>
           </div>
           <div className="rounded-xl bg-gray-50 p-3 text-gray-500 dark:bg-white/5">

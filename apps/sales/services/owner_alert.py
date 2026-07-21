@@ -100,6 +100,44 @@ def notify_owner_restock_issue(
     )
 
 
+def build_owner_suggestion_body(
+    *,
+    resident: Resident,
+    product_label: str,
+) -> str:
+    market_name = resident.market.name if resident.market_id else "Condomínio"
+    resident_name = resident.name or resident.phone_number
+    product = product_label.strip() or "produto não identificado"
+    return (
+        f"💡 SUGESTÃO DE PRODUTO - {market_name}\n\n"
+        f"O morador {resident_name} sugeriu incluir {product} no catálogo do mercado."
+    )
+
+
+def notify_owner_product_suggestion(
+    *,
+    instance: WhatsappInstance,
+    resident: Resident,
+    product_label: str,
+    original_message: str,
+) -> None:
+    owner_phone = resolve_tenant_owner_phone(resident.tenant_id)
+    body = build_owner_suggestion_body(resident=resident, product_label=product_label)
+    if not owner_phone:
+        logger.warning(
+            "Sugestão de produto ignorada: sem telefone do tenant=%s",
+            resident.tenant_id,
+        )
+        return
+    send_whatsapp_reply(instance, owner_phone, body)
+    logger.info(
+        "Sugestão produto enviada: tenant=%s produto=%r msg=%r",
+        resident.tenant_id,
+        product_label,
+        original_message[:80],
+    )
+
+
 def notify_owner_support_issue(
     *,
     instance: WhatsappInstance,

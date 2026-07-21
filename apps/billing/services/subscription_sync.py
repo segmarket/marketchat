@@ -15,7 +15,8 @@ def update_tenant_subscription_value(
     client: AsaasClient | None = None,
 ) -> None:
     """
-    Sincroniza o valor da assinatura Asaas com a quantidade de mercados ativos.
+    Sincroniza o valor da assinatura Asaas com a soma dos preços dos mercados ativos
+    (custom_price por mercado ou MARKET_MONTHLY_PRICE).
     Sem mercados ativos: pausa assinatura (INACTIVE).
     """
     try:

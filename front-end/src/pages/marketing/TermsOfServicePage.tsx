@@ -80,7 +80,7 @@ export default function TermsOfServicePage() {
             <li>
               <strong>Saques:</strong> O saldo disponível pode ser transferido para a conta
               bancária do Cliente via chave Pix cadastrada no painel, sujeito aos prazos de
-              processamento do gateway parceiro (Asaas) e disponibilidade do sistema bancário.
+              processamento do gateway de pagamento e disponibilidade do sistema bancário.
             </li>
           </ul>
         </section>

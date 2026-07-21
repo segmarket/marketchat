@@ -43,13 +43,13 @@ export default function WhatsappHealthGrid({ evolutionApiStatus, webhookStatus }
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <HealthCard
-        title="Evolution API"
-        subtitle="Serviço de conexão WhatsApp"
+        title="Conexão WhatsApp"
+        subtitle="Serviço de mensagens da plataforma"
         status={evolutionApiStatus}
       />
       <HealthCard
-        title="Webhook"
-        subtitle="Eventos recebidos nos últimos 10 min"
+        title="Recebimento de eventos"
+        subtitle="Mensagens recebidas nos últimos 10 min"
         status={webhookStatus}
       />
     </div>

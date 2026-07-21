@@ -36,6 +36,7 @@ from apps.sales.services.product_selection import (
 )
 from apps.sales.services.evolution_media import save_cart_photo_from_webhook
 from apps.sales.services.main_menu import handle_main_menu_message
+from apps.sales.services.product_suggestion_handler import handle_product_suggestion
 from apps.sales.services.product_search import (
     ASK_PRODUCT_MESSAGE,
     MAIN_MENU_PURCHASE_PROMPT,
@@ -171,13 +172,23 @@ def process_cart_flow(
             interactive_id,
         )
 
-    if session.state == ChatSession.State.AWAITING_MAIN_MENU and text:
+    if session.state == ChatSession.State.AWAITING_MAIN_MENU and (text or interactive_id):
         return handle_main_menu_message(
             instance=instance,
             phone=phone,
             resident=resident,
             session=session,
             text=text,
+            interactive_id=interactive_id,
+        )
+
+    if session.state == ChatSession.State.AWAITING_PRODUCT_SUGGESTION and text:
+        return handle_product_suggestion(
+            instance=instance,
+            resident=resident,
+            phone=phone,
+            message=text,
+            session=session,
         )
 
     if session.state == ChatSession.State.IDLE:

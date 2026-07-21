@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import BillingBlocked from "../pages/admin/BillingBlocked";
 import TrialExpired from "../pages/admin/TrialExpired";
 import SupportCopilot from "../components/support/SupportCopilot";
+import WhatsNewModal from "../components/whatsNew/WhatsNewModal";
 import AppHeader from "./AppHeader";
 import Backdrop from "./Backdrop";
 import AppSidebar from "./AppSidebar";
@@ -76,6 +77,7 @@ const LayoutContent: React.FC = () => {
         </div>
       </div>
       {!hideSupportCopilot ? <SupportCopilot /> : null}
+      <WhatsNewModal />
     </NotificationsProvider>
   );
 };

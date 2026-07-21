@@ -56,7 +56,17 @@ class Tenant(models.Model):
         return float(getattr(settings, "MARKET_MONTHLY_PRICE", 59.90))
 
     def computed_subscription_value(self) -> float:
-        return round(self.active_markets_count() * self.subscription_unit_value(), 2)
+        """Soma dos preços dos mercados ativos (custom_price ou preço padrão)."""
+        from apps.markets.models import Market
+
+        unit = self.subscription_unit_value()
+        total = 0.0
+        for market in Market.objects.filter(tenant=self, status=Market.Status.ACTIVE):
+            if market.custom_price is not None:
+                total += float(market.custom_price)
+            else:
+                total += unit
+        return round(total, 2)
 
     def days_overdue(self) -> int:
         if self.overdue_since is None:

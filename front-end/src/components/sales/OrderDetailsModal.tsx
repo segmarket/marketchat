@@ -127,7 +127,7 @@ export default function OrderDetailsModal({ open, loading, cart, onClose }: Prop
                   <DataField label="Condomínio" value={cart.market_name || "—"} />
                   <DataField label="Data/Hora" value={formatOrderDateTime(cart.created_at)} />
                   <DataField
-                    label="ID Asaas"
+                    label="ID da cobrança"
                     value={cart.asaas_billing_id || "—"}
                     mono={Boolean(cart.asaas_billing_id)}
                   />

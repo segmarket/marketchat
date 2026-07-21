@@ -332,6 +332,10 @@ def test_greeting_idle_welcome_message(
 
     with (
         mock.patch(
+            "apps.sales.services.main_menu.send_main_menu_list",
+            return_value=False,
+        ),
+        mock.patch(
             "apps.sales.services.main_menu.send_whatsapp_reply",
             send_mock,
         ),

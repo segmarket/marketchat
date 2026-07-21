@@ -118,5 +118,5 @@ def test_send_cart_decision_uses_plain_text_only(mock_send, db):
 
     mock_send.assert_called_once()
     body = mock_send.call_args[0][2]
-    assert "*1*" in body and "Adicionar mais" in body
-    assert "*2*" in body and "Finalizar" in body
+    assert "1 — Adicionar mais" in body
+    assert "2 — Finalizar" in body
