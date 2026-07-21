@@ -111,6 +111,8 @@ def log_inbound(
     message_kind: str = ChatMessageLog.MessageKind.TEXT,
     evolution_message_id: str = "",
     resident: Resident | None = None,
+    attachment_name: str = "",
+    attachment_bytes: bytes | None = None,
 ) -> ChatMessageLog | None:
     if not phone:
         return None
@@ -127,6 +129,35 @@ def log_inbound(
         message_kind=message_kind,
         evolution_message_id=evolution_message_id,
         resident=resident,
+        attachment_name=attachment_name,
+        attachment_bytes=attachment_bytes,
+    )
+
+
+def log_inbound_image(
+    *,
+    tenant_id: int,
+    phone: str,
+    session: ChatSession | None = None,
+    evolution_message_id: str = "",
+    resident: Resident | None = None,
+    caption: str = "",
+    attachment_name: str = "",
+    attachment_bytes: bytes | None = None,
+) -> ChatMessageLog | None:
+    """Registra imagem inbound com arquivo anexado (histórico do inbox)."""
+    text = (caption or "").strip() or "[Imagem]"
+    name = (attachment_name or "").strip() or "inbound.jpg"
+    return log_inbound(
+        tenant_id=tenant_id,
+        phone=phone,
+        message_text=text,
+        session=session,
+        message_kind=ChatMessageLog.MessageKind.IMAGE,
+        evolution_message_id=evolution_message_id,
+        resident=resident,
+        attachment_name=name if attachment_bytes else "",
+        attachment_bytes=attachment_bytes,
     )
 
 
@@ -188,6 +219,14 @@ def log_inbound_image_from_cart(
     evolution_message_id: str = "",
 ) -> ChatMessageLog | None:
     """Registra foto de segurança enviada pelo morador (cópia do arquivo do carrinho)."""
+    evo_id = (evolution_message_id or "").strip()
+    if evo_id and ChatMessageLog.all_objects.filter(
+        tenant_id=tenant_id,
+        evolution_message_id=evo_id,
+    ).exists():
+        # Já registrado no webhook com attachment (evita duplicar no inbox).
+        return None
+
     if not cart.product_photo:
         return None
     try:

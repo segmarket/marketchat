@@ -633,6 +633,7 @@ def _handle_photo(
         instance=instance,
         cart=cart,
         raw_message=raw,
+        evolution_message_id=event.message_id or "",
     ):
         send_whatsapp_reply(
             instance,

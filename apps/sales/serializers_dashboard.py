@@ -86,10 +86,11 @@ class CartDetailSerializer(serializers.Serializer):
         items = []
         for item in cart.items.select_related("product").all():
             subtotal = (item.unit_price * item.quantity).quantize(Decimal("0.01"))
+            product = item.product
             items.append(
                 {
-                    "product_name": item.product.name,
-                    "sku": item.product.sku,
+                    "product_name": item.display_name,
+                    "sku": product.sku if product else "",
                     "quantity": item.quantity,
                     "unit_price": item.unit_price,
                     "subtotal": subtotal,

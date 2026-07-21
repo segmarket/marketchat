@@ -21,6 +21,13 @@ class ProductSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "sku", "created_at", "updated_at")
 
 
+class ProductSearchSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Product
+        fields = ("id", "name", "price")
+        read_only_fields = fields
+
+
 class ProductPatchSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255, required=False)
     search_aliases = serializers.CharField(required=False, allow_blank=True)

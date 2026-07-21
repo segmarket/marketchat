@@ -2,15 +2,15 @@ import { Link } from "react-router";
 
 interface BreadcrumbProps {
   pageTitle: string;
+  className?: string;
 }
 
-const PageBreadcrumb: React.FC<BreadcrumbProps> = ({ pageTitle }) => {
+const PageBreadcrumb: React.FC<BreadcrumbProps> = ({ pageTitle, className = "" }) => {
   return (
-    <div className="mb-6 flex shrink-0 flex-wrap items-center justify-between gap-3">
-      <h2
-        className="text-xl font-semibold text-gray-800 dark:text-white/90"
-        x-text="pageName"
-      >
+    <div
+      className={`mb-6 flex shrink-0 flex-wrap items-center justify-between gap-3 ${className}`.trim()}
+    >
+      <h2 className="text-xl font-semibold text-gray-800 dark:text-white/90">
         {pageTitle}
       </h2>
       <nav>
@@ -18,7 +18,7 @@ const PageBreadcrumb: React.FC<BreadcrumbProps> = ({ pageTitle }) => {
           <li>
             <Link
               className="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400"
-              to="/"
+              to="/admin"
             >
               Home
               <svg

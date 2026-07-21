@@ -16,7 +16,7 @@ function tabToBotActive(tab: InboxTab): boolean | null {
 }
 
 export default function ChatLogsPage() {
-  const [tab, setTab] = useState<InboxTab>("waiting");
+  const [tab, setTab] = useState<InboxTab>("all");
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [rows, setRows] = useState<InboxSessionRow[]>([]);
@@ -103,7 +103,8 @@ export default function ChatLogsPage() {
     <AdminPageLayout
       pageTitle="Atendimento"
       metaDescription="Inbox de atendimento WhatsApp"
-      className="flex h-full min-h-0 flex-1 flex-col overflow-hidden"
+      className="flex h-full min-h-0 flex-1 flex-col overflow-hidden px-4 pt-4 pb-4 md:px-8 md:pt-6 md:pb-6"
+      breadcrumbClassName="!mb-4"
       panelClassName="!p-0 flex min-h-0 flex-1 flex-col overflow-hidden"
     >
       <div className="flex min-h-0 flex-1">

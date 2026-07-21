@@ -7,7 +7,11 @@ import logging
 from django.core.cache import cache
 
 from apps.chatbot.models import ChatMessageLog
-from apps.chatbot.services.chat_logging import get_or_create_chat_session, log_inbound
+from apps.chatbot.services.chat_logging import (
+    get_or_create_chat_session,
+    log_inbound,
+    log_inbound_image,
+)
 from apps.chatbot.services.typing_presence import clear_typing, mark_typing
 from apps.residents.services.session_activity import touch_chat_session_activity
 from apps.residents.services.session_lazy_expiration import maybe_reset_stale_chat_session
@@ -259,6 +263,39 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
 
     bot_should_reply = ensure_bot_active_or_timeout(session)
 
+    message_kind = ChatMessageLog.MessageKind.TEXT
+    if event.message_kind == "interactive":
+        message_kind = ChatMessageLog.MessageKind.INTERACTIVE
+    elif has_image:
+        message_kind = ChatMessageLog.MessageKind.IMAGE
+
+    # Sempre registra no histórico — imagens com attachment para o inbox.
+    if message_kind == ChatMessageLog.MessageKind.IMAGE:
+        image_bytes = None
+        if event.raw_message:
+            from apps.sales.services.evolution_media import download_security_photo_bytes
+
+            image_bytes = download_security_photo_bytes(
+                instance=instance,
+                raw_message=event.raw_message,
+            )
+        log_inbound_image(
+            tenant_id=instance.tenant_id,
+            phone=phone,
+            session=session,
+            evolution_message_id=event.message_id or "",
+            resident=resident_for_lazy,
+            caption=text,
+            attachment_name=f"inbound_{event.message_id or session.id}.jpg",
+            attachment_bytes=image_bytes,
+        )
+        if not image_bytes:
+            logger.warning(
+                "Imagem inbound sem bytes (log sem attachment): tenant=%s msg=%s",
+                instance.tenant_id,
+                event.message_id,
+            )
+
     if (
         bot_should_reply
         and onboarded
@@ -295,13 +332,6 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
     elif not onboarded:
         intent_type = GENERAL
 
-    message_kind = ChatMessageLog.MessageKind.TEXT
-    if event.message_kind == "interactive":
-        message_kind = ChatMessageLog.MessageKind.INTERACTIVE
-    elif has_image:
-        message_kind = ChatMessageLog.MessageKind.IMAGE
-
-    # Fotos de carrinho são registradas em evolution_media com attachment.
     if message_kind != ChatMessageLog.MessageKind.IMAGE:
         log_inbound(
             tenant_id=instance.tenant_id,
@@ -311,6 +341,7 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
             session=session,
             message_kind=message_kind,
             evolution_message_id=event.message_id or "",
+            resident=resident_for_lazy,
         )
 
     if not bot_should_reply:

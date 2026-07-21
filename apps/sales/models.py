@@ -66,7 +66,7 @@ class Cart(models.Model):
 
 
 class CartItem(models.Model):
-    """Item do carrinho."""
+    """Item do carrinho (produto do catálogo ou linha avulsa do chat)."""
 
     cart = models.ForeignKey(
         Cart,
@@ -77,7 +77,10 @@ class CartItem(models.Model):
         "products.Product",
         on_delete=models.PROTECT,
         related_name="cart_items",
+        null=True,
+        blank=True,
     )
+    item_name = models.CharField(max_length=255, blank=True, default="")
     quantity = models.PositiveIntegerField(default=0)
     unit_price = models.DecimalField(max_digits=12, decimal_places=2)
 
@@ -85,12 +88,22 @@ class CartItem(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["cart", "product"],
+                condition=models.Q(product__isnull=False),
                 name="uniq_cart_item_cart_product",
             ),
         ]
 
     def __str__(self) -> str:
-        return f"{self.product.sku} x{self.quantity}"
+        label = self.display_name
+        return f"{label} x{self.quantity}"
+
+    @property
+    def display_name(self) -> str:
+        if (self.item_name or "").strip():
+            return self.item_name.strip()
+        if self.product_id and self.product:
+            return self.product.name or self.product.sku
+        return "Item"
 
     @property
     def subtotal(self) -> Decimal:

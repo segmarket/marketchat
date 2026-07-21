@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django.http import HttpResponse
 from rest_framework import status
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -10,6 +11,7 @@ from apps.products.models import Product
 from apps.products.serializers import (
     ImportConfirmSerializer,
     ProductPatchSerializer,
+    ProductSearchSerializer,
     ProductSerializer,
 )
 from apps.products.services.import_apply import ImportApplyError, confirm_import
@@ -42,6 +44,28 @@ class ProductListView(APIView):
             products = products.filter(status=status)
 
         return Response(ProductSerializer(products, many=True).data)
+
+
+class ProductSearchView(APIView):
+    """Busca leve para autocomplete (cobrança no chat)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request) -> Response:
+        q = (request.query_params.get("q") or "").strip()
+        if len(q) < 2:
+            return Response([])
+
+        products = (
+            Product.objects.filter(status=Product.Status.ACTIVE)
+            .filter(
+                Q(name__icontains=q)
+                | Q(sku__icontains=q)
+                | Q(search_aliases__icontains=q),
+            )
+            .order_by("name")[:15]
+        )
+        return Response(ProductSearchSerializer(products, many=True).data)
 
 
 class ProductDetailView(APIView):

@@ -10,6 +10,11 @@ export interface InputProps {
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onFocus?: React.FocusEventHandler<HTMLInputElement>;
   onBlur?: React.FocusEventHandler<HTMLInputElement>;
+  onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
+  role?: string;
+  "aria-expanded"?: boolean;
+  "aria-controls"?: string;
+  "aria-autocomplete"?: "none" | "inline" | "list" | "both";
   className?: string;
   min?: string | number;
   max?: string | number;
@@ -31,6 +36,11 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     onChange,
     onFocus,
     onBlur,
+    onKeyDown,
+    role,
+    "aria-expanded": ariaExpanded,
+    "aria-controls": ariaControls,
+    "aria-autocomplete": ariaAutocomplete,
     className = "",
     min,
     max,
@@ -67,6 +77,11 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         onChange={onChange}
         onFocus={onFocus}
         onBlur={onBlur}
+        onKeyDown={onKeyDown}
+        role={role}
+        aria-expanded={ariaExpanded}
+        aria-controls={ariaControls}
+        aria-autocomplete={ariaAutocomplete}
         min={min}
         max={max}
         step={step}

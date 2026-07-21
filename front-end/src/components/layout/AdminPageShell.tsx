@@ -35,6 +35,8 @@ type PageLayoutProps = {
   panelClassName?: string;
   /** Classes extras no root (ex.: `h-full min-h-0 flex-1` em rotas fullscreen). */
   className?: string;
+  /** Classes extras no breadcrumb (ex.: `mb-3` em layouts compactos). */
+  breadcrumbClassName?: string;
   children: ReactNode;
 };
 
@@ -46,6 +48,7 @@ export default function AdminPageLayout({
   description,
   panelClassName = "",
   className = "",
+  breadcrumbClassName = "",
   children,
 }: PageLayoutProps) {
   const descriptionOutsideCard =
@@ -58,7 +61,7 @@ export default function AdminPageLayout({
         description={metaDescription ?? pageTitle}
         noIndex
       />
-      <PageBreadcrumb pageTitle={pageTitle} />
+      <PageBreadcrumb pageTitle={pageTitle} className={breadcrumbClassName} />
       {descriptionOutsideCard ? (
         <p className="mb-4 shrink-0 text-sm text-gray-500 dark:text-gray-400">{description}</p>
       ) : null}

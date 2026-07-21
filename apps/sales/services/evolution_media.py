@@ -135,6 +135,7 @@ def save_cart_photo_from_webhook(
     instance: WhatsappInstance,
     cart: Cart,
     raw_message: dict[str, Any],
+    evolution_message_id: str = "",
 ) -> bool:
     """Baixa imagem e salva em cart.product_photo."""
     if not raw_message:
@@ -162,5 +163,6 @@ def save_cart_photo_from_webhook(
         session=session,
         cart=cart,
         resident=cart.resident,
+        evolution_message_id=evolution_message_id,
     )
     return True

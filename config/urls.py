@@ -4,6 +4,7 @@ from django.contrib import admin
 from django.urls import include, path
 
 from apps.billing.views import AsaasWebhookView
+from apps.billing.urls import payments_urlpatterns
 from apps.financial.views_webhooks import AsaasWithdrawalValidationWebhookView
 
 urlpatterns = [
@@ -12,7 +13,9 @@ urlpatterns = [
     path("api/settings/account/", include("apps.accounts.urls_settings")),
     path("api/settings/billing/", include("apps.billing.urls_settings")),
     path("api/billing/", include("apps.billing.urls")),
+    path("api/payments/", include(payments_urlpatterns)),
     path("api/webhooks/asaas/", AsaasWebhookView.as_view(), name="asaas-webhook-public"),
+
     path(
         "api/webhooks/asaas/validate-transfer/",
         AsaasWithdrawalValidationWebhookView.as_view(),

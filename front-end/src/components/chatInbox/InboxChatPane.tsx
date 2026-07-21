@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Send } from "lucide-react";
+import { Receipt, Send } from "lucide-react";
 import { toast } from "sonner";
 import Switch from "../form/switch/Switch";
+import ChargePixModal from "./ChargePixModal";
 import TypingIndicator from "./TypingIndicator";
 import { formatAttendanceDateTime } from "../../features/chatLogs/format";
 import {
@@ -13,6 +14,7 @@ import { markSessionSeen } from "../../features/chatLogs/inboxUnread";
 import type { ChatConversationResponse, ChatLogMessage } from "../../features/chatLogs/types";
 import { formatPhoneBR } from "../../features/residents/format";
 import { getAxiosErrorMessage } from "../../utils/apiError";
+import { useModal } from "../../hooks/useModal";
 
 type Props = {
   sessionId: number | null;
@@ -22,12 +24,12 @@ type Props = {
 
 function bubbleClass(direction: string): string {
   if (direction === "INBOUND") {
-    return "rounded-br-sm bg-emerald-100 text-emerald-950";
+    return "rounded-bl-sm bg-emerald-100 text-emerald-950";
   }
   if (direction === "AGENT") {
-    return "rounded-bl-sm bg-brand-500 text-white";
+    return "rounded-br-sm bg-brand-500 text-white";
   }
-  return "rounded-bl-sm bg-gray-200 text-gray-800 dark:bg-gray-800 dark:text-gray-100";
+  return "rounded-br-sm bg-gray-200 text-gray-800 dark:bg-gray-800 dark:text-gray-100";
 }
 
 function directionLabel(direction: string): string {
@@ -66,6 +68,7 @@ export default function InboxChatPane({
   const [toggling, setToggling] = useState(false);
   const [sending, setSending] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const chargeModal = useModal();
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -381,7 +384,7 @@ export default function InboxChatPane({
             return (
               <div
                 key={msg.id}
-                className={`flex ${inbound ? "justify-end" : "justify-start"}`}
+                className={`flex ${inbound ? "justify-start" : "justify-end"}`}
               >
                 <div
                   className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm shadow-sm ${bubbleClass(msg.direction)}`}
@@ -417,6 +420,16 @@ export default function InboxChatPane({
       {conversation && !loading ? (
         <footer className="shrink-0 border-t border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
           <div className="flex items-end gap-2">
+            <button
+              type="button"
+              onClick={chargeModal.openModal}
+              disabled={sending}
+              className="inline-flex h-11 min-w-[44px] items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-300 dark:hover:bg-white/5"
+              aria-label="Gerar cobrança PIX"
+              title="Gerar cobrança PIX"
+            >
+              <Receipt className="size-4" />
+            </button>
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -446,6 +459,18 @@ export default function InboxChatPane({
             interação humana.
           </p>
         </footer>
+      ) : null}
+
+      {sessionId != null ? (
+        <ChargePixModal
+          open={chargeModal.isOpen}
+          sessionId={sessionId}
+          onClose={chargeModal.closeModal}
+          onInsertDraft={(text) => {
+            setDraft(text);
+            stickToBottomRef.current = true;
+          }}
+        />
       ) : null}
     </div>
   );

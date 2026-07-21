@@ -39,6 +39,21 @@ export async function fetchProducts(params?: FetchProductsParams): Promise<Produ
   return data;
 }
 
+export type ProductSearchHit = {
+  id: number;
+  name: string;
+  price: string;
+};
+
+export async function searchProducts(q: string): Promise<ProductSearchHit[]> {
+  const trimmed = q.trim();
+  if (trimmed.length < 2) return [];
+  const { data } = await api.get<ProductSearchHit[]>("/api/products/search/", {
+    params: { q: trimmed },
+  });
+  return data;
+}
+
 export async function patchProduct(id: number, payload: ProductPatchPayload): Promise<Product> {
   const { data } = await api.patch<Product>(`/api/products/${id}/`, payload);
   return data;

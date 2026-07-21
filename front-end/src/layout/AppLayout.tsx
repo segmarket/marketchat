@@ -14,6 +14,8 @@ import AppSidebar from "./AppSidebar";
 const FULLSCREEN_ROUTES = ["/admin/chatbot-flows", "/admin/chat-logs"];
 /** Rotas que pausam o poll global de notificações (canvas pesado). */
 const PAUSE_NOTIFICATION_POLL_ROUTES = ["/admin/chatbot-flows"];
+/** Rotas em que o botão flutuante do Support Copilot atrapalha a UI. */
+const HIDE_SUPPORT_COPILOT_ROUTES = ["/admin/chat-logs"];
 
 const LayoutContent: React.FC = () => {
   const { isExpanded, isHovered, isMobileOpen, closeMobileSidebar } = useSidebar();
@@ -30,6 +32,9 @@ const LayoutContent: React.FC = () => {
   }, [pathname, search, closeMobileSidebar]);
   const isFullscreen = FULLSCREEN_ROUTES.some((route) => pathname.startsWith(route));
   const pauseNotificationPoll = PAUSE_NOTIFICATION_POLL_ROUTES.some((route) =>
+    pathname.startsWith(route),
+  );
+  const hideSupportCopilot = HIDE_SUPPORT_COPILOT_ROUTES.some((route) =>
     pathname.startsWith(route),
   );
   const onBillingSettings = pathname.startsWith("/admin/settings");
@@ -70,7 +75,7 @@ const LayoutContent: React.FC = () => {
           </div>
         </div>
       </div>
-      <SupportCopilot />
+      {!hideSupportCopilot ? <SupportCopilot /> : null}
     </NotificationsProvider>
   );
 };

@@ -6,9 +6,9 @@ type Props = {
 };
 
 const TABS: { id: InboxTab; label: string }[] = [
+  { id: "all", label: "Todos" },
   { id: "waiting", label: "Aguardando" },
   { id: "bot", label: "Bot" },
-  { id: "all", label: "Todos" },
 ];
 
 export default function InboxTabs({ value, onChange }: Props) {
