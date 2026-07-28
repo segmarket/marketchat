@@ -12,6 +12,7 @@ urlpatterns = [
     path("api/auth/", include("apps.accounts.urls")),
     path("api/settings/account/", include("apps.accounts.urls_settings")),
     path("api/settings/billing/", include("apps.billing.urls_settings")),
+    path("api/settings/bot-schedule/", include("apps.chatbot.urls_settings")),
     path("api/billing/", include("apps.billing.urls")),
     path("api/payments/", include(payments_urlpatterns)),
     path("api/webhooks/asaas/", AsaasWebhookView.as_view(), name="asaas-webhook-public"),

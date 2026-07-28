@@ -260,8 +260,30 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
     onboarded = resident_has_completed_onboarding(instance.tenant_id, phone)
 
     from apps.chatbot.services.human_handover import ensure_bot_active_or_timeout
+    from apps.chatbot.services.bot_schedule import should_bot_auto_reply
+    from apps.tenants.models import Tenant
 
-    bot_should_reply = ensure_bot_active_or_timeout(session)
+    tenant = (
+        Tenant.objects.filter(pk=instance.tenant_id)
+        .only("is_bot_active_global")
+        .first()
+    )
+    bot_should_reply = bool(tenant and tenant.is_bot_active_global)
+    if not bot_should_reply:
+        logger.info(
+            "Bot desligado pela chave geral: tenant=%s phone=%s",
+            instance.tenant_id,
+            phone,
+        )
+    else:
+        bot_should_reply = ensure_bot_active_or_timeout(session)
+        if bot_should_reply and not should_bot_auto_reply(instance.tenant_id):
+            bot_should_reply = False
+            logger.info(
+                "Bot pausado no horário comercial: tenant=%s phone=%s",
+                instance.tenant_id,
+                phone,
+            )
 
     message_kind = ChatMessageLog.MessageKind.TEXT
     if event.message_kind == "interactive":

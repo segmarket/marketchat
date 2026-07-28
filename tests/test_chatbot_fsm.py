@@ -332,10 +332,6 @@ def test_greeting_idle_welcome_message(
 
     with (
         mock.patch(
-            "apps.sales.services.main_menu.send_main_menu_list",
-            return_value=False,
-        ),
-        mock.patch(
             "apps.sales.services.main_menu.send_whatsapp_reply",
             send_mock,
         ),
@@ -360,7 +356,8 @@ def test_greeting_idle_welcome_message(
 
     body = _whatsapp_body(send_mock)
     assert "Olá" in body
-    assert "Fazer uma compra" in body
+    assert "Indisp. de pagamento ou queda sistema" in body
+    assert "Fazer uma compra" not in body
     assert "O que você precisa" not in body
     assert "Por nada" not in body
 
@@ -440,6 +437,8 @@ def test_produto_estragado_sanitary_alert(
     fsm_instance,
     fsm_session,
 ):
+    from apps.chatbot.services.occurrence_dispatch import ALERTA_QUALIDADE_RESIDENT_MESSAGE
+
     owner_patch = mock.patch(
         "apps.chatbot.services.occurrence_dispatch.notify_owner_support_issue",
     )
@@ -456,6 +455,7 @@ def test_produto_estragado_sanitary_alert(
 
     fsm_session.refresh_from_db()
     assert fsm_session.state == ChatSession.State.IDLE
+    assert fsm_session.is_bot_active is False
 
     note = Notification.all_objects.filter(
         tenant=fsm_tenant,
@@ -464,6 +464,9 @@ def test_produto_estragado_sanitary_alert(
     assert note is not None
     assert note.severity == Notification.Severity.CRITICAL
 
+    body = _whatsapp_body(send_mock)
+    assert "transferindo o seu atendimento" in body
+    assert body == ALERTA_QUALIDADE_RESIDENT_MESSAGE
     _assert_no_tags_in_outbound(send_mock)
     _assert_assistant_history_clean(fsm_session)
 

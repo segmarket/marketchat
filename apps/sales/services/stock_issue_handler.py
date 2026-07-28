@@ -48,6 +48,7 @@ def handle_stock_issue_report(
     phone: str,
     message: str,
     session: ChatSession | None = None,
+    queue_for_human: bool = False,
 ) -> None:
     product_label = extract_stock_product_label(message)
     if session is None:
@@ -62,11 +63,12 @@ def handle_stock_issue_report(
         matches = search_active_products(resident.tenant_id, product_label)
         if matches:
             record_discussed_product(session, matches[0])
-    reply = build_stock_issue_resident_message(
-        resident=resident,
-        product_label=product_label,
-    )
-    send_whatsapp_reply(instance, phone, reply)
+    if not queue_for_human:
+        reply = build_stock_issue_resident_message(
+            resident=resident,
+            product_label=product_label,
+        )
+        send_whatsapp_reply(instance, phone, reply)
     notify_owner_restock_issue(
         instance=instance,
         resident=resident,

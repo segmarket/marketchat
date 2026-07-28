@@ -112,3 +112,33 @@ class ChatMessageLog(TenantAwareModel):
 
     def __str__(self) -> str:
         return f"ChatMessageLog({self.session_id}, {self.direction})"
+
+
+class BotSchedule(TenantAwareModel):
+    """Horário em que o chatbot responde automaticamente (por dia da semana)."""
+
+    day_of_week = models.PositiveSmallIntegerField(
+        help_text="0=Segunda … 6=Domingo",
+    )
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    is_active = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["day_of_week"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tenant", "day_of_week"],
+                name="uniq_bot_schedule_tenant_day",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(day_of_week__gte=0) & models.Q(day_of_week__lte=6),
+                name="bot_schedule_day_of_week_range",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["tenant", "day_of_week"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"BotSchedule(tenant={self.tenant_id}, day={self.day_of_week})"

@@ -50,6 +50,7 @@ def process_ai_assistant_reply(
     resident: Resident,
     user_message: str,
     owner_pre_notified: bool = False,
+    record_assistant: bool = True,
 ) -> tuple[str, str | None]:
     """
     Interpreta tags, dispara alertas e grava apenas o texto limpo no histórico.
@@ -69,7 +70,7 @@ def process_ai_assistant_reply(
             owner_pre_notified=owner_pre_notified,
         )
 
-    if body:
+    if body and record_assistant:
         append_assistant_message(session, body)
 
     return body, tag

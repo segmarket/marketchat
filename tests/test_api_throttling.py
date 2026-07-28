@@ -80,3 +80,32 @@ def test_webhook_not_throttled(settings, api_client):
             format="json",
         )
         assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_evolution_webhook_not_throttled(settings, api_client):
+    """Webhook Evolution não pode usar o throttle anon (10/min) — perde mensagens."""
+    settings.TRUST_X_FORWARDED_FOR = True
+    from apps.integrations.models import WhatsappInstance
+    from tests.factories import WhatsappInstanceFactory
+
+    inst = WhatsappInstanceFactory(
+        webhook_secret="evo-throttle-secret",
+        connection_status=WhatsappInstance.ConnectionStatus.OPEN,
+    )
+    url = reverse("webhook-evolution")
+    headers = {"HTTP_X_FORWARDED_FOR": "198.51.100.77"}
+    payload = {
+        "event": "CONNECTION",
+        "instance": inst.instance_name,
+        "data": {"state": "open"},
+    }
+
+    for i in range(15):
+        response = api_client.post(
+            f"{url}?secret=evo-throttle-secret",
+            payload,
+            format="json",
+            **headers,
+        )
+        assert response.status_code == 200, f"request {i + 1} got {response.status_code}"

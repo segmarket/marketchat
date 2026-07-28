@@ -465,10 +465,25 @@ export default function InboxChatPane({
         <ChargePixModal
           open={chargeModal.isOpen}
           sessionId={sessionId}
+          walkInBilling={conversation?.resident_billing_identified === false}
           onClose={chargeModal.closeModal}
-          onInsertDraft={(text) => {
-            setDraft(text);
+          onPixDelivered={() => {
+            const sid = sessionId;
+            if (sid == null) return;
             stickToBottomRef.current = true;
+            reportBotStatus(sid, false);
+            void (async () => {
+              try {
+                const data = await fetchConversation(sid);
+                if (sessionIdRef.current !== sid) return;
+                setConversation(data);
+                knownMaxIdRef.current = maxMessageId(data.messages);
+                markSeenFromMessages(sid, data.messages);
+                reportBotStatus(sid, data.is_bot_active);
+              } catch {
+                // polling atualizará em seguida
+              }
+            })();
           }}
         />
       ) : null}

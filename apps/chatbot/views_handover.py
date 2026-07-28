@@ -18,6 +18,7 @@ from apps.chatbot.services.human_handover import pause_bot, toggle_bot
 from apps.integrations.services.instance_lookup import get_active_whatsapp_instance
 from apps.residents.models import ChatSession
 from apps.residents.services.whatsapp_reply import send_whatsapp_reply
+from apps.sales.services.chat_fsm import transition
 from apps.tenants.context import tenant_scope
 
 
@@ -118,6 +119,8 @@ class ChatSessionAgentMessageView(APIView):
                 session=session,
             )
             pause_bot(session)
+            if session.state == ChatSession.State.WAITING_FOR_HUMAN:
+                transition(session, ChatSession.State.IDLE, reason="agent_assumed")
             session.refresh_from_db()
 
             payload = {

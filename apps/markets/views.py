@@ -7,6 +7,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.billing.services.subscription_sync import update_tenant_subscription_value
+from apps.billing.services.tenant_default_asaas_customer import (
+    ensure_tenant_default_asaas_customer_by_id,
+)
 from apps.markets.models import Market
 from apps.tenants.models import Tenant
 from apps.markets.serializers import (
@@ -23,6 +26,13 @@ def _schedule_subscription_sync(tenant_id: int) -> None:
             update_tenant_subscription_value(tenant)
 
     transaction.on_commit(_sync)
+
+
+def _schedule_default_asaas_customer(tenant_id: int) -> None:
+    def _provision() -> None:
+        ensure_tenant_default_asaas_customer_by_id(tenant_id)
+
+    transaction.on_commit(_provision)
 
 
 class MarketListCreateView(APIView):
@@ -56,6 +66,7 @@ class MarketListCreateView(APIView):
             status=data.get("status", Market.Status.ACTIVE),
         )
         _schedule_subscription_sync(request.user.tenant_id)
+        _schedule_default_asaas_customer(request.user.tenant_id)
         return Response(MarketSerializer(market).data, status=status.HTTP_201_CREATED)
 
 

@@ -4,6 +4,10 @@
 > [Evolution GO](https://github.com/evolution-foundation/evolution-go) (gateway
 > WhatsApp em Go). Cobre provisionamento de instâncias, webhook reverso, envio
 > de mensagens, mídia E2E e armadilhas que custaram dias de debug em produção.
+>
+> Para portar a **plataforma completa** (Django + painel React + inbox/handover,
+> sem regras de micromercado), veja também
+> [`whatsapp-bot-platform-playbook.md`](./whatsapp-bot-platform-playbook.md).
 
 Última revisão: maio/2026 — derivado da implementação do projeto
 `talkpref`.

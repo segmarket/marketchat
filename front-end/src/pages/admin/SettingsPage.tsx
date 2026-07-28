@@ -11,13 +11,14 @@ import { getAxiosErrorMessage } from "../../utils/apiError";
 import MarketsPage from "./MarketsPage";
 import IntegrationsPage from "./IntegrationsPage";
 import PrivacyHub from "../../components/settings/PrivacyHub";
+import BotScheduleSettings from "../../components/settings/BotScheduleSettings";
 
 function resolveActiveSection(
   tab: string | null,
   section: string | null,
 ): SettingsSectionId {
   if (tab === "plan" || tab === "history") return tab;
-  if (section === "markets" || section === "integrations" || section === "privacy") {
+  if (section === "markets" || section === "integrations" || section === "privacy" || section === "bot-schedule") {
     return section;
   }
   return "account";
@@ -87,6 +88,7 @@ export default function SettingsPage() {
     markets: "Mercados",
     integrations: "Integrações",
     privacy: "Privacidade",
+    "bot-schedule": "Horário Comercial",
     plan: "Plano e pagamento",
     history: "Histórico de Faturas",
   };
@@ -96,6 +98,7 @@ export default function SettingsPage() {
     markets: "Cadastre e gerencie os mercados do seu condomínio.",
     integrations: "WhatsApp e conta Pix de recebimento.",
     privacy: "Exportação de dados e anonimização de moradores (LGPD).",
+    "bot-schedule": "Expediente da equipe: nesses horários o bot fica pausado.",
     plan: "Assinatura e forma de pagamento.",
     history: "Faturas e pagamentos anteriores.",
   };
@@ -125,6 +128,7 @@ export default function SettingsPage() {
             <IntegrationsPage embedded />
           )}
           {activeSection === "privacy" && isTenantAdmin && <PrivacyHub />}
+          {activeSection === "bot-schedule" && <BotScheduleSettings />}
           {activeSection === "plan" && isTenantAdmin && (
             <PlanPaymentPanel accountData={accountData} />
           )}

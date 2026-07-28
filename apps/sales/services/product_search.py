@@ -49,7 +49,7 @@ def build_product_name_q(term: str) -> Q:
         return Q(pk__in=[])
     query = Q()
     for word in words:
-        query &= Q(name__icontains=word)
+        query &= Q(name__icontains=word) | Q(search_aliases__icontains=word)
     return query
 
 

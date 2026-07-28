@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.billing.services.chat_pix_charge import ChatPixChargeError, generate_chat_pix_charge
+from apps.billing.services.chat_pix_whatsapp_delivery import deliver_chat_pix_charge_messages
 from apps.tenants.context import tenant_scope
 
 
@@ -29,6 +30,7 @@ class ChatPixChargeSerializer(serializers.Serializer):
         min_value=Decimal("0.01"),
     )
     description = serializers.CharField(required=False, allow_blank=True, max_length=500)
+    deliver_whatsapp = serializers.BooleanField(required=False, default=False)
 
     def validate(self, attrs: dict) -> dict:
         amount = attrs.get("amount")
@@ -73,6 +75,15 @@ class GenerateChatPixView(APIView):
                     amount=amount,
                     description=data.get("description") or "",
                 )
+                delivered = False
+                if data.get("deliver_whatsapp"):
+                    deliver_chat_pix_charge_messages(
+                        tenant_id=int(tenant_id),
+                        session_id=int(data["session_id"]),
+                        summary_text=result["message_summary"],
+                        pix_code=result["message_pix"],
+                    )
+                    delivered = True
         except ChatPixChargeError as exc:
             return Response({"detail": str(exc)}, status=400)
 
@@ -84,6 +95,10 @@ class GenerateChatPixView(APIView):
                 "cart_id": result["cart_id"],
                 "description": result["description"],
                 "items_summary": result["items_summary"],
+                "billing_mode": result["billing_mode"],
+                "message_summary": result["message_summary"],
+                "message_pix": result["message_pix"],
+                "delivered_whatsapp": delivered,
             },
             status=201,
         )

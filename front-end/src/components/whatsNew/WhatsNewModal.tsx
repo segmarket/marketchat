@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { ListChecks, MessagesSquare, Receipt, type LucideIcon } from "lucide-react";
+import {
+  Clock,
+  ListChecks,
+  MessagesSquare,
+  Power,
+  Receipt,
+  type LucideIcon,
+} from "lucide-react";
 import {
   CHANGELOG_ITEMS,
   CURRENT_VERSION,
@@ -10,6 +17,8 @@ import Button from "../ui/button/Button";
 import { Modal } from "../ui/modal";
 
 const ICON_MAP: Record<ChangelogIconName, LucideIcon> = {
+  Clock,
+  Power,
   MessagesSquare,
   Receipt,
   ListChecks,

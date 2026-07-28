@@ -36,6 +36,16 @@ class Tenant(models.Model):
     gclid = models.CharField(max_length=255, blank=True, default="")
     fbclid = models.CharField(max_length=255, blank=True, default="")
     terms_accepted_at = models.DateTimeField(null=True, blank=True)
+    is_bot_active_global = models.BooleanField(
+        default=True,
+        help_text="Chave geral: se False, o bot não responde em nenhuma conversa.",
+    )
+    asaas_default_customer_id = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        help_text="Customer Asaas Consumidor Final para cobranças PIX avulsas no chat.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

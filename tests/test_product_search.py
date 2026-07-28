@@ -56,6 +56,36 @@ def test_split_word_search_coca_zero_finds_product():
 
 
 @pytest.mark.django_db
+def test_case_insensitive_search_finds_uppercase_product():
+    tenant = TenantFactory()
+    product = ProductFactory(
+        tenant=tenant,
+        sku="COCA-01",
+        name="COCA-COLA Lata 350ml",
+    )
+    ProductFactory(tenant=tenant, sku="PEPSI", name="Pepsi 350ml")
+
+    for term in ("coca", "COCA", "CoCa", "  coca  "):
+        results = search_active_products(tenant.id, term)
+        assert product in results, f"term {term!r} should match COCA-COLA"
+
+
+@pytest.mark.django_db
+def test_search_matches_search_aliases():
+    tenant = TenantFactory()
+    product = ProductFactory(
+        tenant=tenant,
+        sku="REFRI-01",
+        name="Refrigerante Cola 2L",
+        search_aliases="coca, coca-cola",
+    )
+    ProductFactory(tenant=tenant, sku="AGUA", name="Água Mineral 500ml")
+
+    results = search_active_products(tenant.id, "coca")
+    assert list(results) == [product]
+
+
+@pytest.mark.django_db
 def test_build_product_name_q_ignores_single_letter_tokens():
     tenant = TenantFactory()
     ProductFactory(tenant=tenant, name="Coca Cola Lata Zero 350ml")

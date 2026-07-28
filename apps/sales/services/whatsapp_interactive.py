@@ -1,20 +1,16 @@
 from __future__ import annotations
 
-import logging
 from decimal import Decimal
-from typing import Any
 
 from apps.integrations.models import WhatsappInstance
-from apps.integrations.services.evolution_client import EvolutionClient
 from apps.products.models import Product
 from apps.residents.services.whatsapp_reply import send_whatsapp_reply
-
-logger = logging.getLogger(__name__)
 
 PROD_ID_PREFIX = "prod:"
 CART_ADD_MORE = "cart:add_more"
 CART_CHECKOUT = "cart:checkout"
 
+# Mantidos para tipificação / legado; o menu principal só usa as 7 opções abaixo.
 MENU_PURCHASE = "menu:purchase"
 MENU_SUGGEST = "menu:suggest"
 MENU_STOCK = "menu:stock"
@@ -26,21 +22,67 @@ MENU_STORE = "menu:store"
 MENU_PRODUCT = "menu:product"
 MENU_OTHER = "menu:other"
 
-# Ordem = índice 1–10 do fallback numérico.
+# Ordem = índice 1–7 do menu de suporte.
 MAIN_MENU_ROWS: tuple[tuple[str, str, str], ...] = (
-    (MENU_PURCHASE, "Fazer uma compra", "Buscar itens e pagar com Pix"),
-    (MENU_SUGGEST, "Sugestão de produto", "Indicar produto que gostaria de ver"),
-    (MENU_STOCK, "Falta de produto", "Avisar que algo acabou na gôndola"),
-    (MENU_UNCATALOGUED, "Produto sem cadastro", "Item sem preço ou não encontrado"),
-    (MENU_PAYMENT, "Indisp. de pagamento", "Maquininha ou Pix fora do ar"),
-    (MENU_BILLING, "Problema cobrança", "Valor ou cobrança incorreta"),
-    (MENU_FRIDGE, "Problema geladeira", "Geladeira ou freezer com defeito"),
-    (MENU_STORE, "Problema loja", "Infraestrutura ou ambiente da loja"),
-    (MENU_PRODUCT, "Problema com produto", "Qualidade, validade ou defeito"),
-    (MENU_OTHER, "Outros assuntos", "Qualquer outro pedido de ajuda"),
+    (MENU_PAYMENT, "Indisp. de pagamento ou queda sistema", ""),
+    (MENU_UNCATALOGUED, "Produto sem cadastro", ""),
+    (MENU_BILLING, "Problema cobrança", ""),
+    (MENU_FRIDGE, "Problema geladeira", ""),
+    (MENU_STORE, "Problema loja", ""),
+    (MENU_PRODUCT, "Problema com produto", ""),
+    (MENU_OTHER, "Outros assuntos", ""),
 )
 
 MAIN_MENU_ROW_IDS = frozenset(row_id for row_id, _, _ in MAIN_MENU_ROWS)
+
+SUPPORT_DETAILS_PROMPT = (
+    "Entendido. Por favor, digite mais detalhes sobre o ocorrido "
+    "para que nossa equipe possa te ajudar."
+)
+
+SUPPORT_HANDOVER_ACK = (
+    "Obrigado pelas informações! Um atendente da nossa equipe "
+    "vai te ajudar em breve."
+)
+
+SUPPORT_WAITING_QUEUE_MESSAGE = (
+    "Sua solicitação foi registrada e nossa equipe já foi notificada! "
+    "Um atendente assumirá essa conversa em instantes.\n\n"
+    "(Se você precisar fazer uma nova compra ou quiser cancelar este chamado, digite SAIR)."
+)
+
+UNREGISTERED_PRODUCT_SEARCH_PROMPT = (
+    "Qual produto deu como 'não cadastrado' na maquininha? "
+    "Digite o nome ou marca para eu procurar no nosso sistema e tentar gerar o pagamento por aqui mesmo."
+)
+
+UNREGISTERED_PRODUCT_FOUND_INTRO = (
+    "Boa notícia! Encontrei o produto aqui no sistema:"
+)
+
+UNREGISTERED_PRODUCT_FOUND_CTA = (
+    "Deseja adicionar ao carrinho e pagar por aqui?"
+)
+
+UNREGISTERED_PRODUCT_NOT_FOUND_MESSAGE = (
+    "Realmente esse produto não está aparecendo no meu sistema. "
+    "Já notifiquei a equipe para realizar o cadastro e ajustar a maquininha! "
+    "Um atendente assumirá essa conversa em instantes para te ajudar.\n\n"
+    "(Se quiser cancelar este chamado, digite SAIR)."
+)
+
+
+def build_uncatalogued_product_found_message(products: list[Product]) -> str:
+    """Uma mensagem com intro, catálogo numerado e CTA (sem send_product_list duplicado)."""
+    lines = [UNREGISTERED_PRODUCT_FOUND_INTRO, ""]
+    for idx, product in enumerate(products[:10], start=1):
+        price_label = _format_brl(product.price)
+        lines.append(f"{idx}. {product.name} — {price_label}")
+    lines.append("")
+    lines.append(UNREGISTERED_PRODUCT_FOUND_CTA)
+    lines.append("")
+    lines.append("Responda com o *número* do produto desejado (ex.: 1).")
+    return "\n".join(lines)
 
 
 def _format_brl(value: Decimal) -> str:
@@ -111,55 +153,12 @@ def parse_numeric_loop_choice(text: str) -> str | None:
     return None
 
 
-def build_main_menu_sections() -> list[dict[str, Any]]:
-    rows = [
-        {
-            "rowId": row_id,
-            "title": title[:24],
-            "description": (description or "")[:72],
-        }
-        for row_id, title, description in MAIN_MENU_ROWS
-    ]
-    return [{"title": "Como podemos ajudar?", "rows": rows}]
-
-
 def build_main_menu_text_fallback(*, greeting: str) -> str:
     lines = [greeting.strip(), ""]
     for idx, (_row_id, title, _desc) in enumerate(MAIN_MENU_ROWS, start=1):
         lines.append(f"{idx} — {title}")
     lines.append("")
-    lines.append("Responda com o número da opção (1 a 10).")
+    lines.append(
+        'Responda com o número da opção (1 a 7 ou Digite "sair" para reiniciar o menu).'
+    )
     return "\n".join(lines)
-
-
-def send_main_menu_list(
-    instance: WhatsappInstance,
-    phone: str,
-    *,
-    title: str,
-    description: str,
-) -> bool:
-    """
-    Envia lista interativa do menu. Retorna True se Evolution aceitou.
-    Em falha o caller deve enviar o fallback em texto.
-    """
-    digits = "".join(c for c in phone if c.isdigit())
-    if not digits:
-        return False
-    try:
-        EvolutionClient().send_list(
-            instance_api_key=instance.api_key,
-            number=digits,
-            title=title[:60] or "Menu",
-            description=description[:1024] or "Escolha uma opção",
-            button_text="Ver opções",
-            sections=build_main_menu_sections(),
-        )
-        return True
-    except Exception:
-        logger.exception(
-            "Falha ao enviar lista do menu: tenant=%s phone=%s",
-            instance.tenant_id,
-            digits,
-        )
-        return False

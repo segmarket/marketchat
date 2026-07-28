@@ -62,6 +62,7 @@ export type ChatConversationResponse = {
   market_name: string;
   attendance_date: string;
   is_bot_active: boolean;
+  resident_billing_identified: boolean;
   last_human_interaction_at: string | null;
   client_is_typing?: boolean;
   messages: ChatLogMessage[];

@@ -11,7 +11,12 @@ from apps.chatbot.services.chatbot_core import (
     ChatbotCoreError,
     complete_with_session_history,
 )
-from apps.chatbot.services.occurrence_tags import process_ai_assistant_reply
+from apps.chatbot.services.human_handover import pause_bot
+from apps.chatbot.services.occurrence_dispatch import ALERTA_QUALIDADE_RESIDENT_MESSAGE
+from apps.chatbot.services.occurrence_tags import (
+    parse_occurrence_tag,
+    process_ai_assistant_reply,
+)
 from apps.integrations.models import WhatsappInstance
 from apps.residents.models import ChatSession, Resident
 from apps.residents.services.whatsapp_reply import send_whatsapp_reply
@@ -44,6 +49,14 @@ from apps.sales.services.resident_ai_context import (
 from apps.tenants.models import Tenant
 
 logger = logging.getLogger(__name__)
+
+
+def _apply_alerta_qualidade_copy(raw: str) -> str:
+    """Se a IA emitiu ALERTA_QUALIDADE, força o copy fixo com expectativa de handover."""
+    tag, _clean = parse_occurrence_tag(raw)
+    if tag == "ALERTA_QUALIDADE":
+        return f"[ALERTA_QUALIDADE]\n{ALERTA_QUALIDADE_RESIDENT_MESSAGE}"
+    return raw
 
 
 def _tenant_display_name(tenant_id: int) -> str:
@@ -109,9 +122,11 @@ def handle_maintenance_issue(
     resident: Resident,
     session: ChatSession,
     message: str,
+    queue_for_human: bool = False,
 ) -> bool:
-    send_whatsapp_reply(instance, phone, SUPPORT_RESIDENT_MESSAGE)
-    append_assistant_message(session, SUPPORT_RESIDENT_MESSAGE)
+    if not queue_for_human:
+        send_whatsapp_reply(instance, phone, SUPPORT_RESIDENT_MESSAGE)
+        append_assistant_message(session, SUPPORT_RESIDENT_MESSAGE)
     notify_owner_support_issue(
         instance=instance,
         tenant_id=tenant_id,
@@ -181,6 +196,7 @@ def handle_stock_issue(
     resident: Resident,
     session: ChatSession,
     message: str,
+    queue_for_human: bool = False,
 ) -> bool:
     handle_stock_issue_report(
         instance=instance,
@@ -188,6 +204,7 @@ def handle_stock_issue(
         phone=phone,
         message=message,
         session=session,
+        queue_for_human=queue_for_human,
     )
     return True
 
@@ -200,6 +217,7 @@ def handle_complaint(
     resident: Resident,
     session: ChatSession,
     message: str,
+    queue_for_human: bool = False,
 ) -> bool:
     """Reclamação: responde via IA com matriz de ocorrências e tags de comando."""
     dynamic_tail = (
@@ -207,6 +225,8 @@ def handle_complaint(
         f"{build_complaint_dynamic_context(resident)}"
     )
     intent_for_log = COMPLAINT
+    tag: str | None = None
+    reply = ""
     try:
         raw = complete_with_session_history(
             session=session,
@@ -216,6 +236,8 @@ def handle_complaint(
             max_tokens=180,
             record_assistant=False,
         )
+        if not queue_for_human:
+            raw = _apply_alerta_qualidade_copy(raw)
         reply, tag = process_ai_assistant_reply(
             raw_reply=raw,
             session=session,
@@ -223,6 +245,7 @@ def handle_complaint(
             instance=instance,
             resident=resident,
             user_message=message,
+            record_assistant=not queue_for_human,
         )
         if not tag:
             notify_owner_support_issue(
@@ -235,11 +258,12 @@ def handle_complaint(
         if tag:
             intent_for_log = tag
     except ChatbotCoreError:
-        reply = (
-            "Sinto muito pelo transtorno. Pode me contar com mais detalhes o que aconteceu? "
-            "Já avisei a equipe responsável pelo mercado."
-        )
-        append_assistant_message(session, reply)
+        if not queue_for_human:
+            reply = (
+                "Sinto muito pelo transtorno. Pode me contar com mais detalhes o que aconteceu? "
+                "Já avisei a equipe responsável pelo mercado."
+            )
+            append_assistant_message(session, reply)
         notify_owner_support_issue(
             instance=instance,
             tenant_id=tenant_id,
@@ -249,11 +273,12 @@ def handle_complaint(
         )
     except Exception:
         logger.exception("Falha na resposta de reclamação")
-        reply = (
-            "Recebi sua reclamação e já encaminhei para a equipe do mercado. "
-            "Pode descrever melhor o que aconteceu?"
-        )
-        append_assistant_message(session, reply)
+        if not queue_for_human:
+            reply = (
+                "Recebi sua reclamação e já encaminhei para a equipe do mercado. "
+                "Pode descrever melhor o que aconteceu?"
+            )
+            append_assistant_message(session, reply)
         notify_owner_support_issue(
             instance=instance,
             tenant_id=tenant_id,
@@ -262,7 +287,7 @@ def handle_complaint(
             issue_label="Reclamação",
         )
 
-    if reply:
+    if reply and not queue_for_human:
         send_whatsapp_reply(
             instance,
             phone,
@@ -270,6 +295,8 @@ def handle_complaint(
             intent_type=intent_for_log,
             session=session,
         )
+    if tag == "ALERTA_QUALIDADE" and not queue_for_human:
+        pause_bot(session)
     return True
 
 
@@ -287,6 +314,7 @@ def handle_general_message(
         f"{build_resident_dynamic_context(resident)}"
     )
     intent_for_log = ""
+    tag: str | None = None
     try:
         raw = complete_with_session_history(
             session=session,
@@ -296,6 +324,7 @@ def handle_general_message(
             max_tokens=180,
             record_assistant=False,
         )
+        raw = _apply_alerta_qualidade_copy(raw)
         reply, tag = process_ai_assistant_reply(
             raw_reply=raw,
             session=session,
@@ -326,6 +355,8 @@ def handle_general_message(
             intent_type=intent_for_log,
             session=session,
         )
+    if tag == "ALERTA_QUALIDADE":
+        pause_bot(session)
     return True
 
 

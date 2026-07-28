@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from decimal import Decimal
 
+from apps.chatbot.services.human_handover import resume_bot
 from apps.integrations.models import WhatsappInstance
 from apps.integrations.services.message_interactive import event_has_image
 from apps.integrations.services.webhook_parser import EvolutionWebhookEvent
@@ -11,7 +12,13 @@ from apps.residents.models import ChatSession, Resident
 from apps.residents.services.onboarding_flow import resident_has_completed_onboarding
 from apps.residents.services.whatsapp_reply import send_whatsapp_reply
 from apps.sales.models import Cart, CartItem
-from apps.sales.services.active_bot_router import route_idle_message
+from apps.sales.services.active_bot_router import (
+    handle_complaint,
+    handle_maintenance_issue,
+    handle_payment_error_pivot,
+    handle_stock_issue,
+    route_idle_message,
+)
 from apps.sales.services.availability_handler import handle_availability_question
 from apps.sales.services.cart_escape import (
     CHECKOUT_PHOTO_MESSAGE,
@@ -35,8 +42,15 @@ from apps.sales.services.product_selection import (
     is_product_selection_escape,
 )
 from apps.sales.services.evolution_media import save_cart_photo_from_webhook
-from apps.sales.services.main_menu import handle_main_menu_message
+from apps.sales.services.intent_gatekeeper import (
+    COMPLAINT,
+    MAINTENANCE_ISSUE,
+    STOCK_ISSUE,
+    classify_user_intent,
+)
+from apps.sales.services.main_menu import handle_main_menu_message, show_main_menu
 from apps.sales.services.product_suggestion_handler import handle_product_suggestion
+from apps.sales.services.uncatalogued_product_flow import handle_uncatalogued_product_search
 from apps.sales.services.product_search import (
     ASK_PRODUCT_MESSAGE,
     MAIN_MENU_PURCHASE_PROMPT,
@@ -51,7 +65,9 @@ from apps.sales.services.purchase_context import is_purchase_without_product
 from apps.sales.services.whatsapp_interactive import (
     CART_ADD_MORE,
     CART_CHECKOUT,
+    MENU_PAYMENT,
     PROD_ID_PREFIX,
+    SUPPORT_WAITING_QUEUE_MESSAGE,
     parse_numeric_product_choice,
     send_cart_decision_buttons,
     send_product_list,
@@ -116,6 +132,66 @@ def _resolve_interactive_id(
     return ""
 
 
+def _handle_support_details(
+    *,
+    instance: WhatsappInstance,
+    phone: str,
+    resident: Resident,
+    session: ChatSession,
+    text: str,
+) -> bool:
+    """
+    Opção 1 = pivot pagamento.
+    Opções 2–7 = classifica o detalhe (COMPLAINT/manutenção/estoque),
+    dispara alertas internos e entra na fila de espera ativa.
+    """
+    category = (session.temporary_name or "").strip()
+    session.temporary_name = ""
+    session.save(update_fields=["temporary_name", "updated_at"])
+
+    if category == MENU_PAYMENT:
+        return handle_payment_error_pivot(
+            instance=instance,
+            tenant_id=session.tenant_id,
+            phone=phone,
+            resident=resident,
+            session=session,
+            message=text,
+        )
+
+    intent = classify_user_intent(
+        text,
+        tenant_id=session.tenant_id,
+        phone=phone,
+    )
+    handler_kwargs = {
+        "instance": instance,
+        "tenant_id": session.tenant_id,
+        "phone": phone,
+        "resident": resident,
+        "session": session,
+        "message": text,
+        "queue_for_human": True,
+    }
+    if intent == COMPLAINT:
+        handle_complaint(**handler_kwargs)
+    elif intent == MAINTENANCE_ISSUE:
+        handle_maintenance_issue(**handler_kwargs)
+    elif intent == STOCK_ISSUE:
+        handle_stock_issue(**handler_kwargs)
+
+    transition(session, ChatSession.State.WAITING_FOR_HUMAN, reason="support_waiting_queue")
+    if not session.is_bot_active:
+        resume_bot(session)
+    send_whatsapp_reply(
+        instance,
+        phone,
+        SUPPORT_WAITING_QUEUE_MESSAGE,
+        session=session,
+    )
+    return True
+
+
 def process_cart_flow(
     tenant_id: int,
     instance: WhatsappInstance,
@@ -139,6 +215,18 @@ def process_cart_flow(
         return False
 
     text = (event.message_text or "").strip()
+    session = _get_or_create_session(tenant_id, phone)
+
+    if session.state == ChatSession.State.WAITING_FOR_HUMAN and text:
+        if is_global_escape_message(text):
+            show_main_menu(
+                instance=instance,
+                phone=phone,
+                resident=resident,
+                session=session,
+            )
+            return True
+        return True
 
     if text and handle_global_escape(
         instance=instance,
@@ -148,7 +236,6 @@ def process_cart_flow(
     ):
         return True
 
-    session = _get_or_create_session(tenant_id, phone)
     interactive_id = _resolve_interactive_id(event, session, tenant_id)
 
     if text and try_checkout_from_text(
@@ -180,6 +267,25 @@ def process_cart_flow(
             session=session,
             text=text,
             interactive_id=interactive_id,
+        )
+
+    if session.state == ChatSession.State.SEARCHING_UNREGISTERED_PRODUCT and text:
+        return handle_uncatalogued_product_search(
+            tenant_id=tenant_id,
+            instance=instance,
+            phone=phone,
+            resident=resident,
+            session=session,
+            text=text,
+        )
+
+    if session.state == ChatSession.State.AWAITING_SUPPORT_DETAILS and text:
+        return _handle_support_details(
+            instance=instance,
+            phone=phone,
+            resident=resident,
+            session=session,
+            text=text,
         )
 
     if session.state == ChatSession.State.AWAITING_PRODUCT_SUGGESTION and text:

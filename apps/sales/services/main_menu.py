@@ -1,4 +1,4 @@
-"""Menu principal interativo após saudação (GREETING)."""
+"""Menu principal de suporte após saudação (GREETING)."""
 
 from __future__ import annotations
 
@@ -6,14 +6,11 @@ import logging
 import re
 import unicodedata
 
-from apps.chatbot.services.chat_logging import log_outbound
 from apps.integrations.models import WhatsappInstance
 from apps.residents.models import ChatSession, Resident
 from apps.residents.services.whatsapp_reply import send_whatsapp_reply
-from apps.sales.services.cart_repository import get_or_create_open_cart
 from apps.sales.services.chat_fsm import transition
 from apps.sales.services.intent_gatekeeper import is_opening_greeting
-from apps.sales.services.product_search import MAIN_MENU_PURCHASE_PROMPT
 from apps.sales.services.resident_ai_context import resident_display_name
 from apps.sales.services.whatsapp_interactive import (
     MAIN_MENU_ROW_IDS,
@@ -23,13 +20,11 @@ from apps.sales.services.whatsapp_interactive import (
     MENU_OTHER,
     MENU_PAYMENT,
     MENU_PRODUCT,
-    MENU_PURCHASE,
-    MENU_STOCK,
     MENU_STORE,
-    MENU_SUGGEST,
     MENU_UNCATALOGUED,
+    SUPPORT_DETAILS_PROMPT,
+    UNREGISTERED_PRODUCT_SEARCH_PROMPT,
     build_main_menu_text_fallback,
-    send_main_menu_list,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,17 +39,11 @@ _MENU_NUMBER_WORDS = {
     "cinco": 5,
     "seis": 6,
     "sete": 7,
-    "oito": 8,
-    "nove": 9,
-    "dez": 10,
 }
 
 _OPTION_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    (MENU_PURCHASE, ("comprar", "quero comprar", "buscar produto", "fazer uma compra")),
-    (MENU_SUGGEST, ("sugestao", "sugerir produto", "quero que vendam")),
-    (MENU_STOCK, ("falta de", "sem estoque", "acabou")),
+    (MENU_PAYMENT, ("maquininha", "indisp", "queda sistema", "pix nao funciona")),
     (MENU_UNCATALOGUED, ("sem cadastro", "sem preco", "nao cadastrado")),
-    (MENU_PAYMENT, ("maquininha", "indisp", "pix nao funciona")),
     (MENU_BILLING, ("cobranca", "valor errado", "cobrado")),
     (MENU_FRIDGE, ("geladeira", "freezer")),
     (MENU_STORE, ("problema loja", "loja")),
@@ -75,7 +64,7 @@ def build_main_menu_greeting(*, resident: Resident) -> str:
 
 
 def build_main_menu_message(*, resident: Resident) -> str:
-    """Texto completo do menu (inbox + fallback quando a lista falha)."""
+    """Texto completo do menu de suporte."""
     return build_main_menu_text_fallback(greeting=build_main_menu_greeting(resident=resident))
 
 
@@ -84,59 +73,6 @@ def build_main_menu_reminder() -> str:
     for idx, (_row_id, title, _desc) in enumerate(MAIN_MENU_ROWS, start=1):
         lines.append(f"{idx} — {title}")
     return "\n".join(lines)
-
-
-def build_maintenance_prompt() -> str:
-    return (
-        "Descreva em texto o problema (maquininha, geladeira, etc.) "
-        "que vamos registrar."
-    )
-
-
-def build_stock_prompt() -> str:
-    return "Conte em texto sobre o produto (falta, dúvida ou preço)."
-
-
-def build_uncatalogued_prompt() -> str:
-    return (
-        "Qual produto está sem cadastro ou sem preço? "
-        "Informe o nome ou a marca que vamos registrar."
-    )
-
-
-def build_payment_prompt() -> str:
-    return (
-        "Descreva o problema de pagamento (maquininha, Pix indisponível, etc.)."
-    )
-
-
-def build_billing_prompt() -> str:
-    return "Conte o que aconteceu com a cobrança (valor, duplicidade, etc.)."
-
-
-def build_fridge_prompt() -> str:
-    return "Descreva o problema na geladeira ou freezer."
-
-
-def build_store_prompt() -> str:
-    return "Descreva o problema na loja (iluminação, porta, limpeza, etc.)."
-
-
-def build_product_issue_prompt() -> str:
-    return (
-        "Descreva o problema com o produto (estragado, vencido, embalagem, etc.)."
-    )
-
-
-def build_other_prompt() -> str:
-    return "Como posso ajudar? Descreva em texto o que você precisa."
-
-
-def build_suggest_prompt() -> str:
-    return (
-        "Qual produto você gostaria de sugerir para o mercado? "
-        "Pode informar o nome ou a marca."
-    )
 
 
 def parse_main_menu_choice(
@@ -153,28 +89,29 @@ def parse_main_menu_choice(
     if not raw:
         return None
 
-    digit_head = re.match(r"^(10|[1-9])", raw)
+    max_opt = len(MAIN_MENU_ROWS)
+    digit_head = re.match(rf"^([1-{max_opt}])", raw)
     if digit_head:
         rest = raw[digit_head.end() :]
         if not rest or re.fullmatch(r"[\ufe0f\u20e3\s]*", rest):
             return MAIN_MENU_ROWS[int(digit_head.group(1)) - 1][0]
 
     normalized = _normalize_choice_text(raw)
-    if re.fullmatch(r"10|[1-9]", normalized):
+    if re.fullmatch(rf"[1-{max_opt}]", normalized):
         idx = int(normalized)
         return MAIN_MENU_ROWS[idx - 1][0]
 
-    digit_match = re.search(r"\b(10|[1-9])\b", normalized)
+    digit_match = re.search(rf"\b([1-{max_opt}])\b", normalized)
     if digit_match:
         idx = int(digit_match.group(1))
         return MAIN_MENU_ROWS[idx - 1][0]
 
     if normalized in _MENU_NUMBER_WORDS:
         idx = _MENU_NUMBER_WORDS[normalized]
-        if 1 <= idx <= len(MAIN_MENU_ROWS):
+        if 1 <= idx <= max_opt:
             return MAIN_MENU_ROWS[idx - 1][0]
 
-    option_match = re.match(r"^(?:opcao|opção)\s*(10|[1-9])\b", normalized)
+    option_match = re.match(rf"^(?:opcao|opção)\s*([1-{max_opt}])\b", normalized)
     if option_match:
         idx = int(option_match.group(1))
         return MAIN_MENU_ROWS[idx - 1][0]
@@ -194,37 +131,45 @@ def show_main_menu(
     session: ChatSession,
 ) -> None:
     transition(session, ChatSession.State.AWAITING_MAIN_MENU, reason="greeting_menu")
-    greeting = build_main_menu_greeting(resident=resident)
     menu_text = build_main_menu_message(resident=resident)
-
-    sent_list = send_main_menu_list(
-        instance,
-        phone,
-        title="Atendimento",
-        description=greeting,
-    )
-    if sent_list:
-        log_outbound(
-            instance=instance,
-            phone=phone,
-            message_text=menu_text,
-            session=session,
-        )
-        return
-
+    # Listas nativas (/send/list) retornam 405 no WhatsApp via Evolution GO;
+    # menu em texto numerado (igual ao catálogo de produtos).
     send_whatsapp_reply(instance, phone, menu_text, session=session)
 
 
-def _prompt_then_idle(
+def _start_support_details_collection(
     *,
     instance: WhatsappInstance,
     phone: str,
     session: ChatSession,
+    choice: str,
     reason: str,
-    prompt: str,
 ) -> None:
-    transition(session, ChatSession.State.IDLE, reason=reason)
-    send_whatsapp_reply(instance, phone, prompt, session=session)
+    session.temporary_name = choice
+    session.save(update_fields=["temporary_name", "updated_at"])
+    transition(session, ChatSession.State.AWAITING_SUPPORT_DETAILS, reason=reason)
+    send_whatsapp_reply(instance, phone, SUPPORT_DETAILS_PROMPT, session=session)
+
+
+def _start_uncatalogued_product_search(
+    *,
+    instance: WhatsappInstance,
+    phone: str,
+    session: ChatSession,
+) -> None:
+    session.temporary_name = ""
+    session.save(update_fields=["temporary_name", "updated_at"])
+    transition(
+        session,
+        ChatSession.State.SEARCHING_UNREGISTERED_PRODUCT,
+        reason="main_menu_uncatalogued",
+    )
+    send_whatsapp_reply(
+        instance,
+        phone,
+        UNREGISTERED_PRODUCT_SEARCH_PROMPT,
+        session=session,
+    )
 
 
 def handle_main_menu_message(
@@ -247,103 +192,32 @@ def handle_main_menu_message(
         send_whatsapp_reply(instance, phone, build_main_menu_reminder(), session=session)
         return True
 
-    if choice == MENU_PURCHASE:
-        cart = get_or_create_open_cart(resident)
-        session.active_cart = cart
-        session.save(update_fields=["active_cart", "updated_at"])
-        transition(session, ChatSession.State.PRODUCT_SEARCH, reason="main_menu_purchase")
-        send_whatsapp_reply(instance, phone, MAIN_MENU_PURCHASE_PROMPT, session=session)
-        return True
-
-    if choice == MENU_SUGGEST:
-        transition(
-            session,
-            ChatSession.State.AWAITING_PRODUCT_SUGGESTION,
-            reason="main_menu_suggest",
-        )
-        send_whatsapp_reply(instance, phone, build_suggest_prompt(), session=session)
-        return True
-
-    if choice == MENU_STOCK:
-        _prompt_then_idle(
-            instance=instance,
-            phone=phone,
-            session=session,
-            reason="main_menu_stock",
-            prompt=build_stock_prompt(),
-        )
+    if choice not in MAIN_MENU_ROW_IDS:
+        logger.warning("Menu choice sem handler: %s", choice)
+        send_whatsapp_reply(instance, phone, build_main_menu_reminder(), session=session)
         return True
 
     if choice == MENU_UNCATALOGUED:
-        _prompt_then_idle(
+        _start_uncatalogued_product_search(
             instance=instance,
             phone=phone,
             session=session,
-            reason="main_menu_uncatalogued",
-            prompt=build_uncatalogued_prompt(),
         )
         return True
 
-    if choice == MENU_PAYMENT:
-        _prompt_then_idle(
-            instance=instance,
-            phone=phone,
-            session=session,
-            reason="main_menu_payment",
-            prompt=build_payment_prompt(),
-        )
-        return True
-
-    if choice == MENU_BILLING:
-        _prompt_then_idle(
-            instance=instance,
-            phone=phone,
-            session=session,
-            reason="main_menu_billing",
-            prompt=build_billing_prompt(),
-        )
-        return True
-
-    if choice == MENU_FRIDGE:
-        _prompt_then_idle(
-            instance=instance,
-            phone=phone,
-            session=session,
-            reason="main_menu_fridge",
-            prompt=build_fridge_prompt(),
-        )
-        return True
-
-    if choice == MENU_STORE:
-        _prompt_then_idle(
-            instance=instance,
-            phone=phone,
-            session=session,
-            reason="main_menu_store",
-            prompt=build_store_prompt(),
-        )
-        return True
-
-    if choice == MENU_PRODUCT:
-        _prompt_then_idle(
-            instance=instance,
-            phone=phone,
-            session=session,
-            reason="main_menu_product_issue",
-            prompt=build_product_issue_prompt(),
-        )
-        return True
-
-    if choice == MENU_OTHER:
-        _prompt_then_idle(
-            instance=instance,
-            phone=phone,
-            session=session,
-            reason="main_menu_other",
-            prompt=build_other_prompt(),
-        )
-        return True
-
-    logger.warning("Menu choice sem handler: %s", choice)
-    send_whatsapp_reply(instance, phone, build_main_menu_reminder(), session=session)
+    reason_by_choice = {
+        MENU_PAYMENT: "main_menu_payment",
+        MENU_BILLING: "main_menu_billing",
+        MENU_FRIDGE: "main_menu_fridge",
+        MENU_STORE: "main_menu_store",
+        MENU_PRODUCT: "main_menu_product_issue",
+        MENU_OTHER: "main_menu_other",
+    }
+    _start_support_details_collection(
+        instance=instance,
+        phone=phone,
+        session=session,
+        choice=choice,
+        reason=reason_by_choice.get(choice, "main_menu_support"),
+    )
     return True

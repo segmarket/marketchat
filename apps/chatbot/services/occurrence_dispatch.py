@@ -17,6 +17,14 @@ from apps.sales.services.stock_issue_handler import extract_stock_product_label
 
 logger = logging.getLogger(__name__)
 
+ALERTA_QUALIDADE_RESIDENT_MESSAGE = (
+    "Poxa, sinto muito por isso! Por favor, deixe o produto separado na bancada. "
+    "Já bloqueei a venda deste lote e enviei um alerta para a gerência. "
+    "Estou transferindo o seu atendimento para a nossa equipe agora. "
+    "Pode enviar aqui o valor que você pagou para agilizarmos o estorno, "
+    "e um atendente humano te responderá em instantes."
+)
+
 _OWNER_LABELS: dict[str, str] = {
     "ALERTA_QUALIDADE": "Qualidade alimentar",
     "ALERTA_INFRA": "Infraestrutura",

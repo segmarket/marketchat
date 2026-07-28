@@ -70,6 +70,7 @@ const settingsNavItem: NavItem = {
   subItems: [
     { name: "Mercados", to: "/admin/settings?section=markets" },
     { name: "Integrações", to: "/admin/settings?section=integrations", integrationsOnly: true },
+    { name: "Horário Comercial", to: "/admin/settings?section=bot-schedule" },
     { name: "Minha Conta", to: "/admin/settings" },
     { name: "Privacidade", to: "/admin/settings?section=privacy", adminOnly: true },
     { name: "Plano e pagamento", to: "/admin/settings?tab=plan", adminOnly: true },

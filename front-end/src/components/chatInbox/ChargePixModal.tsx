@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Info, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  formatChatPixMessage,
   generateChatPix,
   type ChatPixItemInput,
 } from "../../features/chatLogs/chatPix";
@@ -17,8 +16,9 @@ import ProductItemCombobox from "./ProductItemCombobox";
 type Props = {
   open: boolean;
   sessionId: number;
+  walkInBilling?: boolean;
   onClose: () => void;
-  onInsertDraft: (text: string) => void;
+  onPixDelivered: () => void;
 };
 
 type DraftItem = {
@@ -50,8 +50,9 @@ function toApiMoney(raw: string): string {
 export default function ChargePixModal({
   open,
   sessionId,
+  walkInBilling = false,
   onClose,
-  onInsertDraft,
+  onPixDelivered,
 }: Props) {
   const [amountOnly, setAmountOnly] = useState(false);
   const [amount, setAmount] = useState("");
@@ -119,14 +120,15 @@ export default function ChargePixModal({
         payloadItems = cleaned;
       }
 
-      const data = await generateChatPix({
+      await generateChatPix({
         sessionId,
         items: payloadItems,
         amount: payloadAmount,
         description: description.trim() || undefined,
+        deliverWhatsapp: true,
       });
-      onInsertDraft(formatChatPixMessage(data));
-      toast.success("Cobrança gerada. Revise a mensagem e envie.");
+      onPixDelivered();
+      toast.success("Cobrança enviada em duas mensagens no WhatsApp.");
       onClose();
     } catch (err) {
       toast.error(
@@ -146,9 +148,21 @@ export default function ChargePixModal({
           Gerar cobrança PIX
         </h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Monte o pedido ou informe um valor avulso. O código PIX será inserido
-          no campo de mensagem para você revisar.
+          O resumo e o código PIX serão enviados em duas mensagens separadas no
+          WhatsApp do cliente.
         </p>
+
+        {walkInBilling ? (
+          <p
+            className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200/80 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100"
+            role="status"
+          >
+            <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <span>
+              Cliente não identificado. A cobrança será gerada como Venda Avulsa.
+            </span>
+          </p>
+        ) : null}
 
         <div className="mt-4 flex items-center gap-2">
           <input
@@ -262,7 +276,7 @@ export default function ChargePixModal({
             className="min-h-[44px]"
             disabled={submitting || total <= 0}
           >
-            {submitting ? "Gerando…" : "Gerar cobrança e inserir no chat"}
+            {submitting ? "Enviando…" : "Gerar e enviar cobrança"}
           </Button>
         </div>
       </form>

@@ -20,6 +20,10 @@ logger = logging.getLogger(__name__)
 class EvolutionWebhookView(APIView):
     authentication_classes: list = []
     permission_classes = [AllowAny]
+    # Evolution dispara dezenas de eventos/minuto (MESSAGE, presença, conexão).
+    # O throttle anon global (10/min) gerava 429 e descartava mensagens do morador
+    # (ex.: resposta do nome no onboarding sem registro no histórico).
+    throttle_classes: list = []
 
     def post(self, request: Request) -> Response:
         body = request.data if isinstance(request.data, dict) else {}

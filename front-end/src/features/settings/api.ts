@@ -3,6 +3,8 @@ import type {
   AccountSettingsPatch,
   AccountSettingsResponse,
   BillingHistoryResponse,
+  BotScheduleDay,
+  BotScheduleResponse,
   PaymentMethodSummary,
 } from "./types";
 
@@ -15,6 +17,29 @@ export async function patchAccountSettings(
   payload: AccountSettingsPatch,
 ): Promise<AccountSettingsResponse> {
   const { data } = await api.patch<AccountSettingsResponse>("/api/settings/account/", payload);
+  return data;
+}
+
+export async function fetchBotSchedule(): Promise<BotScheduleResponse> {
+  const { data } = await api.get<BotScheduleResponse>("/api/settings/bot-schedule/");
+  return data;
+}
+
+export async function saveBotSchedule(
+  days: BotScheduleDay[],
+): Promise<BotScheduleResponse> {
+  const { data } = await api.put<BotScheduleResponse>("/api/settings/bot-schedule/", {
+    days,
+  });
+  return data;
+}
+
+export async function patchBotGlobalActive(
+  isBotActiveGlobal: boolean,
+): Promise<BotScheduleResponse> {
+  const { data } = await api.patch<BotScheduleResponse>("/api/settings/bot-schedule/", {
+    is_bot_active_global: isBotActiveGlobal,
+  });
   return data;
 }
 

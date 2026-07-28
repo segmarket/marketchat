@@ -80,5 +80,18 @@ export type SettingsSectionId =
   | "markets"
   | "integrations"
   | "privacy"
+  | "bot-schedule"
   | "plan"
   | "history";
+
+export type BotScheduleDay = {
+  day_of_week: number;
+  is_active: boolean;
+  start_time: string;
+  end_time: string;
+};
+
+export type BotScheduleResponse = {
+  is_bot_active_global: boolean;
+  days: BotScheduleDay[];
+};

@@ -12,7 +12,8 @@ from django.utils import timezone
 
 from apps.chatbot.models import ChatMessageLog
 from apps.chatbot.services.chat_logging import pick_dominant_intent
-from apps.residents.models import ChatSession
+from apps.billing.services.tenant_default_asaas_customer import resident_billing_identified
+from apps.residents.models import ChatSession, Resident
 
 INTENT_RANK_CASE = Case(
     When(
@@ -327,6 +328,22 @@ def conversation_messages(
         if not resident_name:
             resident_name = session.temporary_name or ""
 
+    billing_resident = (
+        Resident.objects.filter(
+            tenant_id=tenant_id,
+            phone_number=session.phone_number,
+            is_active=True,
+            is_anonymized=False,
+        )
+        .select_related("market")
+        .first()
+    )
+    identified = (
+        resident_billing_identified(billing_resident)
+        if billing_resident is not None
+        else False
+    )
+
     header = {
         "session_id": session_id,
         "resident_name": resident_name,
@@ -334,6 +351,7 @@ def conversation_messages(
         "market_name": market_name,
         "attendance_date": header_date.isoformat() if header_date else "",
         "is_bot_active": session.is_bot_active,
+        "resident_billing_identified": identified,
         "last_human_interaction_at": (
             session.last_human_interaction_at.isoformat()
             if session.last_human_interaction_at

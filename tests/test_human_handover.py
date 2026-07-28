@@ -126,6 +126,31 @@ def test_agent_message_pauses_bot(mock_send, api_client):
 
 
 @pytest.mark.django_db
+@patch("apps.chatbot.views_handover.send_whatsapp_reply")
+def test_agent_message_clears_waiting_for_human(mock_send, api_client):
+    tenant = TenantFactory()
+    user = UserFactory(tenant=tenant, email="handover-waiting@example.com")
+    WhatsappInstanceFactory(tenant=tenant, is_active=True)
+    session = ChatSessionFactory(
+        tenant=tenant,
+        phone_number="5511999990002",
+        state=ChatSession.State.WAITING_FOR_HUMAN,
+        is_bot_active=True,
+    )
+    _auth(api_client, user)
+
+    url = reverse("chatbot-session-agent-message", kwargs={"pk": session.pk})
+    resp = api_client.post(url, {"text": "Oi, vou te ajudar"}, format="json")
+    assert resp.status_code == 201
+    assert resp.json()["is_bot_active"] is False
+    mock_send.assert_called_once()
+
+    session.refresh_from_db()
+    assert session.is_bot_active is False
+    assert session.state == ChatSession.State.IDLE
+
+
+@pytest.mark.django_db
 @patch("apps.integrations.services.webhook_handlers.run_chatbot_flow")
 @patch("apps.integrations.services.webhook_handlers.process_cart_flow", return_value=False)
 @patch("apps.integrations.services.webhook_handlers.classify_user_intent", return_value="GENERAL")

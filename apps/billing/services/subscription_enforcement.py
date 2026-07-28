@@ -39,6 +39,9 @@ _ACTIVE_CART_STATUSES = (
 
 _PURCHASE_SESSION_STATES = (
     ChatSession.State.AWAITING_MAIN_MENU,
+    ChatSession.State.AWAITING_SUPPORT_DETAILS,
+    ChatSession.State.SEARCHING_UNREGISTERED_PRODUCT,
+    ChatSession.State.WAITING_FOR_HUMAN,
     ChatSession.State.PRODUCT_SEARCH,
     ChatSession.State.QUANTITY_SELECTION,
     ChatSession.State.CART_REVIEW,
