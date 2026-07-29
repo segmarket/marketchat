@@ -32,6 +32,9 @@ User = get_user_model()
 WELCOME_SUBJECT = "Bem-vindo ao MarketChat - Seu gerente virtual esta pronto"
 PASSWORD_RESET_SUBJECT = "Recuperacao de Senha - MarketChat"
 SUBSCRIPTION_SUSPENDED_SUBJECT = "MarketChat pausado - Regularize sua assinatura"
+WHATSAPP_DISCONNECTED_SUBJECT = (
+    "⚠️ URGENTE: Seu WhatsApp no MarketChat foi desconectado!"
+)
 
 
 def _display_first_name(user: User) -> str:
@@ -218,4 +221,42 @@ def send_subscription_suspended_email_safe(
             user.email,
             tenant.pk,
             reason,
+        )
+
+
+def _whatsapp_settings_action_url() -> str:
+    origin = (getattr(settings, "FRONTEND_APP_ORIGIN", "") or "").strip().rstrip("/")
+    if origin:
+        return f"{origin}/admin/settings?section=integrations"
+    return "/admin/settings?section=integrations"
+
+
+def send_whatsapp_disconnected_email(user: User, tenant: Tenant) -> None:
+    context = build_email_context(
+        first_name=_display_first_name(user),
+        company_name=tenant.name,
+        action_url=_whatsapp_settings_action_url(),
+        alert_body=(
+            "O WhatsApp da sua loja perdeu a conexão e o seu robô está offline. "
+            "Você está perdendo vendas. Acesse o painel agora mesmo para escanear "
+            "um novo QR Code."
+        ),
+    )
+    send_market_transactional_email(
+        WHATSAPP_DISCONNECTED_SUBJECT,
+        "whatsapp_disconnected",
+        context,
+        user.email,
+    )
+
+
+def send_whatsapp_disconnected_email_safe(user: User, tenant: Tenant) -> None:
+    """Não propaga falha de SMTP no webhook de desconexão."""
+    try:
+        send_whatsapp_disconnected_email(user, tenant)
+    except Exception:
+        logger.exception(
+            "Falha ao enviar e-mail de WhatsApp desconectado para %s (tenant=%s)",
+            user.email,
+            tenant.pk,
         )

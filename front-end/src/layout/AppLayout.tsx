@@ -3,6 +3,7 @@ import { NotificationsProvider } from "../context/NotificationsContext";
 import { SidebarProvider, useSidebar } from "../context/SidebarContext";
 import { Outlet, useLocation } from "react-router";
 import GracePeriodBanner from "../components/billing/GracePeriodBanner";
+import { WhatsappDisconnectedBanner } from "../components/integrations/WhatsappDisconnectedBanner";
 import { useAuth } from "../context/AuthContext";
 import BillingBlocked from "../pages/admin/BillingBlocked";
 import TrialExpired from "../pages/admin/TrialExpired";
@@ -63,6 +64,7 @@ const LayoutContent: React.FC = () => {
             isExpanded || isHovered ? "lg:ml-[290px]" : "lg:ml-[90px]"
           } ${isMobileOpen ? "ml-0" : ""}`}
         >
+          <WhatsappDisconnectedBanner />
           <GracePeriodBanner />
           <AppHeader />
           <div

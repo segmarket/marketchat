@@ -40,6 +40,10 @@ class Tenant(models.Model):
         default=True,
         help_text="Chave geral: se False, o bot não responde em nenhuma conversa.",
     )
+    is_whatsapp_connected = models.BooleanField(
+        default=False,
+        help_text="Espelho da sessão WhatsApp ativa (Evolution). False = bot offline para clientes.",
+    )
     asaas_default_customer_id = models.CharField(
         max_length=64,
         blank=True,

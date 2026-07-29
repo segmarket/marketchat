@@ -33,15 +33,14 @@ def _instance_webhook_url(instance: WhatsappInstance) -> str:
 
 
 def _should_recreate_evolution_instance(instance: WhatsappInstance) -> bool:
-    """Sessão já conectada antes ou logout permanente exige novo token no Evolution."""
+    """
+    Sessão não-open no Evolution quase sempre precisa de delete+create+connect.
+    Só `connect`/`logout` em sessão invalidada pelo WhatsApp não gera QR
+    (ver docs/production-whatsapp-evolution.md).
+    """
     if needs_hard_evolution_recreate(instance):
         return True
-    if instance.connection_status != WhatsappInstance.ConnectionStatus.CLOSE:
-        return False
-    return bool(
-        (instance.phone_number or "").strip()
-        or (instance.profile_name or "").strip()
-    )
+    return instance.connection_status != WhatsappInstance.ConnectionStatus.OPEN
 
 
 def _needs_session_reset(instance: WhatsappInstance) -> bool:
@@ -70,6 +69,7 @@ def restart_whatsapp_instance(
         raise EvolutionRestartError("URL do webhook não configurada para esta instância.")
 
     reconnect_result: dict = {}
+    recreated = False
     try:
         if _should_recreate_evolution_instance(instance):
             logger.info(
@@ -77,6 +77,7 @@ def restart_whatsapp_instance(
                 instance.instance_name,
             )
             instance = recreate_evolution_instance(instance, client=client)
+            recreated = True
         else:
             reconnect_result = client.reconnect_instance(
                 instance_api_key=instance.api_key,
@@ -92,6 +93,14 @@ def restart_whatsapp_instance(
             )
     except Exception as exc:
         raise EvolutionRestartError(str(exc)) from exc
+
+    # Após recreate, o Evolution ainda está gerando o QR — não bloqueia o worker.
+    if recreated:
+        logger.info(
+            "Restart %s: instância recriada; QR via polling do painel",
+            instance.instance_name,
+        )
+        return instance, ""
 
     qrcode_image = EvolutionClient.extract_qrcode_image(
         reconnect_result.get("qrcode") or reconnect_result.get("connect") or {}

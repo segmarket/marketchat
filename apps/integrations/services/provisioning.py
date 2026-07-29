@@ -201,6 +201,7 @@ def mark_whatsapp_session_disconnected(
     instance: WhatsappInstance,
     *,
     reason: str = SESSION_DISCONNECTED_REASON,
+    schedule_email: bool = True,
 ) -> None:
     """Sessão WhatsApp caiu no Evolution; mantém registro ativo para reconexão no painel."""
     instance.is_active = True
@@ -214,6 +215,11 @@ def mark_whatsapp_session_disconnected(
             "updated_at",
         ]
     )
+    from apps.integrations.services.whatsapp_connection_alert import (
+        on_whatsapp_disconnected,
+    )
+
+    on_whatsapp_disconnected(instance, schedule_email=schedule_email)
 
 
 def deactivate_stale_whatsapp_instance(
@@ -232,6 +238,9 @@ def deactivate_stale_whatsapp_instance(
             "updated_at",
         ]
     )
+    from apps.integrations.services.whatsapp_connection_alert import set_whatsapp_connected
+
+    set_whatsapp_connected(instance.tenant_id, connected=False)
 
 
 def reconcile_whatsapp_with_evolution(
@@ -400,6 +409,11 @@ def provision_whatsapp_instance(
         if qrcode_payload.get("connected"):
             instance.connection_status = WhatsappInstance.ConnectionStatus.OPEN
             instance.save(update_fields=["connection_status", "updated_at"])
+            from apps.integrations.services.whatsapp_connection_alert import (
+                on_whatsapp_connected,
+            )
+
+            on_whatsapp_connected(instance)
         else:
             qrcode_image = evolution_client_module.EvolutionClient.extract_qrcode_image(
                 qrcode_payload
@@ -430,7 +444,7 @@ def logout_whatsapp_session(
     """Encerra sessão WhatsApp no Evolution sem apagar a instância (reconexão via QR)."""
     client = client or EvolutionClient()
     if not (instance.api_key or "").strip():
-        mark_whatsapp_session_disconnected(instance, reason=reason)
+        mark_whatsapp_session_disconnected(instance, reason=reason, schedule_email=False)
         return
     try:
         client.logout_instance(instance_api_key=instance.api_key)
@@ -449,7 +463,7 @@ def logout_whatsapp_session(
             instance.instance_name,
             exc_info=True,
         )
-    mark_whatsapp_session_disconnected(instance, reason=reason)
+    mark_whatsapp_session_disconnected(instance, reason=reason, schedule_email=False)
 
 
 def disconnect_whatsapp_instance(
@@ -474,6 +488,13 @@ def disconnect_whatsapp_instance(
             "updated_at",
         ]
     )
+    from apps.integrations.services.whatsapp_connection_alert import (
+        cancel_pending_disconnect_email,
+        set_whatsapp_connected,
+    )
+
+    set_whatsapp_connected(instance.tenant_id, connected=False)
+    cancel_pending_disconnect_email(instance.tenant_id)
 
 
 def refresh_qrcode(
@@ -491,8 +512,9 @@ def refresh_qrcode(
     try:
         payload = client.fetch_qrcode(
             instance_api_key=instance.api_key,
-            retries=8,
-            retry_delay=2.0,
+            # Uma tentativa: painel faz polling. Retries com sleep bloqueiam Gunicorn sync.
+            retries=0,
+            retry_delay=0,
         )
     except urllib.error.HTTPError as exc:
         if evolution_client_module.EvolutionClient._http_error_is_qr_not_ready(exc):
@@ -572,4 +594,13 @@ def sync_connection_status(
             instance.disconnect_reason = ""
             update_fields.append("disconnect_reason")
         instance.save(update_fields=update_fields)
+        from apps.integrations.services.whatsapp_connection_alert import (
+            on_whatsapp_connected,
+            on_whatsapp_disconnected,
+        )
+
+        if status == WhatsappInstance.ConnectionStatus.OPEN:
+            on_whatsapp_connected(instance)
+        elif status == WhatsappInstance.ConnectionStatus.CLOSE:
+            on_whatsapp_disconnected(instance)
     return instance.connection_status

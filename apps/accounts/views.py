@@ -52,6 +52,8 @@ class MeView(APIView):
         subscription_canceled = False
         is_in_grace_period = False
         days_overdue = 0
+        is_whatsapp_connected = False
+        has_whatsapp_instance = False
         if user.tenant_id:
             tenant = Tenant.objects.filter(pk=user.tenant_id).first()
             if tenant:
@@ -71,6 +73,12 @@ class MeView(APIView):
                 subscription_canceled = (
                     subscription_status == Tenant.SubscriptionStatus.CANCELED
                 )
+                is_whatsapp_connected = bool(tenant.is_whatsapp_connected)
+                from apps.integrations.models import WhatsappInstance
+
+                has_whatsapp_instance = WhatsappInstance.all_objects.filter(
+                    tenant_id=tenant.pk,
+                ).exists()
         return Response(
             {
                 "id": user.id,
@@ -85,6 +93,9 @@ class MeView(APIView):
                 "subscription_canceled": subscription_canceled,
                 "is_in_grace_period": is_in_grace_period,
                 "days_overdue": days_overdue,
+                "is_tenant_admin": bool(getattr(user, "is_tenant_admin", False)),
+                "is_whatsapp_connected": is_whatsapp_connected,
+                "has_whatsapp_instance": has_whatsapp_instance,
             }
         )
 

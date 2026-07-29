@@ -117,6 +117,11 @@ def _handle_connected(event: EvolutionWebhookEvent, instance: WhatsappInstance) 
         instance.connection_status = status
         instance.save(update_fields=["connection_status", "updated_at"])
     if status == WhatsappInstance.ConnectionStatus.OPEN:
+        from apps.integrations.services.whatsapp_connection_alert import (
+            on_whatsapp_connected,
+        )
+
+        on_whatsapp_connected(instance)
         sync_profile_avatar_from_evolution(instance)
     logger.info(
         "WhatsApp connected: tenant=%s instance=%s event=%s status=%s",
@@ -158,8 +163,17 @@ def _handle_connection(event: EvolutionWebhookEvent, instance: WhatsappInstance)
         instance.save(update_fields=update_fields)
     elif len(update_fields) > 2:
         instance.save(update_fields=update_fields)
+
+    from apps.integrations.services.whatsapp_connection_alert import (
+        on_whatsapp_connected,
+        on_whatsapp_disconnected,
+    )
+
     if status == WhatsappInstance.ConnectionStatus.OPEN:
+        on_whatsapp_connected(instance)
         sync_profile_avatar_from_evolution(instance)
+    elif status == WhatsappInstance.ConnectionStatus.CLOSE:
+        on_whatsapp_disconnected(instance)
     logger.info(
         "WhatsApp connection: tenant=%s instance=%s status=%s",
         instance.tenant_id,

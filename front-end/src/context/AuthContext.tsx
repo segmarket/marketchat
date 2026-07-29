@@ -28,6 +28,9 @@ export type AuthUser = {
   subscription_canceled?: boolean;
   is_in_grace_period?: boolean;
   days_overdue?: number;
+  is_tenant_admin?: boolean;
+  is_whatsapp_connected?: boolean;
+  has_whatsapp_instance?: boolean;
 };
 
 type AuthContextValue = {

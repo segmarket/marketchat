@@ -41,11 +41,13 @@ function isQrFlow(state: WhatsappDashboard, qrcodeImage: string): boolean {
 
 type Props = {
   embedded?: boolean;
+  /** Chamado quando a sessão fica conectada (ex.: modal do banner de desconexão). */
+  onConnected?: () => void;
 };
 
 type ConnectSpotlightStep = "TRIGGER" | "SCAN";
 
-export default function WhatsAppConfig({ embedded = false }: Props) {
+export default function WhatsAppConfig({ embedded = false, onConnected }: Props) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [state, setState] = useState<WhatsappDashboard | null>(null);
@@ -137,11 +139,12 @@ export default function WhatsAppConfig({ embedded = false }: Props) {
         setQrcodeImage("");
         setConnectStep(null);
         toast.success("WhatsApp conectado com sucesso.");
+        onConnected?.();
       }
     } catch {
       /* polling silencioso */
     }
-  }, [stopPolling]);
+  }, [onConnected, stopPolling]);
 
   const shouldPollQr =
     Boolean(state?.has_instance && state.is_active) &&
@@ -176,15 +179,22 @@ export default function WhatsAppConfig({ embedded = false }: Props) {
       if (state?.is_active) {
         const restarted = await restartWhatsapp();
         setState(restarted);
+        let latest = restarted;
         if (restarted.qrcode_image) {
           setQrcodeImage(restarted.qrcode_image);
         } else if (!isConnected(restarted)) {
           const qr = await fetchWhatsappQrcode();
           setState(qr);
+          latest = qr;
           if (qr.qrcode_image) setQrcodeImage(qr.qrcode_image);
           else toast.error(QR_FAIL_MSG);
         }
-        toast.success("Escaneie o novo QR Code para reconectar o WhatsApp.");
+        if (isConnected(latest)) {
+          toast.success("WhatsApp conectado com sucesso.");
+          onConnected?.();
+        } else {
+          toast.success("Escaneie o novo QR Code para reconectar o WhatsApp.");
+        }
       } else {
         await handleConnect();
       }
@@ -207,8 +217,18 @@ export default function WhatsAppConfig({ embedded = false }: Props) {
         setState(qr);
         if (qr.qrcode_image) setQrcodeImage(qr.qrcode_image);
         else toast.error(QR_FAIL_MSG);
+        if (isConnected(qr)) {
+          toast.success("WhatsApp conectado com sucesso.");
+          onConnected?.();
+          return;
+        }
       }
-      toast.success("Escaneie o QR Code no WhatsApp para concluir a conexão.");
+      if (isConnected(data)) {
+        toast.success("WhatsApp conectado com sucesso.");
+        onConnected?.();
+      } else {
+        toast.success("Escaneie o QR Code no WhatsApp para concluir a conexão.");
+      }
     } catch (err) {
       toast.error(getAxiosErrorMessage(err, { notAxiosMessage: QR_FAIL_MSG }));
     } finally {

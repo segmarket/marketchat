@@ -157,9 +157,11 @@ def test_remote_instance_exists_treats_503_as_still_present():
     "apps.integrations.services.provisioning.remote_instance_exists",
     return_value=True,
 )
+@patch("apps.integrations.services.provisioning.EvolutionClient")
 @patch("apps.integrations.services.instance_dashboard.EvolutionClient")
 def test_whatsapp_get_survives_evolution_http_503(
     mock_dash_cls,
+    mock_prov_cls,
     _mock_exists,
     api_client,
 ):
@@ -173,7 +175,9 @@ def test_whatsapp_get_survives_evolution_http_503(
     )
     mock_client = MagicMock()
     mock_dash_cls.return_value = mock_client
+    mock_prov_cls.return_value = mock_client
     mock_client.check_evolution_health.return_value = "error"
+    mock_client.connection_state.return_value = {"data": {"state": "open"}}
 
     url = reverse("integrations-whatsapp")
     api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(user).access_token}")
@@ -579,6 +583,7 @@ def test_whatsapp_dashboard_webhook_stale(mock_prov_cls, mock_dash_cls, api_clie
 @patch("apps.integrations.services.restart.refresh_qrcode")
 @patch("apps.integrations.services.restart.EvolutionClient")
 def test_whatsapp_restart(mock_client_cls, mock_refresh_qr, api_client):
+    """CLOSE → recria instância no Evolution (connect sozinho não gera QR)."""
     tenant = TenantFactory()
     user = UserFactory(tenant=tenant, email="wa-restart@example.com")
     inst = WhatsappInstanceFactory(
@@ -586,10 +591,12 @@ def test_whatsapp_restart(mock_client_cls, mock_refresh_qr, api_client):
         is_active=True,
         connection_status=WhatsappInstance.ConnectionStatus.CLOSE,
         webhook_url="http://localhost/api/integrations/webhooks/evolution/?secret=test",
+        instance_name="mc-restart-test",
+        instance_id="old-id",
+        api_key="old-token",
     )
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
-    mock_client.reconnect_instance.return_value = {"connect": {}, "qrcode": {}}
     mock_refresh_qr.return_value = {
         "connected": False,
         "qrcode_image": f"data:image/png;base64,{'R' * 120}",
@@ -599,13 +606,15 @@ def test_whatsapp_restart(mock_client_cls, mock_refresh_qr, api_client):
     api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(user).access_token}")
     response = api_client.post(url, {}, format="json")
     assert response.status_code == 200
-    mock_client.reconnect_instance.assert_called_once()
-    _, kwargs = mock_client.reconnect_instance.call_args
-    assert kwargs["reset_session"] is True
+    mock_client.reconnect_instance.assert_not_called()
+    mock_client.create_instance_safe.assert_called_once()
+    mock_client.connect_instance.assert_called_once()
     data = response.json()
     assert data["has_instance"] is True
-    assert data["qrcode_image"].startswith("data:image")
-    assert inst.instance_name == data["instance_name"]
+    assert data["connection_status"] == "connecting"
+    inst.refresh_from_db()
+    assert inst.connection_status == WhatsappInstance.ConnectionStatus.CONNECTING
+    assert inst.api_key != "old-token"
 
 
 def _http_error(code: int, body: str) -> urllib.error.HTTPError:

@@ -1,0 +1,20 @@
+MarketChat — WhatsApp desconectado
+
+Ola, {{ first_name }}!
+
+{{ alert_body }}
+
+Empresa: {{ company_name }}
+
+Reconectar WhatsApp no painel:
+{{ action_url }}
+
+---
+{{ company_legal_name }}
+CNPJ: {{ cnpj }}
+{% for line in address_lines %}{{ line }}
+{% endfor %}
+Suporte: {{ support_email }} | WhatsApp {{ support_phone }}
+
+Este e-mail foi enviado automaticamente pelo MarketChat.
+{{ current_year }} | (c) {{ company_legal_name }} | Todos os Direitos Reservados.
