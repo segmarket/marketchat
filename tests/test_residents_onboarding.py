@@ -118,7 +118,7 @@ def test_onboarding_rejects_unknown_condo():
 
 
 @pytest.mark.django_db
-def test_onboarding_creates_resident_and_deletes_session():
+def test_onboarding_creates_resident_and_opens_main_menu():
     tenant = TenantFactory()
     instance = WhatsappInstanceFactory(tenant=tenant)
     market = MarketFactory(tenant=tenant, name="Residencial Vista Alegre")
@@ -130,7 +130,7 @@ def test_onboarding_creates_resident_and_deletes_session():
         temporary_name="Carlos",
     )
 
-    with mock.patch("apps.residents.services.onboarding_flow.send_whatsapp_reply") as send:
+    with mock.patch("apps.sales.services.main_menu.send_whatsapp_reply") as send:
         with tenant_scope(tenant.id):
             process_inbound_message(tenant.id, instance, phone, "Vista Alegre")
 
@@ -138,8 +138,12 @@ def test_onboarding_creates_resident_and_deletes_session():
     assert resident.name == "Carlos"
     assert resident.market_id == market.id
     session = ChatSession.objects.get(tenant=tenant, phone_number=phone)
-    assert session.state == ChatSession.State.IDLE
-    assert "cadastro foi concluído" in send.call_args[0][2].lower()
+    assert session.state == ChatSession.State.AWAITING_MAIN_MENU
+    body = send.call_args[0][2]
+    assert "cadastro foi concluído" in body.lower()
+    assert market.name in body
+    assert "1 —" in body
+    assert "Como posso te ajudar agora?" not in body
 
 
 @pytest.mark.django_db
@@ -191,6 +195,28 @@ def test_find_market_fuzzy_match():
     found = find_market_by_query(tenant.id, "parque flores")
     assert found is not None
     assert found.id == market.id
+
+
+@pytest.mark.django_db
+def test_find_market_long_phrase_with_condo_name():
+    """Usuário digita nome próprio + frase; ainda encontra o condomínio."""
+    tenant = TenantFactory()
+    market = MarketFactory(tenant=tenant, name="Vila Sônia")
+    found = find_market_by_query(
+        tenant.id,
+        "Antônia Leidiane Condomínio vila Sônia",
+    )
+    assert found is not None
+    assert found.id == market.id
+
+
+@pytest.mark.django_db
+def test_find_market_respects_tenant_isolation():
+    tenant_a = TenantFactory()
+    tenant_b = TenantFactory()
+    MarketFactory(tenant=tenant_b, name="Vila Sônia")
+    found = find_market_by_query(tenant_a.id, "Vila Sônia")
+    assert found is None
 
 
 @pytest.mark.django_db

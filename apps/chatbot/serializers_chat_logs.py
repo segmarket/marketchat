@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.conf import settings
 from rest_framework import serializers
 
 from apps.chatbot.models import ChatMessageLog
@@ -39,6 +40,9 @@ class ChatLogMessageSerializer(serializers.ModelSerializer):
         url = obj.attachment.url
         if request:
             return request.build_absolute_uri(url)
+        base = getattr(settings, "PUBLIC_WEBHOOK_BASE_URL", "").rstrip("/")
+        if base and url.startswith("/"):
+            return f"{base}{url}"
         return url
 
 

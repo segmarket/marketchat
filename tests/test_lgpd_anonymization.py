@@ -7,10 +7,22 @@ from apps.financial.models import LedgerTransaction, Wallet
 from apps.lgpd.services.anonymization import (
     ResidentAnonymizationError,
     anonymize_resident_by_phone,
+    build_anonymous_phone_token,
 )
 from apps.residents.models import ChatMessage, ChatSession, Resident
 from apps.sales.models import Cart
 from tests.factories import CartFactory, MarketFactory, ResidentFactory, TenantFactory
+
+
+def test_anonymous_phone_token_fits_chat_session_and_resident():
+    token = build_anonymous_phone_token(tenant_id=1, phone_number="5511999887766")
+    session_max = ChatSession._meta.get_field("phone_number").max_length
+    resident_max = Resident._meta.get_field("phone_number").max_length
+    assert token.startswith("anon_")
+    assert len(token) <= session_max
+    assert len(token) <= resident_max
+    # Compatível com varchar(32) legado da sessão em ambientes ainda sem migration.
+    assert len(token) <= 32
 
 
 @pytest.mark.django_db

@@ -229,3 +229,11 @@ def test_chat_logs_conversation_with_image(api_client):
     assert msg["direction"] == ChatMessageLog.Direction.INBOUND
     assert msg["message_kind"] == ChatMessageLog.MessageKind.IMAGE
     assert msg["attachment_url"]
+    assert "/media/" in msg["attachment_url"]
+    assert msg["attachment_url"].startswith("http")
+
+    media_path = msg["attachment_url"].split("/media/", 1)[1]
+    media_resp = api_client.get(f"/media/{media_path}")
+    assert media_resp.status_code == 200
+    body_bytes = b"".join(media_resp.streaming_content)
+    assert body_bytes == b"fake-image-bytes"

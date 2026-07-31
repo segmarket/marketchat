@@ -48,3 +48,7 @@ export async function patchResidentMarket(
   });
   return data;
 }
+
+export async function deleteResident(residentId: number): Promise<void> {
+  await api.delete(`/api/residents/${residentId}/`);
+}

@@ -1,12 +1,16 @@
 import re
 
-from django.db.models import Q
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.accounts.permissions import IsTenantAdmin
+from apps.lgpd.services.anonymization import (
+    ResidentAnonymizationError,
+    perform_resident_anonymization,
+)
 from apps.markets.models import Market
 from apps.residents.models import Resident
 from apps.residents.serializers import (
@@ -20,8 +24,14 @@ class ResidentListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request: Request) -> Response:
-        qs = Resident.objects.filter(market__isnull=False).select_related("market").order_by(
-            "-created_at"
+        qs = (
+            Resident.objects.filter(
+                market__isnull=False,
+                is_anonymized=False,
+                is_active=True,
+            )
+            .select_related("market")
+            .order_by("-created_at")
         )
         market_id = request.query_params.get("market_id")
         if market_id:
@@ -55,9 +65,18 @@ class ResidentMarketListView(APIView):
 class ResidentDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
+    def get_permissions(self):
+        if self.request.method == "DELETE":
+            return [IsAuthenticated(), IsTenantAdmin()]
+        return [IsAuthenticated()]
+
     def patch(self, request: Request, pk: int) -> Response:
         try:
-            resident = Resident.objects.get(pk=pk, market__isnull=False)
+            resident = Resident.objects.get(
+                pk=pk,
+                market__isnull=False,
+                is_anonymized=False,
+            )
         except Resident.DoesNotExist:
             return Response({"detail": "Morador não encontrado."}, status=404)
 
@@ -70,3 +89,27 @@ class ResidentDetailView(APIView):
         resident.market = market
         resident.save(update_fields=["market", "updated_at"])
         return Response(ResidentSerializer(resident).data)
+
+    def delete(self, request: Request, pk: int) -> Response:
+        """
+        Soft delete via anonimização LGPD (preserva histórico financeiro).
+        Não usar resident.delete() — há mensagens e ledger atrelados ao morador.
+        """
+        if not request.user.tenant_id:
+            return Response({"detail": "Morador não encontrado."}, status=404)
+
+        try:
+            resident = Resident.objects.get(
+                pk=pk,
+                market__isnull=False,
+                is_anonymized=False,
+            )
+        except Resident.DoesNotExist:
+            return Response({"detail": "Morador não encontrado."}, status=404)
+
+        try:
+            perform_resident_anonymization(resident)
+        except ResidentAnonymizationError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)

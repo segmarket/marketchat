@@ -25,9 +25,14 @@ def normalize_phone_digits(phone: str) -> str:
 
 
 def build_anonymous_phone_token(*, tenant_id: int, phone_number: str) -> str:
+    """Token estável e não reversível; cabe em ChatSession/Resident.phone_number (64).
+
+    Prefixo ``anon_`` (5) + 27 hex = 32 chars — compatível também com DBs
+    que ainda tenham varchar(32) na sessão antes da migration.
+    """
     salt = getattr(settings, "SECRET_KEY", "marketchat")
     digest = hashlib.sha256(f"{tenant_id}:{phone_number}:{salt}".encode("utf-8")).hexdigest()
-    return f"anon_{digest[:32]}"
+    return f"anon_{digest[:27]}"
 
 
 def _delete_file_field(file_field) -> None:

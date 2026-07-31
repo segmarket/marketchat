@@ -78,7 +78,7 @@ class ChatSession(models.Model):
         on_delete=models.CASCADE,
         related_name="chat_sessions",
     )
-    phone_number = models.CharField(max_length=32, db_index=True)
+    phone_number = models.CharField(max_length=64, db_index=True)
     state = models.CharField(
         max_length=32,
         choices=State.choices,

@@ -129,12 +129,19 @@ def show_main_menu(
     phone: str,
     resident: Resident,
     session: ChatSession,
+    intro: str | None = None,
+    reason: str = "greeting_menu",
 ) -> None:
-    transition(session, ChatSession.State.AWAITING_MAIN_MENU, reason="greeting_menu")
+    # Estado antes do envio — evita race se o morador responder muito rápido.
+    transition(session, ChatSession.State.AWAITING_MAIN_MENU, reason=reason)
     menu_text = build_main_menu_message(resident=resident)
+    body = menu_text
+    intro_clean = (intro or "").strip()
+    if intro_clean:
+        body = f"{intro_clean}\n\n{menu_text}"
     # Listas nativas (/send/list) retornam 405 no WhatsApp via Evolution GO;
     # menu em texto numerado (igual ao catálogo de produtos).
-    send_whatsapp_reply(instance, phone, menu_text, session=session)
+    send_whatsapp_reply(instance, phone, body, session=session)
 
 
 def _start_support_details_collection(

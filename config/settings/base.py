@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",
     "corsheaders",
     "rest_framework",
     "rest_framework_simplejwt",
@@ -264,6 +265,10 @@ ASAAS_RESIDENT_DEFAULT_CPF = env("ASAAS_RESIDENT_DEFAULT_CPF", default="11144477
 FINANCIAL_PLATFORM_FEE_PERCENT = env.float("FINANCIAL_PLATFORM_FEE_PERCENT", default=2.0)
 
 RESIDENT_CONDO_MATCH_MIN_RATIO = env.float("RESIDENT_CONDO_MATCH_MIN_RATIO", default=0.55)
+RESIDENT_CONDO_TRIGRAM_MIN_SIMILARITY = env.float(
+    "RESIDENT_CONDO_TRIGRAM_MIN_SIMILARITY",
+    default=0.3,
+)
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_MODEL = env("OPENAI_MODEL", default="gpt-4o-mini")

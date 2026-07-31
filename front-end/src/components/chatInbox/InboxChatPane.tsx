@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import { Receipt, Send } from "lucide-react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { ImageOff, Receipt, Send } from "lucide-react";
 import { toast } from "sonner";
 import Switch from "../form/switch/Switch";
 import ChargePixModal from "./ChargePixModal";
+import ChatImageLightbox from "./ChatImageLightbox";
 import TypingIndicator from "./TypingIndicator";
 import { formatAttendanceDateTime } from "../../features/chatLogs/format";
 import {
@@ -13,6 +14,7 @@ import {
 import { markSessionSeen } from "../../features/chatLogs/inboxUnread";
 import type { ChatConversationResponse, ChatLogMessage } from "../../features/chatLogs/types";
 import { formatPhoneBR } from "../../features/residents/format";
+import { resolveMediaUrl } from "../../services/api";
 import { getAxiosErrorMessage } from "../../utils/apiError";
 import { useModal } from "../../hooks/useModal";
 
@@ -36,6 +38,40 @@ function directionLabel(direction: string): string {
   if (direction === "INBOUND") return "Morador";
   if (direction === "AGENT") return "Você";
   return "Bot";
+}
+
+function ChatAttachmentImage({ url }: { url: string }) {
+  const [failed, setFailed] = useState(false);
+  const [zoomedSrc, setZoomedSrc] = useState<string | null>(null);
+  const src = resolveMediaUrl(url);
+
+  const handleOpen = (_event: MouseEvent<HTMLImageElement>) => {
+    setZoomedSrc(src);
+  };
+
+  if (failed || !src) {
+    return (
+      <div className="mb-2 flex items-center gap-2 rounded-lg border border-dashed border-current/20 bg-black/5 px-3 py-4 text-xs opacity-80">
+        <ImageOff className="h-4 w-4 shrink-0" aria-hidden />
+        <span>Erro ao carregar imagem</span>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <img
+        src={src}
+        alt="Anexo"
+        className="mb-2 max-h-48 w-full cursor-pointer rounded-lg object-cover transition-opacity hover:opacity-90"
+        onClick={handleOpen}
+        onError={() => setFailed(true)}
+      />
+      {zoomedSrc ? (
+        <ChatImageLightbox src={zoomedSrc} onClose={() => setZoomedSrc(null)} />
+      ) : null}
+    </>
+  );
 }
 
 function maxMessageId(messages: ChatLogMessage[]): number {
@@ -393,11 +429,7 @@ export default function InboxChatPane({
                     {directionLabel(msg.direction)}
                   </p>
                   {msg.message_kind === "image" && msg.attachment_url ? (
-                    <img
-                      src={msg.attachment_url}
-                      alt="Anexo"
-                      className="mb-2 max-h-48 w-full rounded-lg object-cover"
-                    />
+                    <ChatAttachmentImage url={msg.attachment_url} />
                   ) : null}
                   {msg.message_text ? (
                     <p className="whitespace-pre-wrap break-words">{msg.message_text}</p>

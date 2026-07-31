@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import AdminPageLayout from "../../components/layout/AdminPageShell";
+import ResidentDeleteConfirmModal from "../../components/residents/ResidentDeleteConfirmModal";
 import ResidentEditModal from "../../components/residents/ResidentEditModal";
 import ResidentsSearchPanel from "../../components/residents/ResidentsSearchPanel";
 import ResidentsTable from "../../components/residents/ResidentsTable";
+import { useAuth } from "../../context/AuthContext";
 import {
   buildResidentsQueryParams,
+  deleteResident,
   fetchResidentMarkets,
   fetchResidents,
   patchResidentMarket,
@@ -20,6 +23,9 @@ import type { Resident, ResidentMarketOption } from "../../features/residents/ty
 import { getAxiosErrorMessage } from "../../utils/apiError";
 
 export default function ResidentsPage() {
+  const { user } = useAuth();
+  const canDelete = Boolean(user?.is_tenant_admin);
+
   const [residents, setResidents] = useState<Resident[]>([]);
   const [markets, setMarkets] = useState<ResidentMarketOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,6 +34,8 @@ export default function ResidentsPage() {
   );
   const [editingResident, setEditingResident] = useState<Resident | null>(null);
   const [editBusy, setEditBusy] = useState(false);
+  const [deletingResident, setDeletingResident] = useState<Resident | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const loadResidents = useCallback(async (filters: ResidentsSearchFilters) => {
     setLoading(true);
@@ -84,6 +92,22 @@ export default function ResidentsPage() {
     }
   }
 
+  async function handleDeleteConfirm() {
+    if (!deletingResident) return;
+    const id = deletingResident.id;
+    setDeleteBusy(true);
+    try {
+      await deleteResident(id);
+      setResidents((prev) => prev.filter((row) => row.id !== id));
+      setDeletingResident(null);
+      toast.success("Morador excluído.");
+    } catch (err) {
+      toast.error(getAxiosErrorMessage(err, { notAxiosMessage: "Falha ao excluir morador." }));
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
   const filtersActive = hasActiveResidentsFilters(appliedFilters);
 
   return (
@@ -105,7 +129,9 @@ export default function ResidentsPage() {
           residents={residents}
           loading={loading}
           filtersActive={filtersActive}
+          canDelete={canDelete}
           onEdit={setEditingResident}
+          onDelete={canDelete ? setDeletingResident : undefined}
         />
       </AdminPageLayout>
 
@@ -116,6 +142,16 @@ export default function ResidentsPage() {
         busy={editBusy}
         onClose={() => setEditingResident(null)}
         onSubmit={(values) => void handleEditSubmit(values)}
+      />
+
+      <ResidentDeleteConfirmModal
+        resident={deletingResident}
+        isOpen={deletingResident !== null}
+        busy={deleteBusy}
+        onClose={() => {
+          if (!deleteBusy) setDeletingResident(null);
+        }}
+        onConfirm={() => void handleDeleteConfirm()}
       />
     </>
   );

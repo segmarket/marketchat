@@ -179,10 +179,27 @@ production_frontend_port() {
 
 production_smoke_test() {
   local fe_code be_code api_port fe_port
+  local attempt max_attempts sleep_s
   api_port="$(production_backend_port)"
   fe_port="$(production_frontend_port)"
+  max_attempts="${PRODUCTION_SMOKE_API_ATTEMPTS:-24}"
+  sleep_s="${PRODUCTION_SMOKE_API_SLEEP:-5}"
+
   fe_code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${fe_port}/" 2>/dev/null || echo '000')"
-  be_code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${api_port}/api/auth/me/" 2>/dev/null || echo '000')"
+
+  # O entrypoint roda migrate+collectstatic antes do Gunicorn; 6s costuma ser cedo demais.
+  be_code="000"
+  attempt=1
+  while [[ "$attempt" -le "$max_attempts" ]]; do
+    be_code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${api_port}/api/auth/me/" 2>/dev/null || echo '000')"
+    if [[ "$be_code" != "000" ]]; then
+      break
+    fi
+    echo "[smoke] API ainda indisponível (tentativa ${attempt}/${max_attempts}, HTTP 000). Aguardando ${sleep_s}s..."
+    sleep "$sleep_s"
+    attempt=$((attempt + 1))
+  done
+
   echo ""
   echo "Smoke test (localhost no servidor):"
   echo "  Front :$fe_port       -> HTTP $fe_code (esperado 200)"

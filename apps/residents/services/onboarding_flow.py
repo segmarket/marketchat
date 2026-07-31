@@ -140,7 +140,7 @@ def _handle_awaiting_condo(
         return
 
     name = session.temporary_name.strip()
-    Resident.objects.update_or_create(
+    resident, _created = Resident.objects.update_or_create(
         tenant_id=tenant_id,
         phone_number=phone,
         defaults={
@@ -148,13 +148,11 @@ def _handle_awaiting_condo(
             "market": market,
         },
     )
-    session.state = ChatSession.State.IDLE
     session.temporary_name = ""
     session.active_cart = None
     session.pending_product = None
     session.save(
         update_fields=[
-            "state",
             "temporary_name",
             "active_cart",
             "pending_product",
@@ -162,11 +160,18 @@ def _handle_awaiting_condo(
         ],
     )
 
-    send_whatsapp_reply(
-        instance,
-        phone,
-        f"Perfeito, identificamos o mercado no {market.name}! "
-        "Seu cadastro foi concluído com sucesso. Como posso te ajudar agora?",
+    from apps.sales.services.main_menu import show_main_menu
+
+    show_main_menu(
+        instance=instance,
+        phone=phone,
+        resident=resident,
+        session=session,
+        intro=(
+            f"Perfeito, identificamos o mercado no {market.name}!\n"
+            "Seu cadastro foi concluído com sucesso."
+        ),
+        reason="onboarding_complete",
     )
     logger.info(
         "Morador cadastrado: tenant=%s phone=%s market=%s",

@@ -5,7 +5,7 @@ import axios, { type InternalAxiosRequestConfig } from "axios";
  * Staging (Opção A): app em staging-app, Django em staging-api — usa VITE_API_BASE_URL.
  * Alternativa: ProxyPass /api no vhost do app e VITE_API_BASE_URL=https://staging-app...
  */
-function resolveApiBaseUrl(): string {
+export function resolveApiBaseUrl(): string {
   if (import.meta.env.DEV) return "";
 
   const fromEnv = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
@@ -22,6 +22,15 @@ function resolveApiBaseUrl(): string {
   }
 
   return "";
+}
+
+/** Monta URL absoluta para anexos `/media/...` quando a API e o app estão em hosts distintos. */
+export function resolveMediaUrl(url: string): string {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url) || url.startsWith("data:")) return url;
+  const base = resolveApiBaseUrl();
+  if (!base) return url;
+  return `${base}${url.startsWith("/") ? url : `/${url}`}`;
 }
 
 const baseURL = resolveApiBaseUrl();
