@@ -4,11 +4,16 @@
 
 services:
   backend:
+    image: marketchat-backend-prd:${IMAGE_TAG:-current}
     build:
       context: .
       dockerfile: docker/Dockerfile.backend
     container_name: marketchat_backend_prd
     restart: always
+    # Evita falha de DNS (Errno -3) ao chamar api.openai.com via resolver embutido do Docker.
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     ports:
       - "${PRODUCTION_BACKEND_PORT:-9001}:8000"
     env_file:
@@ -27,6 +32,7 @@ services:
       - marketchat_media_prd:/app/media
 
   frontend:
+    image: marketchat-frontend-prd:${IMAGE_TAG:-current}
     build:
       context: ./front-end
       dockerfile: Dockerfile

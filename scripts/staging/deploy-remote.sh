@@ -3,10 +3,12 @@
 #
 # Uso:
 #   ./scripts/staging/deploy-remote.sh full       # = deploy-full.sh
-#   ./scripts/staging/deploy-remote.sh backend  # = deploy-backend.sh
+#   ./scripts/staging/deploy-remote.sh backend
 #   ./scripts/staging/deploy-remote.sh frontend
 #   ./scripts/staging/deploy-remote.sh bootstrap
 #   ./scripts/staging/deploy-remote.sh sync      # só rsync (sem docker)
+#   ./scripts/staging/deploy-remote.sh rollback [DEPLOY_ID]
+#   ./scripts/staging/deploy-remote.sh backup
 #
 # Variáveis: STAGING_SSH, STAGING_PATH, PUSH_LOCAL_ENV — ver remote-lib.sh
 
@@ -14,6 +16,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ACTION="${1:-full}"
+shift || true
 
 case "$ACTION" in
   sync)
@@ -34,8 +37,14 @@ case "$ACTION" in
   frontend)
     exec "$SCRIPT_DIR/deploy-frontend.sh"
     ;;
+  rollback)
+    exec "$SCRIPT_DIR/rollback.sh" "$@"
+    ;;
+  backup)
+    exec "$SCRIPT_DIR/backup-db.sh"
+    ;;
   *)
-    echo "Uso: $0 {sync|bootstrap|full|backend|frontend}" >&2
+    echo "Uso: $0 {sync|bootstrap|full|backend|frontend|rollback|backup}" >&2
     exit 1
     ;;
 esac

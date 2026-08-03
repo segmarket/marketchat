@@ -332,6 +332,49 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
                 event.message_id,
             )
 
+    intent_type = ""
+    if bot_should_reply and onboarded and text and session.state == ChatSession.State.IDLE:
+        intent_type = classify_user_intent(
+            text,
+            tenant_id=instance.tenant_id,
+            phone=phone,
+        )
+    elif not onboarded:
+        intent_type = GENERAL
+
+    if message_kind != ChatMessageLog.MessageKind.IMAGE:
+        log_inbound(
+            tenant_id=instance.tenant_id,
+            phone=phone,
+            message_text=text,
+            intent_type=intent_type,
+            session=session,
+            message_kind=message_kind,
+            evolution_message_id=event.message_id or "",
+            resident=resident_for_lazy,
+        )
+
+    from apps.chatbot.services.human_handover import should_mute_for_human
+    from apps.sales.services.maquininha_backup import try_escape_human_queue_for_purchase
+
+    if should_mute_for_human(session):
+        if text and try_escape_human_queue_for_purchase(
+            instance=instance,
+            phone=phone,
+            text=text,
+            session=session,
+            resident=resident_for_lazy,
+        ):
+            return
+        logger.info(
+            "WhatsApp MESSAGE mute humano: tenant=%s phone=%s state=%s bot_active=%s",
+            instance.tenant_id,
+            phone,
+            session.state,
+            session.is_bot_active,
+        )
+        return
+
     if (
         bot_should_reply
         and onboarded
@@ -356,28 +399,6 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
             phone,
             role="user",
             content=text,
-        )
-
-    intent_type = ""
-    if bot_should_reply and onboarded and text and session.state == ChatSession.State.IDLE:
-        intent_type = classify_user_intent(
-            text,
-            tenant_id=instance.tenant_id,
-            phone=phone,
-        )
-    elif not onboarded:
-        intent_type = GENERAL
-
-    if message_kind != ChatMessageLog.MessageKind.IMAGE:
-        log_inbound(
-            tenant_id=instance.tenant_id,
-            phone=phone,
-            message_text=text,
-            intent_type=intent_type,
-            session=session,
-            message_kind=message_kind,
-            evolution_message_id=event.message_id or "",
-            resident=resident_for_lazy,
         )
 
     if not bot_should_reply:

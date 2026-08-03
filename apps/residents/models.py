@@ -85,6 +85,12 @@ class ChatSession(models.Model):
         default=State.AWAITING_NAME,
     )
     temporary_name = models.CharField(max_length=255, blank=True, default="")
+    pending_intent = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        help_text="Intenção da IA no onboarding (ex.: reclamacao); limpa após o cadastro.",
+    )
     active_cart = models.ForeignKey(
         "sales.Cart",
         on_delete=models.SET_NULL,

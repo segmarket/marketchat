@@ -25,6 +25,20 @@ ALLOWED_CONTENT_TYPES = frozenset(
 )
 HTTP_URL_PATTERN = re.compile(r"^https?://", re.I)
 
+# JPEG mínimo (SOI+EOI) — suficiente para a demo; sem Evolution.
+_DEMO_PLACEHOLDER_JPEG = b"\xff\xd8\xff\xd9"
+
+
+def _is_demo_simulated_image(raw_message: dict[str, Any], instance: WhatsappInstance) -> bool:
+    from apps.demo.services.portal import DEMO_API_KEY
+
+    if instance.api_key == DEMO_API_KEY:
+        return True
+    image_msg = raw_message.get("imageMessage")
+    if isinstance(image_msg, dict) and image_msg.get("demoSimulated"):
+        return True
+    return False
+
 
 def _extract_image_url_from_message(raw_message: dict[str, Any]) -> str:
     """Tenta obter URL direta de imagem no payload Evolution/WhatsApp."""
@@ -120,6 +134,9 @@ def download_security_photo_bytes(
     raw_message: dict[str, Any],
 ) -> bytes | None:
     """Baixa bytes da foto: Evolution API primeiro, fallback por URL no payload."""
+    if _is_demo_simulated_image(raw_message, instance):
+        return _DEMO_PLACEHOLDER_JPEG
+
     data = _download_image_via_evolution(instance=instance, raw_message=raw_message)
     if data:
         return data

@@ -15,6 +15,9 @@ import { useUTM } from "../../hooks/useUTM";
 
 const MarketingPillarsGrid = lazy(() => import("../../components/marketing/MarketingPillarsGrid"));
 const MarketingOwnerFlow = lazy(() => import("../../components/marketing/MarketingOwnerFlow"));
+const InteractiveDemoSection = lazy(
+  () => import("../../components/marketing/InteractiveDemoSection"),
+);
 const MarketingPricing = lazy(() => import("../../components/marketing/MarketingPricing"));
 
 export default function LandingPage() {
@@ -37,6 +40,7 @@ export default function LandingPage() {
         <Suspense fallback={null}>
           <MarketingPillarsGrid />
           <MarketingOwnerFlow />
+          <InteractiveDemoSection />
           <MarketingPricing />
           <MarketingFaq />
         </Suspense>

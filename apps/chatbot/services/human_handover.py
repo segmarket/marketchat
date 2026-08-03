@@ -10,6 +10,22 @@ from apps.residents.models import ChatSession
 
 HUMAN_HANDOVER_TIMEOUT = timedelta(hours=2)
 
+# Bot pausado + estes estados = sessão inconsistente (ex.: demo/LP). Reativa em vez de mutar.
+_STUCK_PAUSE_STATES = frozenset(
+    {
+        ChatSession.State.PRODUCT_SEARCH,
+        ChatSession.State.QUANTITY_SELECTION,
+        ChatSession.State.CART_REVIEW,
+        ChatSession.State.AWAITING_PHOTO,
+        ChatSession.State.AWAITING_MAIN_MENU,
+        ChatSession.State.AWAITING_SUPPORT_DETAILS,
+        ChatSession.State.SEARCHING_UNREGISTERED_PRODUCT,
+        ChatSession.State.AWAITING_PRODUCT_SUGGESTION,
+        ChatSession.State.AWAITING_NAME,
+        ChatSession.State.AWAITING_CONDO,
+    },
+)
+
 
 def pause_bot(session: ChatSession) -> ChatSession:
     """Pausa o bot e registra interação humana."""
@@ -53,3 +69,19 @@ def ensure_bot_active_or_timeout(session: ChatSession) -> bool:
         return True
 
     return False
+
+
+def should_mute_for_human(session: ChatSession) -> bool:
+    """
+    Estado bloqueante: fila humana ou bot pausado pelo atendente (IDLE).
+    Se o bot estiver pausado mas a FSM ainda estiver em fluxo ativo, reativa
+    (estado inconsistente — comum em sessões demo/localStorage).
+    """
+    if session.state == ChatSession.State.WAITING_FOR_HUMAN:
+        return True
+    if session.is_bot_active:
+        return False
+    if session.state in _STUCK_PAUSE_STATES:
+        resume_bot(session)
+        return False
+    return True

@@ -100,12 +100,35 @@ cd ~/Documentos/marketchat
 | Comando | Ação |
 |---------|------|
 | `./scripts/producao/bootstrap.sh` | Primeiro deploy (build + up) |
-| `./scripts/producao/deploy-full.sh` | Backend + frontend |
+| `./scripts/producao/deploy-full.sh` | Backend + frontend (**backup DB + tag imagens**) |
 | `./scripts/producao/deploy-backend.sh` | Só API (migrations no entrypoint) |
 | `./scripts/producao/deploy-frontend.sh` | Só painel (rebuild VITE_*) |
+| `./scripts/producao/backup-db.sh` | Só dump Postgres (sem rebuild) |
+| `./scripts/producao/rollback.sh` | Restore DB + imagens do `previous` (ou `DEPLOY_ID`) |
 | `./scripts/producao/deploy-remote.sh sync` | Só rsync, sem Docker |
 | `./scripts/bootstrap-prd.sh` | Mesmo que `producao/bootstrap.sh` |
 | `./scripts/deploy-prd.sh full` | Mesmo que `deploy-remote.sh full` |
+
+### Backup, versionamento e rollback
+
+Cada `deploy-full` no servidor:
+
+1. Gera `DEPLOY_ID` (`YYYYMMDD-HHMMSS-<gitsha>`)
+2. `pg_dump -Fc` em `~/marketchat/backups/<DEPLOY_ID>/db.dump`
+3. Build com tag `marketchat-*-prd:<DEPLOY_ID>` e também `:current`
+4. Mantém ponteiros em `~/marketchat/releases/{current,previous}`
+5. Prune: mantém os **5** releases mais recentes (mais current/previous)
+
+Rollback (**sempre restaura o banco** + imagens):
+
+```bash
+./scripts/producao/rollback.sh                 # previous
+./scripts/producao/rollback.sh 20260802-101530-abc1234
+CONFIRM=1 ./scripts/producao/rollback.sh       # sem prompt
+```
+
+`backups/` e `releases/` ficam **só no servidor** (rsync não apaga — estão no exclude).
+Volume de mídia não entra no backup nesta versão.
 
 ## Redis (cache / chat)
 

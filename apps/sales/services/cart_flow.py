@@ -15,7 +15,6 @@ from apps.sales.models import Cart, CartItem
 from apps.sales.services.active_bot_router import (
     handle_complaint,
     handle_maintenance_issue,
-    handle_payment_error_pivot,
     handle_stock_issue,
     route_idle_message,
 )
@@ -54,6 +53,7 @@ from apps.sales.services.uncatalogued_product_flow import handle_uncatalogued_pr
 from apps.sales.services.product_search import (
     ASK_PRODUCT_MESSAGE,
     MAIN_MENU_PURCHASE_PROMPT,
+    PRODUCT_NOT_FOUND_MESSAGE,
     is_product_term_none,
     search_active_products,
 )
@@ -65,6 +65,7 @@ from apps.sales.services.purchase_context import is_purchase_without_product
 from apps.sales.services.whatsapp_interactive import (
     CART_ADD_MORE,
     CART_CHECKOUT,
+    MENU_BILLING,
     MENU_PAYMENT,
     PROD_ID_PREFIX,
     SUPPORT_WAITING_QUEUE_MESSAGE,
@@ -74,6 +75,11 @@ from apps.sales.services.whatsapp_interactive import (
 )
 
 logger = logging.getLogger(__name__)
+
+PAYMENT_WAITING_MESSAGE = (
+    "Estou aguardando a confirmação automática do banco. "
+    "Assim que o pagamento for reconhecido, te aviso por aqui! ⏱️"
+)
 
 CART_SESSION_STATES = frozenset(
     {
@@ -141,23 +147,30 @@ def _handle_support_details(
     text: str,
 ) -> bool:
     """
-    Opção 1 = pivot pagamento.
-    Opções 2–7 = classifica o detalhe (COMPLAINT/manutenção/estoque),
-    dispara alertas internos e entra na fila de espera ativa.
+    Opção 1 (pagamento) e opção 3 (cobrança) = notifica equipe e abre venda Pix.
+    Demais opções = classifica o detalhe, dispara alertas e entra na fila humana.
     """
+    from apps.sales.services.maquininha_backup import (
+        SUPPORT_PAYMENT_BACKUP_SALE_MESSAGE,
+        start_maquininha_backup_sale,
+    )
+
     category = (session.temporary_name or "").strip()
     session.temporary_name = ""
     session.save(update_fields=["temporary_name", "updated_at"])
 
-    if category == MENU_PAYMENT:
-        return handle_payment_error_pivot(
+    if category in {MENU_PAYMENT, MENU_BILLING}:
+        start_maquininha_backup_sale(
             instance=instance,
             tenant_id=session.tenant_id,
             phone=phone,
             resident=resident,
             session=session,
-            message=text,
+            message=text or category,
+            issue_label="Pagamento" if category == MENU_PAYMENT else "Cobrança",
+            reply_text=SUPPORT_PAYMENT_BACKUP_SALE_MESSAGE,
         )
+        return True
 
     intent = classify_user_intent(
         text,
@@ -217,15 +230,29 @@ def process_cart_flow(
     text = (event.message_text or "").strip()
     session = _get_or_create_session(tenant_id, phone)
 
-    if session.state == ChatSession.State.WAITING_FOR_HUMAN and text:
-        if is_global_escape_message(text):
-            show_main_menu(
-                instance=instance,
-                phone=phone,
-                resident=resident,
-                session=session,
-            )
+    if session.state == ChatSession.State.WAITING_FOR_HUMAN:
+        from apps.sales.services.maquininha_backup import (
+            try_escape_human_queue_for_purchase,
+        )
+
+        if text and try_escape_human_queue_for_purchase(
+            instance=instance,
+            phone=phone,
+            text=text,
+            session=session,
+            resident=resident,
+        ):
             return True
+        return True
+
+    active_cart = session.active_cart
+    if active_cart is not None and active_cart.status == Cart.Status.AWAITING_PAYMENT:
+        send_whatsapp_reply(
+            instance,
+            phone,
+            PAYMENT_WAITING_MESSAGE,
+            session=session,
+        )
         return True
 
     if text and handle_global_escape(
@@ -548,7 +575,7 @@ def _handle_product_search(
         send_whatsapp_reply(
             instance,
             phone,
-            f'Não encontrei "{term}" no catálogo. Tente outro nome de produto.',
+            PRODUCT_NOT_FOUND_MESSAGE,
         )
         return True
 
@@ -760,13 +787,39 @@ def _handle_photo(
         return True
 
     from apps.billing.services.asaas_pix_charge import PixChargeError, create_cart_pix_charge
+    from apps.demo.services.portal import DEMO_API_KEY
 
-    try:
-        pix_code = create_cart_pix_charge(cart, resident)
-    except PixChargeError as exc:
-        send_whatsapp_reply(instance, phone, str(exc))
-        return True
+    if instance.api_key == DEMO_API_KEY:
+        cart.status = Cart.Status.AWAITING_PAYMENT
+        cart.asaas_billing_id = f"demo-pix-{cart.id}"
+        cart.save(update_fields=["status", "asaas_billing_id", "updated_at"])
+        pix_code = (
+            "00020126580014BR.GOV.BCB.PIX0136DEMO-MARKETCHAT-PIX"
+            f"{cart.id:06d}5204000053039865802BR5925MarketChat Demo Portal6009SAO PAULO62070503***6304ABCD"
+        )
+    else:
+        try:
+            pix_code = create_cart_pix_charge(cart, resident)
+        except PixChargeError as exc:
+            send_whatsapp_reply(instance, phone, str(exc))
+            return True
 
+    clear_product_search_context(
+        session,
+        clear_discussed=True,
+        clear_pending=True,
+        save=False,
+    )
+    session.pending_intent = ""
+    session.save(
+        update_fields=[
+            "temporary_name",
+            "last_discussed_product",
+            "pending_product",
+            "pending_intent",
+            "updated_at",
+        ],
+    )
     transition(session, ChatSession.State.IDLE, reason="pix_sent")
 
     send_whatsapp_reply(

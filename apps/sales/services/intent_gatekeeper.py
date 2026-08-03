@@ -60,6 +60,16 @@ _COMPLAINT_PATTERNS = (
     r"\bproduto (estragado|vencido|estragad)",
 )
 
+_PAYMENT_ERROR_PATTERNS = (
+    r"\bmaquininha\b",
+    r"\bmaquina\b.*\b(fora|quebr|off|parado|parou)\b",
+    r"\b(fora|quebr|off|parado|parou)\b.*\bmaquina\b",
+    r"\btotem\b",
+    r"\bnao passa(r)?\b.*\bcartao\b",
+    r"\bcartao\b.*\bnao passa",
+    r"\bleitor\b.*\b(fora|quebr|cartao)\b",
+)
+
 _BARE_PRODUCT_MAX_WORDS = 4
 
 _NON_PRODUCT_QUERY_PATTERNS = (
@@ -154,6 +164,13 @@ def _detect_complaint_heuristic(message: str) -> bool:
     if not text:
         return False
     return any(re.search(pattern, text) for pattern in _COMPLAINT_PATTERNS)
+
+
+def _detect_payment_error_heuristic(message: str) -> bool:
+    text = _normalize_text(message)
+    if not text:
+        return False
+    return any(re.search(pattern, text) for pattern in _PAYMENT_ERROR_PATTERNS)
 
 
 def _detect_stock_issue_heuristic(message: str) -> bool:
@@ -252,6 +269,10 @@ def classify_user_intent(
     if _detect_stock_issue_heuristic(stripped):
         logger.info("Gatekeeper heurístico: STOCK_ISSUE para %r", stripped[:80])
         return STOCK_ISSUE
+
+    if _detect_payment_error_heuristic(stripped):
+        logger.info("Gatekeeper heurístico: PAYMENT_ERROR para %r", stripped[:80])
+        return PAYMENT_ERROR
 
     if _detect_complaint_heuristic(stripped):
         logger.info("Gatekeeper heurístico: COMPLAINT para %r", stripped[:80])

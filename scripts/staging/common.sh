@@ -29,6 +29,7 @@ staging_should_run_local() {
 # Do notebook: rsync + SSH no servidor. No servidor: segue o script chamador (return 0).
 staging_run_remote_unless_on_server() {
   local script_name="${1:?}"
+  shift
 
   if staging_should_run_local; then
     return 0
@@ -59,8 +60,18 @@ staging_run_remote_unless_on_server() {
     remote_ensure_env_on_server
   fi
 
-  remote_run_deploy_script "$script_name"
+  remote_run_deploy_script "$script_name" "$@"
   exit 0
+}
+
+staging_release_init() {
+  RELEASE_ROOT="$STAGING_ROOT"
+  RELEASE_ENV_FILE="$STAGING_ENV_FILE"
+  RELEASE_BACKEND_IMAGE="marketchat-backend-staging"
+  RELEASE_FRONTEND_IMAGE="marketchat-frontend-staging"
+  # shellcheck source=../lib/release.sh
+  source "$STAGING_SCRIPT_DIR/../lib/release.sh"
+  release_require_vars
 }
 
 staging_cd() {
@@ -91,6 +102,7 @@ staging_require_env() {
 
 staging_compose() {
   # --env-file alimenta interpolação ${VITE_*} no build do front.
+  export IMAGE_TAG="${IMAGE_TAG:-current}"
   docker compose --env-file "$STAGING_ENV_FILE" -f "$COMPOSE_FILE" "$@"
 }
 

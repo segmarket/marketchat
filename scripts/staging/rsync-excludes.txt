@@ -23,3 +23,5 @@ front-end/node_modules
 front-end/dist
 node_modules
 *.md
+backups
+releases

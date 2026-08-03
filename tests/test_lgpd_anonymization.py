@@ -15,7 +15,11 @@ from tests.factories import CartFactory, MarketFactory, ResidentFactory, TenantF
 
 
 def test_anonymous_phone_token_fits_chat_session_and_resident():
-    token = build_anonymous_phone_token(tenant_id=1, phone_number="5511999887766")
+    token = build_anonymous_phone_token(
+        tenant_id=1,
+        phone_number="5511999887766",
+        resident_id=42,
+    )
     session_max = ChatSession._meta.get_field("phone_number").max_length
     resident_max = Resident._meta.get_field("phone_number").max_length
     assert token.startswith("anon_")
@@ -23,6 +27,54 @@ def test_anonymous_phone_token_fits_chat_session_and_resident():
     assert len(token) <= resident_max
     # Compatível com varchar(32) legado da sessão em ambientes ainda sem migration.
     assert len(token) <= 32
+    # Mesmo telefone, residents diferentes → tokens diferentes (evita UniqueViolation).
+    other = build_anonymous_phone_token(
+        tenant_id=1,
+        phone_number="5511999887766",
+        resident_id=99,
+    )
+    assert token != other
+
+
+@pytest.mark.django_db
+def test_anonymize_after_reregistration_updates_session_without_collision():
+    """Re-cadastro no mesmo telefone: 2ª exclusão não colide no uniq da ChatSession."""
+    tenant = TenantFactory()
+    market = MarketFactory(tenant=tenant)
+    phone = "5511555444333"
+
+    first = ResidentFactory(tenant=tenant, market=market, phone_number=phone, name="Primeiro")
+    ChatSession.objects.create(
+        tenant=tenant,
+        phone_number=phone,
+        state=ChatSession.State.IDLE,
+    )
+    anonymize_resident_by_phone(tenant_id=tenant.id, phone=phone)
+
+    first.refresh_from_db()
+    old_session = ChatSession.objects.get(tenant=tenant, phone_number=first.phone_number)
+    assert old_session.phone_number.startswith("anon_")
+
+    second = Resident.objects.create(
+        tenant=tenant,
+        phone_number=phone,
+        name="Segundo",
+        market=market,
+    )
+    ChatSession.objects.create(
+        tenant=tenant,
+        phone_number=phone,
+        state=ChatSession.State.IDLE,
+    )
+
+    anonymize_resident_by_phone(tenant_id=tenant.id, phone=phone)
+
+    second.refresh_from_db()
+    assert second.is_anonymized is True
+    assert second.phone_number.startswith("anon_")
+    assert second.phone_number != first.phone_number
+    assert ChatSession.objects.filter(tenant=tenant, phone_number=second.phone_number).count() == 1
+    assert ChatSession.objects.filter(tenant=tenant, phone_number=first.phone_number).count() == 1
 
 
 @pytest.mark.django_db

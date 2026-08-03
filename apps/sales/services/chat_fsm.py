@@ -115,7 +115,14 @@ def reset_to_idle(
     session.state = ChatSession.State.IDLE
     session.pending_product = None
     session.temporary_name = ""
-    update_fields = ["state", "pending_product", "temporary_name", "updated_at"]
+    session.pending_intent = ""
+    update_fields = [
+        "state",
+        "pending_product",
+        "temporary_name",
+        "pending_intent",
+        "updated_at",
+    ]
     if clear_cart_link:
         session.active_cart = None
         update_fields.append("active_cart")
