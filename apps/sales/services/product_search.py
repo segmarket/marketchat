@@ -1,20 +1,15 @@
-"""Busca de produtos no catálogo (icontains + trigram pg_trgm + fallback difflib)."""
+"""Busca de produtos no catálogo (palavras independentes da ordem + fuzzy)."""
 
 from __future__ import annotations
 
-import logging
 import re
 import unicodedata
 from difflib import SequenceMatcher
 
 from django.conf import settings
-from django.db import connection
 from django.db.models import Q
-from django.db.utils import ProgrammingError
 
 from apps.products.models import Product
-
-logger = logging.getLogger(__name__)
 
 PRODUCT_TERM_NONE = "NONE"
 
@@ -26,13 +21,6 @@ ASK_PRODUCT_MESSAGE = (
 MAIN_MENU_PURCHASE_PROMPT = (
     "Excelente! Digite o nome do produto que deseja buscar."
 )
-
-PRODUCT_NOT_FOUND_MESSAGE = (
-    "Poxa, não encontrei nenhum produto com esse nome no mercado do seu "
-    "condomínio. Que tal tentar buscar com outra palavra?"
-)
-
-MIN_FUZZY_TERM_LENGTH = 4
 
 
 def normalize_extracted_term(term: str) -> str:
@@ -69,18 +57,6 @@ def _fuzzy_threshold() -> float:
     return float(getattr(settings, "PRODUCT_FUZZY_MATCH_THRESHOLD", 0.65))
 
 
-def _trigram_threshold() -> float:
-    return float(getattr(settings, "PRODUCT_TRIGRAM_MIN_SIMILARITY", 0.25))
-
-
-def _pg_trgm_available() -> bool:
-    if connection.vendor != "postgresql":
-        return False
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm'")
-        return cursor.fetchone() is not None
-
-
 def _product_search_corpus(product: Product) -> str:
     parts = [product.name or ""]
     aliases = (product.search_aliases or "").strip()
@@ -110,6 +86,9 @@ def _score_product_match(term: str, product: Product) -> float:
     return max(scores)
 
 
+MIN_FUZZY_TERM_LENGTH = 4
+
+
 def fuzzy_search_active_products(
     tenant_id: int,
     term: str,
@@ -117,7 +96,7 @@ def fuzzy_search_active_products(
     limit: int = 10,
     threshold: float | None = None,
 ) -> list[Product]:
-    """Fallback in-Python (difflib) quando icontains/trigram não encontram."""
+    """Fallback quando icontains não encontra (typos)."""
     normalized_term = _normalize_for_match(normalize_extracted_term(term))
     if not normalized_term or is_product_term_none(term):
         return []
@@ -140,50 +119,12 @@ def fuzzy_search_active_products(
     return [product for _, product in scored[:limit]]
 
 
-def _trigram_search_active_products(
-    tenant_id: int,
-    term: str,
-    *,
-    limit: int = 10,
-) -> list[Product]:
-    """Busca fuzzy no Postgres via TrigramWordSimilarity (pg_trgm)."""
-    from django.contrib.postgres.search import TrigramWordSimilarity
-    from django.db.models.functions import Greatest
-
-    text = normalize_extracted_term(term)
-    if not text:
-        return []
-
-    min_sim = _trigram_threshold()
-    qs = (
-        Product.objects.filter(
-            tenant_id=tenant_id,
-            status=Product.Status.ACTIVE,
-        )
-        .annotate(
-            similarity=Greatest(
-                TrigramWordSimilarity(text, "name"),
-                TrigramWordSimilarity(text, "search_aliases"),
-            )
-        )
-        .filter(similarity__gt=min_sim)
-        .order_by("-similarity", "name")[:limit]
-    )
-    return list(qs)
-
-
 def search_active_products(
     tenant_id: int,
     term: str,
     *,
     limit: int = 10,
 ) -> list[Product]:
-    """
-    Busca produtos ativos do tenant.
-    1) icontains (nome/aliases, multi-palavra)
-    2) TrigramWordSimilarity no Postgres (se pg_trgm disponível)
-    3) Fallback difflib (SQLite / sem extensão)
-    """
     if is_product_term_none(term):
         return []
     name_filter = build_product_name_q(term)
@@ -197,30 +138,4 @@ def search_active_products(
     )
     if results:
         return results
-
-    if connection.vendor == "postgresql" and _pg_trgm_available():
-        try:
-            trgm_hits = _trigram_search_active_products(
-                tenant_id,
-                term,
-                limit=limit,
-            )
-            if trgm_hits:
-                return trgm_hits
-        except ProgrammingError:
-            logger.warning(
-                "Trigram product search falhou; usando fallback difflib.",
-                exc_info=True,
-            )
-
     return fuzzy_search_active_products(tenant_id, term, limit=limit)
-
-
-def search_products(
-    tenant_id: int,
-    search_term: str,
-    *,
-    limit: int = 10,
-) -> list[Product]:
-    """Alias alinhado ao enunciado da busca difusa."""
-    return search_active_products(tenant_id, search_term, limit=limit)

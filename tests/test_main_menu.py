@@ -172,7 +172,7 @@ def test_main_menu_ignores_repeated_greeting_without_reminder():
 
 
 @pytest.mark.django_db
-def test_main_menu_option_1_fast_tracks_payment_backup_sale():
+def test_main_menu_option_1_awaits_payment_details():
     tenant = TenantFactory()
     instance = WhatsappInstanceFactory(tenant=tenant)
     resident = ResidentFactory(tenant=tenant, phone_number="5511999887766")
@@ -182,22 +182,7 @@ def test_main_menu_option_1_fast_tracks_payment_backup_sale():
         state=ChatSession.State.AWAITING_MAIN_MENU,
     )
 
-    from apps.sales.services.maquininha_backup import SUPPORT_PAYMENT_BACKUP_SALE_MESSAGE
-
-    with (
-        mock.patch(
-            "apps.sales.services.maquininha_backup.notify_owner_support_issue",
-        ),
-        mock.patch(
-            "apps.sales.services.maquininha_backup.create_critical_panel_notification",
-        ),
-        mock.patch(
-            "apps.sales.services.maquininha_backup.send_whatsapp_reply",
-        ) as send,
-        mock.patch(
-            "apps.sales.services.maquininha_backup.append_assistant_message",
-        ),
-    ):
+    with mock.patch("apps.sales.services.main_menu.send_whatsapp_reply") as send:
         with tenant_scope(tenant.id):
             handled = process_cart_flow(
                 tenant.id,
@@ -208,10 +193,9 @@ def test_main_menu_option_1_fast_tracks_payment_backup_sale():
 
     assert handled is True
     session.refresh_from_db()
-    assert session.state == ChatSession.State.PRODUCT_SEARCH
-    assert session.active_cart_id is not None
-    assert session.temporary_name == ""
-    assert send.call_args[0][2] == SUPPORT_PAYMENT_BACKUP_SALE_MESSAGE
+    assert session.state == ChatSession.State.AWAITING_SUPPORT_DETAILS
+    assert session.temporary_name == MENU_PAYMENT
+    assert send.call_args[0][2] == SUPPORT_DETAILS_PROMPT
 
 
 @pytest.mark.django_db
@@ -392,7 +376,7 @@ def test_main_menu_interactive_billing_awaits_details():
 
 
 @pytest.mark.django_db
-def test_support_details_payment_opens_backup_sale():
+def test_support_details_payment_calls_pivot():
     tenant = TenantFactory()
     instance = WhatsappInstanceFactory(tenant=tenant)
     resident = ResidentFactory(tenant=tenant, phone_number="5511999887766")
@@ -403,22 +387,10 @@ def test_support_details_payment_opens_backup_sale():
         temporary_name=MENU_PAYMENT,
     )
 
-    from apps.sales.services.maquininha_backup import SUPPORT_PAYMENT_BACKUP_SALE_MESSAGE
-
-    with (
-        mock.patch(
-            "apps.sales.services.maquininha_backup.notify_owner_support_issue",
-        ) as notify,
-        mock.patch(
-            "apps.sales.services.maquininha_backup.create_critical_panel_notification",
-        ),
-        mock.patch(
-            "apps.sales.services.maquininha_backup.send_whatsapp_reply",
-        ) as send,
-        mock.patch(
-            "apps.sales.services.maquininha_backup.append_assistant_message",
-        ),
-    ):
+    with mock.patch(
+        "apps.sales.services.cart_flow.handle_payment_error_pivot",
+        return_value=True,
+    ) as pivot:
         with tenant_scope(tenant.id):
             handled = process_cart_flow(
                 tenant.id,
@@ -428,60 +400,10 @@ def test_support_details_payment_opens_backup_sale():
             )
 
     assert handled is True
-    notify.assert_called_once()
+    pivot.assert_called_once()
+    assert pivot.call_args.kwargs["message"] == "Maquininha sem sinal"
     session.refresh_from_db()
     assert session.temporary_name == ""
-    assert session.state == ChatSession.State.PRODUCT_SEARCH
-    assert session.active_cart_id is not None
-    assert send.call_args[0][2] == SUPPORT_PAYMENT_BACKUP_SALE_MESSAGE
-
-
-@pytest.mark.django_db
-def test_support_details_billing_opens_backup_sale_not_human_queue():
-    tenant = TenantFactory()
-    instance = WhatsappInstanceFactory(tenant=tenant)
-    resident = ResidentFactory(tenant=tenant, phone_number="5511999887766")
-    session = ChatSessionFactory(
-        tenant=tenant,
-        phone_number=resident.phone_number,
-        state=ChatSession.State.AWAITING_SUPPORT_DETAILS,
-        temporary_name=MENU_BILLING,
-        is_bot_active=True,
-    )
-
-    from apps.sales.services.maquininha_backup import SUPPORT_PAYMENT_BACKUP_SALE_MESSAGE
-
-    with (
-        mock.patch(
-            "apps.sales.services.maquininha_backup.notify_owner_support_issue",
-        ) as notify,
-        mock.patch(
-            "apps.sales.services.maquininha_backup.create_critical_panel_notification",
-        ),
-        mock.patch(
-            "apps.sales.services.maquininha_backup.send_whatsapp_reply",
-        ) as send,
-        mock.patch(
-            "apps.sales.services.maquininha_backup.append_assistant_message",
-        ),
-        mock.patch("apps.sales.services.cart_flow.handle_complaint") as complaint,
-    ):
-        with tenant_scope(tenant.id):
-            handled = process_cart_flow(
-                tenant.id,
-                instance,
-                resident.phone_number,
-                _event_text("Fui cobrado duas vezes no cartão"),
-            )
-
-    assert handled is True
-    notify.assert_called_once()
-    assert notify.call_args.kwargs["issue_label"] == "Cobrança"
-    complaint.assert_not_called()
-    session.refresh_from_db()
-    assert session.state == ChatSession.State.PRODUCT_SEARCH
-    assert session.state != ChatSession.State.WAITING_FOR_HUMAN
-    assert send.call_args[0][2] == SUPPORT_PAYMENT_BACKUP_SALE_MESSAGE
 
 
 @pytest.mark.django_db
@@ -493,7 +415,7 @@ def test_support_details_general_enters_waiting_queue():
         tenant=tenant,
         phone_number=resident.phone_number,
         state=ChatSession.State.AWAITING_SUPPORT_DETAILS,
-        temporary_name=MENU_OTHER,
+        temporary_name=MENU_BILLING,
         is_bot_active=True,
     )
 
@@ -509,6 +431,9 @@ def test_support_details_general_enters_waiting_queue():
         mock.patch(
             "apps.sales.services.cart_flow.route_idle_message",
         ) as route_idle,
+        mock.patch(
+            "apps.sales.services.cart_flow.handle_payment_error_pivot",
+        ) as pivot,
     ):
         with tenant_scope(tenant.id):
             handled = process_cart_flow(
@@ -524,9 +449,10 @@ def test_support_details_general_enters_waiting_queue():
     assert session.is_bot_active is True
     assert session.temporary_name == ""
     assert send.call_args[0][2] == SUPPORT_WAITING_QUEUE_MESSAGE
-    assert "digite SAIR" not in send.call_args[0][2]
+    assert "digite SAIR" in send.call_args[0][2]
     complaint.assert_not_called()
     route_idle.assert_not_called()
+    pivot.assert_not_called()
 
 
 @pytest.mark.django_db
@@ -538,7 +464,7 @@ def test_support_details_complaint_queues_for_human():
         tenant=tenant,
         phone_number=resident.phone_number,
         state=ChatSession.State.AWAITING_SUPPORT_DETAILS,
-        temporary_name=MENU_OTHER,
+        temporary_name=MENU_BILLING,
         is_bot_active=True,
     )
     detail = "fui comprar um leite e estava vencido"
@@ -553,6 +479,9 @@ def test_support_details_complaint_queues_for_human():
             return_value=True,
         ) as complaint,
         mock.patch("apps.sales.services.cart_flow.send_whatsapp_reply") as send,
+        mock.patch(
+            "apps.sales.services.cart_flow.handle_payment_error_pivot",
+        ) as pivot,
     ):
         with tenant_scope(tenant.id):
             handled = process_cart_flow(
@@ -570,6 +499,7 @@ def test_support_details_complaint_queues_for_human():
     assert session.state == ChatSession.State.WAITING_FOR_HUMAN
     assert session.is_bot_active is True
     assert send.call_args[0][2] == SUPPORT_WAITING_QUEUE_MESSAGE
+    pivot.assert_not_called()
 
 
 @pytest.mark.django_db
@@ -627,7 +557,7 @@ def test_support_details_alerta_qualidade_queues_without_pausing():
     assert session.state == ChatSession.State.WAITING_FOR_HUMAN
     send_handler.assert_not_called()
     assert send_queue.call_args[0][2] == SUPPORT_WAITING_QUEUE_MESSAGE
-    assert "digite SAIR" not in send_queue.call_args[0][2]
+    assert "digite SAIR" in send_queue.call_args[0][2]
 
 
 @pytest.mark.django_db
@@ -659,7 +589,7 @@ def test_waiting_for_human_ignores_text_keeps_bot_active():
 
 
 @pytest.mark.django_db
-def test_waiting_for_human_mutes_price_and_sair():
+def test_waiting_for_human_sair_shows_main_menu():
     tenant = TenantFactory()
     instance = WhatsappInstanceFactory(tenant=tenant)
     resident = ResidentFactory(tenant=tenant, phone_number="5511999887766", name="Ana")
@@ -670,29 +600,21 @@ def test_waiting_for_human_mutes_price_and_sair():
         is_bot_active=True,
     )
 
-    with mock.patch("apps.sales.services.cart_flow.send_whatsapp_reply") as send:
-        with mock.patch("apps.sales.services.main_menu.send_whatsapp_reply") as send_menu:
-            with tenant_scope(tenant.id):
-                handled_price = process_cart_flow(
-                    tenant.id,
-                    instance,
-                    resident.phone_number,
-                    _event_text("R$ 12,90"),
-                )
-                handled_sair = process_cart_flow(
-                    tenant.id,
-                    instance,
-                    resident.phone_number,
-                    _event_text("SAIR"),
-                )
+    with mock.patch("apps.sales.services.main_menu.send_whatsapp_reply") as send:
+        with tenant_scope(tenant.id):
+            handled = process_cart_flow(
+                tenant.id,
+                instance,
+                resident.phone_number,
+                _event_text("SAIR"),
+            )
 
-    assert handled_price is True
-    assert handled_sair is True
+    assert handled is True
     session.refresh_from_db()
-    assert session.state == ChatSession.State.WAITING_FOR_HUMAN
+    assert session.state == ChatSession.State.AWAITING_MAIN_MENU
     assert session.is_bot_active is True
-    send.assert_not_called()
-    send_menu.assert_not_called()
+    send.assert_called_once()
+    assert "1 —" in send.call_args[0][2]
 
 
 @pytest.mark.django_db

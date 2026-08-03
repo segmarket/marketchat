@@ -87,11 +87,6 @@ export const CONSULTATIVE_FAQ_ITEMS = [
     answer:
       "Na consultoria explicamos o cronograma típico: configuração do painel, conexão do WhatsApp e primeiros fluxos de atendimento — geralmente em poucos dias.",
   },
-  {
-    question: "Quais são as taxas da plataforma?",
-    answer:
-      "A assinatura mensal é fixa de acordo com o plano escolhido. Para as vendas realizadas diretamente pelo WhatsApp utilizando a nossa integração de pagamento, aplicamos apenas uma taxa de 2% sobre o valor de cada transação via Pix.",
-  },
 ] as const;
 
 export const HERO_MICROCOPY = [
@@ -102,12 +97,10 @@ export const HERO_MICROCOPY = [
 
 export const PRICING_HEADLINE = "Toda essa operação por menos que um café por dia.";
 export const PRICING_SUBHEADLINE =
-  "Um plano simples, com tudo que você precisa para operar o mercado autônomo. Assinatura transparente, sem surpresas na mensalidade.";
+  "Um plano simples, com tudo que você precisa para operar o mercado autônomo. Sem surpresas, sem taxas ocultas.";
 export const PRICING_ANCHOR_SUFFIX = "Menos que o custo de uma única venda perdida.";
 export const PRICING_ANTI_FEAR =
   "Não cobramos nada nos 7 dias. Você só paga se continuar — cancela em 1 clique.";
-export const PRICING_PIX_FEE_DISCLAIMER =
-  "Sobre os pagamentos processados via Pix dentro da plataforma, é aplicada uma taxa de 2% por transação.";
 
 export const TRUST_GUARANTEES = [
   {
@@ -152,11 +145,6 @@ export const FAQ_ITEMS = [
     question: "A IA conversa bem com o morador?",
     answer:
       "Sim. O tom é amigável para compras e dúvidas reais, e firme e profissional em situações de provocação ou abuso.",
-  },
-  {
-    question: "Quais são as taxas da plataforma?",
-    answer:
-      "A assinatura mensal é fixa de acordo com o plano escolhido. Para as vendas realizadas diretamente pelo WhatsApp utilizando a nossa integração de pagamento, aplicamos apenas uma taxa de 2% sobre o valor de cada transação via Pix.",
   },
 ] as const;
 

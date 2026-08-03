@@ -554,27 +554,6 @@ class EvolutionClient:
         text: str,
         delay_ms: int = 0,
     ) -> dict[str, Any]:
-        # Fail-fast: sessão Connected mas sem LoggedIn faz /send/text travar ~60s.
-        try:
-            status_payload = self.connection_state(instance_api_key=instance_api_key)
-            status_data = (
-                status_payload.get("data") if isinstance(status_payload, dict) else None
-            )
-            if not isinstance(status_data, dict):
-                status_data = {}
-            if status_data.get("LoggedIn") is False:
-                raise RuntimeError(
-                    "Evolution: WhatsApp não autenticado (LoggedIn=false). "
-                    "Reconecte a instância (QR) antes de enviar mensagens."
-                )
-        except RuntimeError:
-            raise
-        except Exception as exc:
-            logger.warning(
-                "Evolution: não foi possível pré-checar /instance/status antes do send: %s",
-                exc,
-            )
-
         body = {
             "number": number,
             "text": text,

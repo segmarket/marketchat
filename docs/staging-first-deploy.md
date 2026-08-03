@@ -6,12 +6,10 @@ Por padrão, **todos os scripts em `scripts/staging/`** (exceto `deploy-remote.s
 
 | Comando no notebook | O que acontece |
 |---------------------|----------------|
-| `./scripts/staging/deploy-full.sh` | rsync → SSH → **backup DB + build** no servidor |
+| `./scripts/staging/deploy-full.sh` | rsync → SSH → build no servidor |
 | `./scripts/staging/deploy-backend.sh` | idem (só API) |
 | `./scripts/staging/deploy-frontend.sh` | idem (só painel) |
 | `./scripts/staging/bootstrap.sh` | idem (primeiro deploy) |
-| `./scripts/staging/backup-db.sh` | só dump Postgres |
-| `./scripts/staging/rollback.sh` | restore DB + imagens (`previous` ou `DEPLOY_ID`) |
 
 | Exceção | Comportamento |
 |---------|----------------|
@@ -75,15 +73,11 @@ Se faltar `.env.staging` no servidor, o script cria a partir do example e pede p
 Atualizações (dia a dia):
 
 ```bash
-./scripts/staging/deploy-full.sh      # sync + backup DB + backend + frontend
+./scripts/staging/deploy-full.sh      # sync + backend + frontend no servidor
 ./scripts/staging/deploy-backend.sh   # só API
 ./scripts/staging/deploy-frontend.sh  # só painel
-./scripts/staging/backup-db.sh        # só dump Postgres
-./scripts/staging/rollback.sh         # restore DB + imagens (previous)
 ./scripts/staging/deploy-remote.sh sync  # só copia arquivos (sem docker)
 ```
-
-`deploy-full` versiona imagens (`marketchat-*-staging:<DEPLOY_ID>` + `:current`), grava dump em `backups/` e ponteiros em `releases/` (política idêntica à produção: keep=5; rollback sempre com DB).
 
 `deploy-remote.sh full|backend|frontend|bootstrap` continua como atalho equivalente.
 

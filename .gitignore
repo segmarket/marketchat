@@ -18,5 +18,3 @@ venv/
 staticfiles/
 .pytest_cache/
 .mypy_cache/
-backups/
-releases/

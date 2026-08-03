@@ -102,22 +102,14 @@ EOF
 
 remote_run_deploy_script() {
   local script_name="$1"
-  shift
-  local quoted_args=""
-  local confirm_q
-  if [[ "$#" -gt 0 ]]; then
-    printf -v quoted_args '%q ' "$@"
-  fi
-  printf -v confirm_q '%q' "${CONFIRM:-}"
   echo ""
   echo "== 2/2 Build e deploy no servidor ($script_name) =="
   prod_ssh_cmd -t "$PRODUCTION_SSH" bash -s <<EOF
 set -euo pipefail
 cd "\$HOME/$PRODUCTION_PATH"
-chmod +x scripts/producao/*.sh scripts/lib/*.sh 2>/dev/null || chmod +x scripts/producao/*.sh
+chmod +x scripts/producao/*.sh
 export PRODUCTION_ON_SERVER=1
 export PRODUCTION_SKIP_ENV_PROMPT=1
-export CONFIRM=${confirm_q}
-./scripts/producao/${script_name} ${quoted_args}
+./scripts/producao/$script_name
 EOF
 }

@@ -1,4 +1,4 @@
-import { Check, Info } from "lucide-react";
+import { Check } from "lucide-react";
 import { CTA_LOCATIONS } from "../../constants/analyticsEvents";
 import MarketingCtaLink from "./MarketingCtaLink";
 import MarketingConsultativeCta from "./MarketingConsultativeCta";
@@ -10,7 +10,6 @@ import {
   PRICING_ANCHOR_SUFFIX,
   PRICING_ANTI_FEAR,
   PRICING_HEADLINE,
-  PRICING_PIX_FEE_DISCLAIMER,
   PRICING_SUBHEADLINE,
   planDailyPriceLabel,
   planPriceDisplay,
@@ -88,11 +87,6 @@ export default function MarketingPricing({ variant = "default" }: MarketingPrici
             {isConsultative ? CONSULTATIVE_PRICING_FOOTER : PRICING_ANTI_FEAR}
           </p>
         </article>
-
-        <p className="mx-auto mt-8 flex max-w-lg gap-2 text-left text-sm leading-relaxed text-gray-500">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" aria-hidden />
-          <span>{PRICING_PIX_FEE_DISCLAIMER}</span>
-        </p>
       </div>
     </section>
   );

@@ -17,7 +17,6 @@ def unlock_resident_chat_session(
         "pending_product": None,
         "temporary_name": "",
         "last_discussed_product": None,
-        "pending_intent": "",
     }
     if clear_cart_link:
         updates["active_cart"] = None

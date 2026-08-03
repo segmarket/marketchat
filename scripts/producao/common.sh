@@ -31,7 +31,6 @@ production_should_run_local() {
 
 production_run_remote_unless_on_server() {
   local script_name="${1:?}"
-  shift
 
   if production_should_run_local; then
     return 0
@@ -62,18 +61,8 @@ production_run_remote_unless_on_server() {
     remote_ensure_env_on_server
   fi
 
-  remote_run_deploy_script "$script_name" "$@"
+  remote_run_deploy_script "$script_name"
   exit 0
-}
-
-production_release_init() {
-  RELEASE_ROOT="$PRODUCTION_ROOT"
-  RELEASE_ENV_FILE="$PRODUCTION_ENV_FILE"
-  RELEASE_BACKEND_IMAGE="marketchat-backend-prd"
-  RELEASE_FRONTEND_IMAGE="marketchat-frontend-prd"
-  # shellcheck source=../lib/release.sh
-  source "$PRODUCTION_SCRIPT_DIR/../lib/release.sh"
-  release_require_vars
 }
 
 production_cd() {
@@ -136,7 +125,6 @@ production_compose() {
       fi
     done < "$PRODUCTION_ENV_FILE"
   fi
-  export IMAGE_TAG="${IMAGE_TAG:-current}"
   docker compose -f "$COMPOSE_FILE" "$@"
 }
 

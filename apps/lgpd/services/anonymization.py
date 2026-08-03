@@ -24,22 +24,14 @@ def normalize_phone_digits(phone: str) -> str:
     return re.sub(r"\D", "", (phone or "").strip())
 
 
-def build_anonymous_phone_token(
-    *,
-    tenant_id: int,
-    phone_number: str,
-    resident_id: int,
-) -> str:
-    """Token não reversível e único por morador; cabe em varchar(32).
+def build_anonymous_phone_token(*, tenant_id: int, phone_number: str) -> str:
+    """Token estável e não reversível; cabe em ChatSession/Resident.phone_number (64).
 
-    Inclui ``resident_id`` para não colidir com sessão/morador já anonimizado
-    do mesmo telefone após re-cadastro (uniq_chat_session_tenant_phone).
-    Prefixo ``anon_`` (5) + 27 hex = 32 chars.
+    Prefixo ``anon_`` (5) + 27 hex = 32 chars — compatível também com DBs
+    que ainda tenham varchar(32) na sessão antes da migration.
     """
     salt = getattr(settings, "SECRET_KEY", "marketchat")
-    digest = hashlib.sha256(
-        f"{tenant_id}:{resident_id}:{phone_number}:{salt}".encode("utf-8")
-    ).hexdigest()
+    digest = hashlib.sha256(f"{tenant_id}:{phone_number}:{salt}".encode("utf-8")).hexdigest()
     return f"anon_{digest[:27]}"
 
 
@@ -57,7 +49,6 @@ def perform_resident_anonymization(resident: Resident) -> None:
     anon_phone = build_anonymous_phone_token(
         tenant_id=resident.tenant_id,
         phone_number=original_phone,
-        resident_id=resident.pk,
     )
 
     resident.phone_number = anon_phone

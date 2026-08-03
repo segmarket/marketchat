@@ -25,5 +25,3 @@ front-end/dist
 node_modules
 agent-tools
 agent-transcripts
-backups
-releases

@@ -129,13 +129,9 @@ def classify_gatekeeper_intent(
         raw = (response.choices[0].message.content or "").strip()
         return parse_gatekeeper_tag(raw)
     except BadRequestError as exc:
-        logger.error("Gatekeeper OpenAI BadRequest: %s; fallback isolado", exc)
+        logger.warning("Gatekeeper OpenAI BadRequest: %s; fallback isolado", exc)
     except Exception:
-        logger.error(
-            "Gatekeeper: falha com contexto; fallback isolado msg=%r",
-            stripped[:80],
-            exc_info=True,
-        )
+        logger.warning("Gatekeeper: falha com contexto; fallback isolado", exc_info=True)
 
     return classify_gatekeeper_intent_isolated(message=stripped)
 
@@ -159,17 +155,9 @@ def classify_gatekeeper_intent_isolated(*, message: str) -> str:
         )
         return parse_gatekeeper_tag(raw)
     except ChatbotCoreError:
-        logger.error(
-            "Gatekeeper isolado: ChatbotCoreError; GENERAL msg=%r",
-            (message or "")[:80],
-        )
         return "GENERAL"
     except Exception:
-        logger.error(
-            "Gatekeeper isolado: falha na classificação msg=%r",
-            (message or "")[:80],
-            exc_info=True,
-        )
+        logger.exception("Gatekeeper isolado: falha na classificação")
         return "GENERAL"
 
 

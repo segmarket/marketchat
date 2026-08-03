@@ -47,7 +47,8 @@ SUPPORT_HANDOVER_ACK = (
 
 SUPPORT_WAITING_QUEUE_MESSAGE = (
     "Sua solicitação foi registrada e nossa equipe já foi notificada! "
-    "Um atendente assumirá essa conversa em instantes."
+    "Um atendente assumirá essa conversa em instantes.\n\n"
+    "(Se você precisar fazer uma nova compra ou quiser cancelar este chamado, digite SAIR)."
 )
 
 UNREGISTERED_PRODUCT_SEARCH_PROMPT = (
@@ -66,7 +67,8 @@ UNREGISTERED_PRODUCT_FOUND_CTA = (
 UNREGISTERED_PRODUCT_NOT_FOUND_MESSAGE = (
     "Realmente esse produto não está aparecendo no meu sistema. "
     "Já notifiquei a equipe para realizar o cadastro e ajustar a maquininha! "
-    "Um atendente assumirá essa conversa em instantes para te ajudar."
+    "Um atendente assumirá essa conversa em instantes para te ajudar.\n\n"
+    "(Se quiser cancelar este chamado, digite SAIR)."
 )
 
 

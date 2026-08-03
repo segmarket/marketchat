@@ -144,7 +144,7 @@ def show_main_menu(
     send_whatsapp_reply(instance, phone, body, session=session)
 
 
-def start_support_details_collection(
+def _start_support_details_collection(
     *,
     instance: WhatsappInstance,
     phone: str,
@@ -152,15 +152,10 @@ def start_support_details_collection(
     choice: str,
     reason: str,
 ) -> None:
-    """Entra no fluxo de detalhes de suporte (mesma entrada das opções 1/3–7 do menu)."""
     session.temporary_name = choice
     session.save(update_fields=["temporary_name", "updated_at"])
     transition(session, ChatSession.State.AWAITING_SUPPORT_DETAILS, reason=reason)
     send_whatsapp_reply(instance, phone, SUPPORT_DETAILS_PROMPT, session=session)
-
-
-# Compat: callers internos antigos
-_start_support_details_collection = start_support_details_collection
 
 
 def _start_uncatalogued_product_search(
@@ -217,26 +212,8 @@ def handle_main_menu_message(
         )
         return True
 
-    # Opção 1 — Indisp. pagamento: registra e abre PDV Pix sem pedir mais detalhes.
-    if choice == MENU_PAYMENT:
-        from apps.sales.services.maquininha_backup import (
-            SUPPORT_PAYMENT_BACKUP_SALE_MESSAGE,
-            start_maquininha_backup_sale,
-        )
-
-        start_maquininha_backup_sale(
-            instance=instance,
-            tenant_id=session.tenant_id,
-            phone=phone,
-            resident=resident,
-            session=session,
-            message="Indisp. de pagamento ou queda sistema (menu)",
-            issue_label="Pagamento",
-            reply_text=SUPPORT_PAYMENT_BACKUP_SALE_MESSAGE,
-        )
-        return True
-
     reason_by_choice = {
+        MENU_PAYMENT: "main_menu_payment",
         MENU_BILLING: "main_menu_billing",
         MENU_FRIDGE: "main_menu_fridge",
         MENU_STORE: "main_menu_store",

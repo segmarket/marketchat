@@ -33,7 +33,6 @@ urlpatterns = [
     path("api/onboarding/", include("apps.onboarding.urls")),
     path("api/support/", include("apps.support.urls")),
     path("api/lgpd/", include("apps.lgpd.urls")),
-    path("api/demo/", include("apps.demo.urls")),
     path("api/", include("apps.tenants.urls")),
 ]
 

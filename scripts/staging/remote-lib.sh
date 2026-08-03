@@ -71,22 +71,14 @@ EOF
 
 remote_run_deploy_script() {
   local script_name="$1"
-  shift
-  local quoted_args=""
-  local confirm_q
-  if [[ "$#" -gt 0 ]]; then
-    printf -v quoted_args '%q ' "$@"
-  fi
-  printf -v confirm_q '%q' "${CONFIRM:-}"
   echo ""
   echo "== 2/2 Build e deploy no servidor ($script_name) =="
   ssh -t "$STAGING_SSH" bash -s <<EOF
 set -euo pipefail
 cd "\$HOME/$STAGING_PATH"
-chmod +x scripts/staging/*.sh scripts/lib/*.sh 2>/dev/null || chmod +x scripts/staging/*.sh
+chmod +x scripts/staging/*.sh
 export STAGING_ON_SERVER=1
 export STAGING_SKIP_ENV_PROMPT=1
-export CONFIRM=${confirm_q}
-./scripts/staging/${script_name} ${quoted_args}
+./scripts/staging/$script_name
 EOF
 }
