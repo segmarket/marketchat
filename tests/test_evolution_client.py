@@ -304,3 +304,31 @@ def test_fetch_instances_does_not_fallback_on_503():
         with pytest.raises(urllib.error.HTTPError) as raised:
             client.fetch_instances()
     assert raised.value.code == 503
+
+
+def test_build_webhook_url_appends_path_when_origin_only():
+    url = EvolutionClient.build_webhook_url(
+        "https://staging-api.example.com",
+        "abcSecretToken",
+    )
+    assert url == (
+        "https://staging-api.example.com/api/integrations/webhooks/evolution/"
+        "?secret=abcSecretToken"
+    )
+
+
+def test_build_webhook_url_preserves_full_path():
+    base = "https://api.example.com/api/integrations/webhooks/evolution/"
+    url = EvolutionClient.build_webhook_url(base, "tok")
+    assert url == f"{base}?secret=tok"
+
+
+def test_build_webhook_url_repairs_origin_with_existing_secret_query():
+    url = EvolutionClient.build_webhook_url(
+        "https://staging-api.example.com?secret=already",
+        "ignored",
+    )
+    assert url == (
+        "https://staging-api.example.com/api/integrations/webhooks/evolution/"
+        "?secret=already"
+    )

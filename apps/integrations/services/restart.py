@@ -24,8 +24,10 @@ class EvolutionRestartError(Exception):
 
 
 def _instance_webhook_url(instance: WhatsappInstance) -> str:
-    if (instance.webhook_url or "").strip():
-        return instance.webhook_url.strip()
+    raw = (instance.webhook_url or "").strip()
+    if raw:
+        # Repara URLs origin-only gravadas por engano (sem path do webhook).
+        return EvolutionClient.build_webhook_url(raw, instance.webhook_secret)
     return EvolutionClient.build_webhook_url(
         build_webhook_base_url(),
         instance.webhook_secret,

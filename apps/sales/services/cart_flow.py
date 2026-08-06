@@ -15,9 +15,13 @@ from apps.sales.models import Cart, CartItem
 from apps.sales.services.active_bot_router import (
     handle_complaint,
     handle_maintenance_issue,
-    handle_payment_error_pivot,
     handle_stock_issue,
     route_idle_message,
+)
+from apps.sales.services.handlers.payment import (
+    SUPPORT_PAYMENT_BACKUP_SALE_MESSAGE,
+    start_maquininha_backup_sale,
+    try_escape_human_queue_for_purchase,
 )
 from apps.sales.services.availability_handler import handle_availability_question
 from apps.sales.services.cart_escape import (
@@ -141,23 +145,25 @@ def _handle_support_details(
     text: str,
 ) -> bool:
     """
-    Opção 1 = pivot pagamento.
-    Opções 2–7 = classifica o detalhe (COMPLAINT/manutenção/estoque),
-    dispara alertas internos e entra na fila de espera ativa.
+    Fallback legado opção 1 (MENU_PAYMENT) = venda backup Pix.
+    Opções 3–7 = classifica o detalhe, dispara alertas e entra na fila humana.
     """
     category = (session.temporary_name or "").strip()
     session.temporary_name = ""
     session.save(update_fields=["temporary_name", "updated_at"])
 
     if category == MENU_PAYMENT:
-        return handle_payment_error_pivot(
+        start_maquininha_backup_sale(
             instance=instance,
             tenant_id=session.tenant_id,
             phone=phone,
             resident=resident,
             session=session,
-            message=text,
+            message=text or category,
+            issue_label="Pagamento",
+            reply_text=SUPPORT_PAYMENT_BACKUP_SALE_MESSAGE,
         )
+        return True
 
     intent = classify_user_intent(
         text,
@@ -217,8 +223,16 @@ def process_cart_flow(
     text = (event.message_text or "").strip()
     session = _get_or_create_session(tenant_id, phone)
 
-    if session.state == ChatSession.State.WAITING_FOR_HUMAN and text:
-        if is_global_escape_message(text):
+    if session.state == ChatSession.State.WAITING_FOR_HUMAN:
+        if text and try_escape_human_queue_for_purchase(
+            instance=instance,
+            phone=phone,
+            text=text,
+            session=session,
+            resident=resident,
+        ):
+            return True
+        if text and is_global_escape_message(text):
             show_main_menu(
                 instance=instance,
                 phone=phone,

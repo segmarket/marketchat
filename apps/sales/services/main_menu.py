@@ -10,6 +10,7 @@ from apps.integrations.models import WhatsappInstance
 from apps.residents.models import ChatSession, Resident
 from apps.residents.services.whatsapp_reply import send_whatsapp_reply
 from apps.sales.services.chat_fsm import transition
+from apps.sales.services.handlers import dispatch_support_menu_choice
 from apps.sales.services.intent_gatekeeper import is_opening_greeting
 from apps.sales.services.resident_ai_context import resident_display_name
 from apps.sales.services.whatsapp_interactive import (
@@ -22,8 +23,6 @@ from apps.sales.services.whatsapp_interactive import (
     MENU_PRODUCT,
     MENU_STORE,
     MENU_UNCATALOGUED,
-    SUPPORT_DETAILS_PROMPT,
-    UNREGISTERED_PRODUCT_SEARCH_PROMPT,
     build_main_menu_text_fallback,
 )
 
@@ -144,41 +143,6 @@ def show_main_menu(
     send_whatsapp_reply(instance, phone, body, session=session)
 
 
-def _start_support_details_collection(
-    *,
-    instance: WhatsappInstance,
-    phone: str,
-    session: ChatSession,
-    choice: str,
-    reason: str,
-) -> None:
-    session.temporary_name = choice
-    session.save(update_fields=["temporary_name", "updated_at"])
-    transition(session, ChatSession.State.AWAITING_SUPPORT_DETAILS, reason=reason)
-    send_whatsapp_reply(instance, phone, SUPPORT_DETAILS_PROMPT, session=session)
-
-
-def _start_uncatalogued_product_search(
-    *,
-    instance: WhatsappInstance,
-    phone: str,
-    session: ChatSession,
-) -> None:
-    session.temporary_name = ""
-    session.save(update_fields=["temporary_name", "updated_at"])
-    transition(
-        session,
-        ChatSession.State.SEARCHING_UNREGISTERED_PRODUCT,
-        reason="main_menu_uncatalogued",
-    )
-    send_whatsapp_reply(
-        instance,
-        phone,
-        UNREGISTERED_PRODUCT_SEARCH_PROMPT,
-        session=session,
-    )
-
-
 def handle_main_menu_message(
     *,
     instance: WhatsappInstance,
@@ -204,27 +168,16 @@ def handle_main_menu_message(
         send_whatsapp_reply(instance, phone, build_main_menu_reminder(), session=session)
         return True
 
-    if choice == MENU_UNCATALOGUED:
-        _start_uncatalogued_product_search(
-            instance=instance,
-            phone=phone,
-            session=session,
-        )
-        return True
-
-    reason_by_choice = {
-        MENU_PAYMENT: "main_menu_payment",
-        MENU_BILLING: "main_menu_billing",
-        MENU_FRIDGE: "main_menu_fridge",
-        MENU_STORE: "main_menu_store",
-        MENU_PRODUCT: "main_menu_product_issue",
-        MENU_OTHER: "main_menu_other",
-    }
-    _start_support_details_collection(
+    handled = dispatch_support_menu_choice(
+        choice=choice,
         instance=instance,
         phone=phone,
+        resident=resident,
         session=session,
-        choice=choice,
-        reason=reason_by_choice.get(choice, "main_menu_support"),
+        text=text,
     )
-    return True
+    if handled is None:
+        logger.warning("Menu choice sem handler registrado: %s", choice)
+        send_whatsapp_reply(instance, phone, build_main_menu_reminder(), session=session)
+        return True
+    return bool(handled)

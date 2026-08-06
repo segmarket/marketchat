@@ -381,6 +381,18 @@ def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) ->
         )
 
     if not bot_should_reply:
+        from apps.sales.services.handlers.payment import (
+            try_escape_human_queue_for_purchase,
+        )
+
+        if text and try_escape_human_queue_for_purchase(
+            instance=instance,
+            phone=phone,
+            text=text,
+            session=session,
+            resident=resident_for_lazy,
+        ):
+            return
         logger.info(
             "WhatsApp MESSAGE em atendimento humano (bot pausado): tenant=%s phone=%s",
             instance.tenant_id,

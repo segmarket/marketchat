@@ -182,12 +182,21 @@ class EvolutionClient:
 
     @staticmethod
     def build_webhook_url(base_url: str, secret: str | None = None) -> str:
+        """Monta URL do webhook. Aceita path completo ou só a origem (PUBLIC_WEBHOOK_BASE_URL)."""
         if not base_url:
             return ""
+        parsed = urllib.parse.urlparse(base_url.strip())
+        # Evita gravar no Evolution só o host (`https://api.example.com?secret=...`),
+        # o que gera 404 em vez de atingir /api/integrations/webhooks/evolution/.
+        if parsed.scheme and parsed.netloc and (parsed.path or "").rstrip("/") in ("",):
+            parsed = parsed._replace(path="/api/integrations/webhooks/evolution/")
+        base = urllib.parse.urlunparse(parsed)
         if not secret:
-            return base_url
-        sep = "&" if "?" in base_url else "?"
-        return f"{base_url}{sep}secret={urllib.parse.quote(secret)}"
+            return base
+        if urllib.parse.parse_qs(urllib.parse.urlparse(base).query).get("secret"):
+            return base
+        sep = "&" if "?" in base else "?"
+        return f"{base}{sep}secret={urllib.parse.quote(secret)}"
 
     def create_instance(self, *, name: str, instance_id: str, token: str) -> dict[str, Any]:
         return self._request(

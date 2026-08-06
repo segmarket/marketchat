@@ -73,6 +73,20 @@ def perform_resident_anonymization(resident: Resident) -> None:
         tenant_id=resident.tenant_id,
         phone_number=original_phone,
     )
+    session_ids = list(sessions.values_list("id", flat=True))
+
+    # Token anon_ é estável por telefone. Se o mesmo número já foi anonimizado
+    # antes, a ChatSession antiga ainda ocupa uniq_chat_session_tenant_phone.
+    conflicting = ChatSession.objects.filter(
+        tenant_id=resident.tenant_id,
+        phone_number=anon_phone,
+    ).exclude(id__in=session_ids)
+    if conflicting.exists():
+        ChatMessage.objects.filter(session__in=conflicting).update(
+            content=REDACTED_MESSAGE
+        )
+        conflicting.delete()
+
     for session in sessions:
         session.phone_number = anon_phone
         session.temporary_name = ""

@@ -4,12 +4,16 @@ import logging
 
 from django.conf import settings
 
-from apps.core.pii import mask_phone
 from apps.integrations.models import WhatsappInstance
 from apps.residents.models import ChatSession, Resident
 from apps.sales.services.resident_ai_context import resident_first_name_from_string
-from apps.residents.services.condo_match import find_market_by_query
+from apps.residents.services.condo_match import match_markets_by_query
 from apps.residents.services.greeting import greeting_for_now
+from apps.residents.services.handlers.condo import (
+    complete_condo_onboarding,
+    handle_condo_suggestion_choice,
+    present_condo_suggestions,
+)
 from apps.residents.services.whatsapp_reply import send_whatsapp_reply
 
 logger = logging.getLogger(__name__)
@@ -66,6 +70,7 @@ def process_inbound_message(
     onboarding_states = (
         ChatSession.State.AWAITING_NAME,
         ChatSession.State.AWAITING_CONDO,
+        ChatSession.State.AWAITING_CONDO_SUGGESTION,
     )
     # O webhook cria ChatSession com ACTIVE_BOT antes do onboarding; sem isso o fluxo
     # cai no return final e o contato novo não recebe resposta.
@@ -79,6 +84,16 @@ def process_inbound_message(
 
     if session.state == ChatSession.State.AWAITING_CONDO:
         _handle_awaiting_condo(instance, session, tenant_id, phone, message)
+        return True
+
+    if session.state == ChatSession.State.AWAITING_CONDO_SUGGESTION:
+        handle_condo_suggestion_choice(
+            instance=instance,
+            phone=phone,
+            session=session,
+            tenant_id=tenant_id,
+            message=message,
+        )
         return True
 
     return True
@@ -96,6 +111,7 @@ def _start_onboarding(instance: WhatsappInstance, phone: str, tenant_id: int) ->
         defaults={
             "state": ChatSession.State.AWAITING_NAME,
             "temporary_name": "",
+            "context_data": {},
         },
     )
 
@@ -134,48 +150,36 @@ def _handle_awaiting_condo(
     phone: str,
     message: str,
 ) -> None:
-    market = find_market_by_query(tenant_id, message)
-    if market is None:
+    result = match_markets_by_query(tenant_id, message)
+    if result.kind == "none" or (
+        result.kind == "perfect" and result.market is None
+    ):
         send_whatsapp_reply(instance, phone, REJECT_CONDO_MESSAGE)
         return
 
-    name = session.temporary_name.strip()
-    resident, _created = Resident.objects.update_or_create(
-        tenant_id=tenant_id,
-        phone_number=phone,
-        defaults={
-            "name": name,
-            "market": market,
-        },
-    )
-    session.temporary_name = ""
-    session.active_cart = None
-    session.pending_product = None
-    session.save(
-        update_fields=[
-            "temporary_name",
-            "active_cart",
-            "pending_product",
-            "updated_at",
-        ],
-    )
+    if result.kind == "suggestions":
+        present_condo_suggestions(
+            instance=instance,
+            phone=phone,
+            session=session,
+            suggestions=result.suggestions,
+        )
+        return
 
-    from apps.sales.services.main_menu import show_main_menu
+    if result.kind == "list_all":
+        present_condo_suggestions(
+            instance=instance,
+            phone=phone,
+            session=session,
+            suggestions=result.suggestions,
+            list_all=True,
+        )
+        return
 
-    show_main_menu(
+    complete_condo_onboarding(
         instance=instance,
         phone=phone,
-        resident=resident,
         session=session,
-        intro=(
-            f"Perfeito, identificamos o mercado no {market.name}!\n"
-            "Seu cadastro foi concluído com sucesso."
-        ),
-        reason="onboarding_complete",
-    )
-    logger.info(
-        "Morador cadastrado: tenant=%s phone=%s market=%s",
-        tenant_id,
-        mask_phone(phone),
-        market.id,
+        tenant_id=tenant_id,
+        market=result.market,
     )

@@ -50,6 +50,10 @@ class ChatSession(models.Model):
     class State(models.TextChoices):
         AWAITING_NAME = "AWAITING_NAME", "Aguardando nome"
         AWAITING_CONDO = "AWAITING_CONDO", "Aguardando condomínio"
+        AWAITING_CONDO_SUGGESTION = (
+            "AWAITING_CONDO_SUGGESTION",
+            "Aguardando escolha de condomínio sugerido",
+        )
         IDLE = "IDLE", "Conversa livre / compra"
         AWAITING_MAIN_MENU = "AWAITING_MAIN_MENU", "Menu principal"
         AWAITING_SUPPORT_DETAILS = (
@@ -85,6 +89,7 @@ class ChatSession(models.Model):
         default=State.AWAITING_NAME,
     )
     temporary_name = models.CharField(max_length=255, blank=True, default="")
+    context_data = models.JSONField(default=dict, blank=True)
     active_cart = models.ForeignKey(
         "sales.Cart",
         on_delete=models.SET_NULL,
