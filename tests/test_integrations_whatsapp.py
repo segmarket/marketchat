@@ -50,8 +50,7 @@ def test_whatsapp_provision_success(mock_prov_cls, mock_dash_cls, api_client):
     mock_prov_cls.return_value = mock_client
     mock_dash_cls.return_value = mock_client
     mock_client.create_instance_safe.return_value = {"ok": True}
-    mock_client.connect_instance.return_value = {"ok": True}
-    mock_client.fetch_qrcode.return_value = {
+    mock_client.connect_instance.return_value = {
         "data": {"Qrcode": f"data:image/png;base64,{'A' * 120}"},
     }
 
@@ -483,7 +482,8 @@ def test_provision_service_unit(mock_client_cls):
     mock_client_cls.return_value = mock_client
     mock_client.create_instance_safe.return_value = {}
     mock_client.connect_instance.return_value = {}
-    mock_client.fetch_qrcode.return_value = {"connected": True}
+    mock_client.connection_state.return_value = {"loggedIn": True, "connected": True}
+    mock_client.fetch_remote_instance.return_value = {"instanceName": "mc-svc-test"}
 
     result = provision_whatsapp_instance(tenant, client=mock_client)
     assert result["instance"].instance_name == "mc-svc-test"
@@ -580,9 +580,8 @@ def test_whatsapp_dashboard_webhook_stale(mock_prov_cls, mock_dash_cls, api_clie
 
 
 @pytest.mark.django_db
-@patch("apps.integrations.services.restart.refresh_qrcode")
 @patch("apps.integrations.services.restart.EvolutionClient")
-def test_whatsapp_restart(mock_client_cls, mock_refresh_qr, api_client):
+def test_whatsapp_restart(mock_client_cls, api_client):
     """CLOSE → recria instância no Evolution (connect sozinho não gera QR)."""
     tenant = TenantFactory()
     user = UserFactory(tenant=tenant, email="wa-restart@example.com")
@@ -597,10 +596,6 @@ def test_whatsapp_restart(mock_client_cls, mock_refresh_qr, api_client):
     )
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
-    mock_refresh_qr.return_value = {
-        "connected": False,
-        "qrcode_image": f"data:image/png;base64,{'R' * 120}",
-    }
 
     url = reverse("integrations-whatsapp-restart")
     api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(user).access_token}")

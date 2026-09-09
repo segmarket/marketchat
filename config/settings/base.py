@@ -193,6 +193,8 @@ EMAIL_PORT = env.int("EMAIL_PORT", default=25)
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=False)
+# Evita WORKER TIMEOUT do Gunicorn quando o SMTP está inacessível (register, reset, etc.).
+EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=10)
 # Hostname usado só na verificação TLS (SNI) após STARTTLS, quando EMAIL_HOST é CNAME
 # e o certificado é emitido para outro nome (ex.: Mailhostbox).
 EMAIL_SMTP_TLS_SERVERNAME = env("EMAIL_SMTP_TLS_SERVERNAME", default="")

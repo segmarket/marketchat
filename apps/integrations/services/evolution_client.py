@@ -319,17 +319,17 @@ class EvolutionClient:
         retries: int = 12,
         retry_delay: float = 3.0,
     ) -> dict[str, Any]:
+        del instance_api_key, retries, retry_delay
         if connect_payload.get("connected"):
             return connect_payload
         image = self.extract_qrcode_image(connect_payload)
         if image:
             return connect_payload
-        time.sleep(2.0)
-        return self.fetch_qrcode(
-            instance_api_key=instance_api_key,
-            retries=retries,
-            retry_delay=retry_delay,
+        logger.info(
+            "[Evolution] QR request skipped reason=awaiting_webhook "
+            "(GET /instance/qr not used after connect)"
         )
+        return {"qr_pending": True}
 
     @staticmethod
     def _http_error_is_qr_limit(exc: urllib.error.HTTPError) -> bool:
@@ -359,8 +359,8 @@ class EvolutionClient:
         Evolution GO não possui /instance/restart — reconexão via logout (opcional),
         connect e (opcionalmente) leitura do QR.
 
-        Por padrão wait_for_qr=False: só dispara o connect e devolve rápido
-        (o painel busca o QR via GET /qrcode/ com polling).
+        Por padrão wait_for_qr=False: só dispara o connect e devolve rápido.
+        O QR chega pelo webhook QRCODE (nunca GET /instance/qr após connect).
         """
         del phone  # QR no painel: pairing code por telefone bloqueia GET /instance/qr
         if reset_session:
@@ -741,9 +741,13 @@ class EvolutionClient:
         self,
         *,
         instance_api_key: str,
-        retries: int = 3,
+        retries: int = 0,
         retry_delay: float = 2.0,
     ) -> dict[str, Any]:
+        logger.warning(
+            "[Evolution] GET /instance/qr invoked — pairing must use webhook QRCODE, "
+            "not this endpoint (duplicate runtime / PR #145)"
+        )
         attempts = max(1, retries + 1)
         for attempt in range(attempts):
             try:
@@ -751,6 +755,9 @@ class EvolutionClient:
             except urllib.error.HTTPError as e:
                 preview = (getattr(e, "_body_preview", b"") or b"").lower()
                 if e.code == 400 and b"already logged in" in preview:
+                    logger.info(
+                        "[Evolution] GET /instance/qr returned already logged in"
+                    )
                     return {"connected": True, "message": "session already logged in"}
                 if (
                     self._http_error_is_qr_not_ready(e)
@@ -991,5 +998,32 @@ class EvolutionClient:
 
         if not isinstance(payload, dict):
             return "unknown"
+        logged_in = False
+        connected_explicit = None
+        for node in (payload, payload.get("data")):
+            if not isinstance(node, dict):
+                continue
+            lowered = {str(k).lower(): v for k, v in node.items()}
+            for key in ("loggedin", "logged_in", "isloggedin"):
+                flag = lowered.get(key)
+                if flag is True or (
+                    isinstance(flag, str) and flag.strip().lower() in ("true", "1")
+                ):
+                    logged_in = True
+                elif flag is False or (
+                    isinstance(flag, str) and flag.strip().lower() in ("false", "0")
+                ):
+                    pass
+            for key in ("connected", "isconnected"):
+                flag = lowered.get(key)
+                if isinstance(flag, bool):
+                    connected_explicit = flag
+                elif isinstance(flag, str) and flag.strip().lower() in ("true", "1"):
+                    connected_explicit = True
+                elif isinstance(flag, str) and flag.strip().lower() in ("false", "0"):
+                    connected_explicit = False
+        # loggedIn sem connected=false explícito = sessão autenticada (CASO A / pós-scan).
+        if logged_in and connected_explicit is not False:
+            return "open"
         data = payload.get("data", payload)
         return walk(data) or "unknown"

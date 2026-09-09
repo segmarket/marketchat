@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import axios from "axios";
 import { toast } from "sonner";
 import ComponentCard from "../../components/common/ComponentCard";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
@@ -54,6 +55,7 @@ export default function WhatsAppConfig({ embedded = false, onConnected }: Props)
   const [qrcodeImage, setQrcodeImage] = useState("");
   const [accessHint, setAccessHint] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollAbortRef = useRef<AbortController | null>(null);
   const loadInFlightRef = useRef(false);
   const avatarFetchStartedRef = useRef(false);
   const disconnectModal = useModal();
@@ -68,6 +70,8 @@ export default function WhatsAppConfig({ embedded = false, onConnected }: Props)
       clearInterval(pollRef.current);
       pollRef.current = null;
     }
+    pollAbortRef.current?.abort();
+    pollAbortRef.current = null;
   }, []);
 
   const load = useCallback(async () => {
@@ -130,10 +134,14 @@ export default function WhatsAppConfig({ embedded = false, onConnected }: Props)
   }, [state, loading]);
 
   const pollStatus = useCallback(async () => {
+    pollAbortRef.current?.abort();
+    const ac = new AbortController();
+    pollAbortRef.current = ac;
     try {
-      const data = await fetchWhatsappStatus();
+      const data = await fetchWhatsappStatus(ac.signal);
+      if (ac.signal.aborted) return;
       setState(data);
-      if (data.qrcode_image) setQrcodeImage(data.qrcode_image);
+      if (data.qrcode_image && !isConnected(data)) setQrcodeImage(data.qrcode_image);
       if (isConnected(data)) {
         stopPolling();
         setQrcodeImage("");
@@ -141,7 +149,10 @@ export default function WhatsAppConfig({ embedded = false, onConnected }: Props)
         toast.success("WhatsApp conectado com sucesso.");
         onConnected?.();
       }
-    } catch {
+    } catch (err) {
+      if (axios.isCancel(err) || (err as { code?: string } | null)?.code === "ERR_CANCELED") {
+        return;
+      }
       /* polling silencioso */
     }
   }, [onConnected, stopPolling]);
@@ -157,21 +168,15 @@ export default function WhatsAppConfig({ embedded = false, onConnected }: Props)
     state?.connection_status === "close" &&
     !qrcodeImage;
 
-  useEffect(() => {
-    stopPolling();
-    if (!shouldPollQr) return;
-    void pollStatus();
-    pollRef.current = setInterval(() => void pollStatus(), POLL_MS);
-    return () => stopPolling();
-  }, [shouldPollQr, pollStatus, stopPolling]);
+  const pollMs = shouldPollQr ? POLL_MS : shouldPollReconnect ? RECONNECT_POLL_MS : 0;
 
   useEffect(() => {
     stopPolling();
-    if (!shouldPollReconnect) return;
+    if (!pollMs) return;
     void pollStatus();
-    pollRef.current = setInterval(() => void pollStatus(), RECONNECT_POLL_MS);
+    pollRef.current = setInterval(() => void pollStatus(), pollMs);
     return () => stopPolling();
-  }, [shouldPollReconnect, pollStatus, stopPolling]);
+  }, [pollMs, pollStatus, stopPolling]);
 
   async function handleReconnect() {
     setBusy(true);
@@ -182,12 +187,6 @@ export default function WhatsAppConfig({ embedded = false, onConnected }: Props)
         let latest = restarted;
         if (restarted.qrcode_image) {
           setQrcodeImage(restarted.qrcode_image);
-        } else if (!isConnected(restarted)) {
-          const qr = await fetchWhatsappQrcode();
-          setState(qr);
-          latest = qr;
-          if (qr.qrcode_image) setQrcodeImage(qr.qrcode_image);
-          else toast.error(QR_FAIL_MSG);
         }
         if (isConnected(latest)) {
           toast.success("WhatsApp conectado com sucesso.");
@@ -212,16 +211,6 @@ export default function WhatsAppConfig({ embedded = false, onConnected }: Props)
       setState(data);
       if (data.qrcode_image) {
         setQrcodeImage(data.qrcode_image);
-      } else if (!isConnected(data)) {
-        const qr = await fetchWhatsappQrcode();
-        setState(qr);
-        if (qr.qrcode_image) setQrcodeImage(qr.qrcode_image);
-        else toast.error(QR_FAIL_MSG);
-        if (isConnected(qr)) {
-          toast.success("WhatsApp conectado com sucesso.");
-          onConnected?.();
-          return;
-        }
       }
       if (isConnected(data)) {
         toast.success("WhatsApp conectado com sucesso.");
@@ -237,6 +226,12 @@ export default function WhatsAppConfig({ embedded = false, onConnected }: Props)
   }
 
   async function handleRefreshQr() {
+    if (state && isConnected(state)) {
+      setQrcodeImage("");
+      stopPolling();
+      toast.success("WhatsApp já está conectado.");
+      return;
+    }
     setBusy(true);
     try {
       const data = await fetchWhatsappQrcode();
@@ -248,7 +243,7 @@ export default function WhatsAppConfig({ embedded = false, onConnected }: Props)
         setQrcodeImage("");
         toast.success("WhatsApp já está conectado.");
       } else {
-        toast.error(QR_FAIL_MSG);
+        toast.message("Aguardando o QR Code do WhatsApp…");
       }
     } catch (err) {
       toast.error(getAxiosErrorMessage(err, { notAxiosMessage: QR_FAIL_MSG }));
@@ -262,7 +257,14 @@ export default function WhatsAppConfig({ embedded = false, onConnected }: Props)
     try {
       const data = await restartWhatsapp();
       setState(data);
-      toast.success("Reinício solicitado. Aguarde a reconexão.");
+      if (isConnected(data)) {
+        setQrcodeImage("");
+        stopPolling();
+        toast.success("WhatsApp já está conectado.");
+        onConnected?.();
+      } else {
+        toast.success("Reinício solicitado. Aguarde a reconexão.");
+      }
     } catch (err) {
       toast.error(getAxiosErrorMessage(err, { notAxiosMessage: "Falha ao reiniciar WhatsApp." }));
     } finally {

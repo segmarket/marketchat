@@ -19,8 +19,10 @@ export async function fetchWhatsappQrcode(): Promise<WhatsappDashboard> {
   return data;
 }
 
-export async function fetchWhatsappStatus(): Promise<WhatsappDashboard> {
-  const { data } = await api.get<WhatsappDashboard>("/api/integrations/whatsapp/status/");
+export async function fetchWhatsappStatus(signal?: AbortSignal): Promise<WhatsappDashboard> {
+  const { data } = await api.get<WhatsappDashboard>("/api/integrations/whatsapp/status/", {
+    signal,
+  });
   return data;
 }
 

@@ -3,17 +3,23 @@
 from __future__ import annotations
 
 import logging
-import urllib.error
 
 from django.conf import settings
 
 from apps.integrations.models import WhatsappInstance
 from apps.integrations.services.evolution_client import EvolutionClient
+from apps.integrations.services.evolution_session import (
+    EvolutionOpLock,
+    end_connect_flight,
+    get_cached_pairing_qr,
+    inspect_remote_session,
+    try_begin_connect_flight,
+)
 from apps.integrations.services.provisioning import (
     build_webhook_base_url,
     needs_hard_evolution_recreate,
     recreate_evolution_instance,
-    refresh_qrcode,
+    sync_connection_status,
 )
 
 logger = logging.getLogger(__name__)
@@ -70,6 +76,79 @@ def restart_whatsapp_instance(
     if not webhook_url:
         raise EvolutionRestartError("URL do webhook não configurada para esta instância.")
 
+    remote = inspect_remote_session(instance, client=client)
+    if (
+        instance.connection_status == WhatsappInstance.ConnectionStatus.OPEN
+        or (remote is not None and remote.is_fully_connected)
+    ):
+        logger.info(
+            "[Evolution] reconnect skipped instance=%s reason=already_logged_in",
+            instance.instance_name,
+        )
+        try:
+            sync_connection_status(instance, client=client)
+        except Exception:
+            logger.info(
+                "[Evolution] status sync after skip reconnect instance=%s failed (ignored)",
+                instance.instance_name,
+            )
+        instance.refresh_from_db()
+        return instance, ""
+
+    lock = EvolutionOpLock(instance)
+    if not lock.acquire():
+        logger.info(
+            "[Evolution] reconnect skipped instance=%s reason=operation_in_progress",
+            instance.instance_name,
+        )
+        instance.refresh_from_db()
+        return instance, ""
+
+    try:
+        instance.refresh_from_db()
+        if instance.connection_status == WhatsappInstance.ConnectionStatus.OPEN:
+            return instance, ""
+        if remote is not None and remote.logged_in and not remote.connected:
+            logger.info(
+                "[Evolution] reconnect without QR instance=%s reason=logged_in_disconnected",
+                instance.instance_name,
+            )
+            if not try_begin_connect_flight(instance.instance_id):
+                instance.refresh_from_db()
+                return instance, ""
+            try:
+                client.reconnect_instance(
+                    instance_api_key=instance.api_key,
+                    webhook_url=webhook_url,
+                    events=events,
+                    reset_session=False,
+                    wait_for_qr=False,
+                )
+            finally:
+                end_connect_flight(instance.instance_id)
+            instance.refresh_from_db()
+            return instance, ""
+        return _restart_pairing(
+            instance,
+            client=client,
+            events=events,
+            webhook_url=webhook_url,
+        )
+    except EvolutionRestartError:
+        raise
+    except Exception as exc:
+        raise EvolutionRestartError(str(exc)) from exc
+    finally:
+        lock.release()
+
+
+def _restart_pairing(
+    instance: WhatsappInstance,
+    *,
+    client: EvolutionClient,
+    events: list[str],
+    webhook_url: str,
+) -> tuple[WhatsappInstance, str]:
     reconnect_result: dict = {}
     recreated = False
     try:
@@ -81,13 +160,19 @@ def restart_whatsapp_instance(
             instance = recreate_evolution_instance(instance, client=client)
             recreated = True
         else:
-            reconnect_result = client.reconnect_instance(
-                instance_api_key=instance.api_key,
-                webhook_url=webhook_url,
-                events=events,
-                reset_session=_needs_session_reset(instance),
-                wait_for_qr=False,
-            )
+            if not try_begin_connect_flight(instance.instance_id):
+                instance.refresh_from_db()
+                return instance, get_cached_pairing_qr(instance)
+            try:
+                reconnect_result = client.reconnect_instance(
+                    instance_api_key=instance.api_key,
+                    webhook_url=webhook_url,
+                    events=events,
+                    reset_session=_needs_session_reset(instance),
+                    wait_for_qr=False,
+                )
+            finally:
+                end_connect_flight(instance.instance_id)
             instance.connection_status = WhatsappInstance.ConnectionStatus.CONNECTING
             instance.disconnect_reason = ""
             instance.save(
@@ -96,7 +181,6 @@ def restart_whatsapp_instance(
     except Exception as exc:
         raise EvolutionRestartError(str(exc)) from exc
 
-    # Após recreate, o Evolution ainda está gerando o QR — não bloqueia o worker.
     if recreated:
         logger.info(
             "Restart %s: instância recriada; QR via polling do painel",
@@ -112,33 +196,14 @@ def restart_whatsapp_instance(
         instance.save(update_fields=["connection_status", "updated_at"])
         return instance, ""
 
-    if not qrcode_image:
-        try:
-            qr_result = refresh_qrcode(
-                instance,
-                client=client,
-                skip_status_sync=True,
-            )
-            qrcode_image = qr_result.get("qrcode_image") or ""
-            if qr_result.get("connected"):
-                instance.connection_status = WhatsappInstance.ConnectionStatus.OPEN
-                instance.save(update_fields=["connection_status", "updated_at"])
-                return instance, ""
-        except Exception as exc:
-            if isinstance(exc, urllib.error.HTTPError):
-                if EvolutionClient._http_error_is_qr_limit(exc):
-                    raise EvolutionRestartError(
-                        "Limite de QR Code atingido no Evolution. Desconecte e conecte "
-                        "novamente para criar uma sessão limpa."
-                    ) from exc
-                if EvolutionClient._http_error_is_qr_not_ready(exc):
-                    logger.info(
-                        "Restart %s: connect OK, QR pendente (frontend fará polling)",
-                        instance.instance_name,
-                    )
-                    return instance, ""
-            if isinstance(exc, Exception) and "Limite de QR Code" in str(exc):
-                raise EvolutionRestartError(str(exc)) from exc
-            raise EvolutionRestartError(str(exc)) from exc
+    if qrcode_image:
+        from apps.integrations.services.evolution_session import cache_pairing_qr
 
-    return instance, qrcode_image
+        cache_pairing_qr(instance, qrcode_image)
+        return instance, qrcode_image
+
+    logger.info(
+        "Restart %s: connect OK, QR via webhook (GET /instance/qr skipped)",
+        instance.instance_name,
+    )
+    return instance, ""

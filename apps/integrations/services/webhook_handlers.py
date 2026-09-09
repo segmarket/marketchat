@@ -68,7 +68,7 @@ def handle_evolution_webhook(event: EvolutionWebhookEvent, instance: WhatsappIns
         elif "CONNECTION" in event_name or event.connection_state:
             _handle_connection(event, instance)
         elif "QRCODE" in event_name or "QR" in event_name:
-            _handle_qrcode(instance)
+            _handle_qrcode(event, instance)
         elif "MESSAGE" in event_name or event_name.startswith("MESSAGES"):
             _handle_message(event, instance)
         else:
@@ -117,10 +117,14 @@ def _handle_connected(event: EvolutionWebhookEvent, instance: WhatsappInstance) 
         instance.connection_status = status
         instance.save(update_fields=["connection_status", "updated_at"])
     if status == WhatsappInstance.ConnectionStatus.OPEN:
+        from apps.integrations.services.evolution_session import (
+            block_qr_after_connected,
+        )
         from apps.integrations.services.whatsapp_connection_alert import (
             on_whatsapp_connected,
         )
 
+        block_qr_after_connected(instance, reason="connected")
         on_whatsapp_connected(instance)
         sync_profile_avatar_from_evolution(instance)
     logger.info(
@@ -170,6 +174,11 @@ def _handle_connection(event: EvolutionWebhookEvent, instance: WhatsappInstance)
     )
 
     if status == WhatsappInstance.ConnectionStatus.OPEN:
+        from apps.integrations.services.evolution_session import (
+            block_qr_after_connected,
+        )
+
+        block_qr_after_connected(instance, reason="connected")
         on_whatsapp_connected(instance)
         sync_profile_avatar_from_evolution(instance)
     elif status == WhatsappInstance.ConnectionStatus.CLOSE:
@@ -182,11 +191,33 @@ def _handle_connection(event: EvolutionWebhookEvent, instance: WhatsappInstance)
     )
 
 
-def _handle_qrcode(instance: WhatsappInstance) -> None:
+def _handle_qrcode(event: EvolutionWebhookEvent, instance: WhatsappInstance) -> None:
+    from apps.integrations.services.evolution_client import EvolutionClient
+    from apps.integrations.services.evolution_session import (
+        cache_pairing_qr,
+        clear_pairing_qr,
+        session_forbids_qr,
+    )
+
+    if session_forbids_qr(instance) or (
+        instance.connection_status == WhatsappInstance.ConnectionStatus.OPEN
+    ):
+        clear_pairing_qr(instance)
+        logger.info(
+            "[Evolution] QR webhook ignored instance=%s reason=already_logged_in",
+            instance.instance_name,
+        )
+        return
+
+    image = EvolutionClient.extract_qrcode_image(event.raw_message or {})
+    if not image and event.raw_message:
+        image = EvolutionClient.extract_qrcode_image({"data": event.raw_message})
+    if image:
+        cache_pairing_qr(instance, image)
     if instance.connection_status != WhatsappInstance.ConnectionStatus.OPEN:
         instance.connection_status = WhatsappInstance.ConnectionStatus.CONNECTING
         instance.save(update_fields=["connection_status", "updated_at"])
-    logger.info("WhatsApp QR update: instance=%s", instance.instance_name)
+    logger.info("WhatsApp QR update: instance=%s cached=%s", instance.instance_name, bool(image))
 
 
 def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) -> None:

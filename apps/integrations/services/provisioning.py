@@ -18,6 +18,16 @@ from django.db import transaction
 from apps.integrations.models import WhatsappInstance
 from apps.integrations.services import evolution_client as evolution_client_module
 from apps.integrations.services.evolution_client import EvolutionClient
+from apps.integrations.services.evolution_session import (
+    apply_authenticated_session,
+    cache_pairing_qr,
+    end_connect_flight,
+    get_cached_pairing_qr,
+    inspect_remote_session,
+    parse_remote_session,
+    session_forbids_qr,
+    try_begin_connect_flight,
+)
 from apps.tenants.models import Tenant
 
 
@@ -97,13 +107,21 @@ def recreate_evolution_instance(
         instance_id=new_instance_id,
         token=new_token,
     )
-    client.connect_instance(
-        instance_api_key=new_token,
-        webhook_url=webhook_url,
-        events=events,
-        phone="",
-        immediate=True,
-    )
+    if not try_begin_connect_flight(new_instance_id):
+        raise EvolutionProvisionError(
+            "Conexão WhatsApp já em andamento para esta instância.",
+            step="connect",
+        )
+    try:
+        client.connect_instance(
+            instance_api_key=new_token,
+            webhook_url=webhook_url,
+            events=events,
+            phone="",
+            immediate=True,
+        )
+    finally:
+        end_connect_flight(new_instance_id)
 
     instance.instance_name = instance_name
     instance.instance_id = new_instance_id
@@ -352,12 +370,22 @@ def provision_whatsapp_instance(
         raise _provision_error(exc, step="create") from exc
 
     try:
-        connect_payload = client.connect_instance(
-            instance_api_key=token,
-            webhook_url=webhook_url,
-            events=events,
-            phone=pair_phone,
-        )
+        if not try_begin_connect_flight(instance_id):
+            raise EvolutionProvisionError(
+                "Conexão WhatsApp já em andamento para esta instância.",
+                step="connect",
+            )
+        try:
+            connect_payload = client.connect_instance(
+                instance_api_key=token,
+                webhook_url=webhook_url,
+                events=events,
+                phone=pair_phone,
+            )
+        finally:
+            end_connect_flight(instance_id)
+    except EvolutionProvisionError:
+        raise
     except Exception as exc:
         _delete_remote_instance(
             client, instance_name=instance_name, instance_id=instance_id
@@ -405,19 +433,27 @@ def provision_whatsapp_instance(
     qrcode_payload: dict[str, Any] = {}
     qrcode_image = ""
     try:
-        qrcode_payload = client.fetch_qrcode(instance_api_key=token)
-        if qrcode_payload.get("connected"):
-            instance.connection_status = WhatsappInstance.ConnectionStatus.OPEN
-            instance.save(update_fields=["connection_status", "updated_at"])
-            from apps.integrations.services.whatsapp_connection_alert import (
-                on_whatsapp_connected,
-            )
-
-            on_whatsapp_connected(instance)
+        remote = inspect_remote_session(instance, client=client)
+        if remote is not None and remote.forbids_qr:
+            apply_authenticated_session(instance, reason="already_logged_in")
+            qrcode_payload = {"connected": True, "message": "session already logged in"}
         else:
+            # NÃO chamar GET /instance/qr: o connect já inicia o runtime.
+            # Um GET /qr simultâneo cria um segundo websocket (Evolution-Go PR #145).
             qrcode_image = evolution_client_module.EvolutionClient.extract_qrcode_image(
-                qrcode_payload
+                connect_payload
             )
+            if qrcode_image:
+                cache_pairing_qr(instance, qrcode_image)
+            else:
+                qrcode_image = get_cached_pairing_qr(instance)
+            logger.info(
+                "[Evolution] connect done instance=%s qr_from_connect=%s "
+                "(GET /instance/qr skipped)",
+                instance.instance_name,
+                bool(qrcode_image),
+            )
+            qrcode_payload = connect_payload if isinstance(connect_payload, dict) else {}
     except Exception:
         pass
 
@@ -502,45 +538,40 @@ def refresh_qrcode(
     *,
     client: EvolutionClient | None = None,
     skip_status_sync: bool = False,
+    acquire_lock: bool = True,
 ) -> dict[str, Any]:
-    client = client or EvolutionClient()
-    if skip_status_sync:
-        if not remote_instance_exists(instance, client=client):
-            raise EvolutionProvisionError(STALE_EVOLUTION_REASON, step="qrcode")
-    elif reconcile_whatsapp_with_evolution(instance, client=client) is None:
-        raise EvolutionProvisionError(STALE_EVOLUTION_REASON, step="qrcode")
-    try:
-        payload = client.fetch_qrcode(
-            instance_api_key=instance.api_key,
-            # Uma tentativa: painel faz polling. Retries com sleep bloqueiam Gunicorn sync.
-            retries=0,
-            retry_delay=0,
+    """Devolve o QR cacheado (webhook/connect). Não chama GET /instance/qr."""
+    del skip_status_sync, acquire_lock
+    instance.refresh_from_db()
+    if session_forbids_qr(instance):
+        logger.info(
+            "[Evolution] QR request skipped instance=%s reason=already_logged_in",
+            instance.instance_name,
         )
-    except urllib.error.HTTPError as exc:
-        if evolution_client_module.EvolutionClient._http_error_is_qr_not_ready(exc):
-            if instance.connection_status != WhatsappInstance.ConnectionStatus.OPEN:
-                instance.connection_status = WhatsappInstance.ConnectionStatus.CONNECTING
-                instance.save(update_fields=["connection_status", "updated_at"])
-            return {"connected": False, "qrcode_image": "", "qr_pending": True}
-        if evolution_client_module.EvolutionClient._http_error_is_qr_limit(exc):
-            raise EvolutionProvisionError(
-                "Limite de QR Code atingido no Evolution. Desconecte e conecte "
-                "novamente para criar uma sessão limpa.",
-                step="qrcode",
-            ) from exc
-        raise EvolutionProvisionError(
-            evolution_client_module.EvolutionClient.format_http_error(exc),
-            step="qrcode",
-        ) from exc
-    if payload.get("connected"):
-        instance.connection_status = WhatsappInstance.ConnectionStatus.OPEN
-        instance.save(update_fields=["connection_status", "updated_at"])
+        if instance.connection_status != WhatsappInstance.ConnectionStatus.OPEN:
+            apply_authenticated_session(instance, reason="already_logged_in")
         return {"connected": True, "qrcode_image": ""}
-    image = evolution_client_module.EvolutionClient.extract_qrcode_image(payload)
+
+    remote = inspect_remote_session(instance, client=client)
+    if remote is not None and remote.forbids_qr:
+        apply_authenticated_session(instance, reason="already_logged_in")
+        return {"connected": True, "qrcode_image": ""}
+
+    image = get_cached_pairing_qr(instance)
+    if image:
+        if instance.connection_status != WhatsappInstance.ConnectionStatus.OPEN:
+            instance.connection_status = WhatsappInstance.ConnectionStatus.CONNECTING
+            instance.save(update_fields=["connection_status", "updated_at"])
+        return {"connected": False, "qrcode_image": image}
+
+    logger.info(
+        "[Evolution] QR pending instance=%s reason=awaiting_webhook",
+        instance.instance_name,
+    )
     if instance.connection_status != WhatsappInstance.ConnectionStatus.OPEN:
         instance.connection_status = WhatsappInstance.ConnectionStatus.CONNECTING
         instance.save(update_fields=["connection_status", "updated_at"])
-    return {"connected": False, "qrcode_image": image, "raw": payload}
+    return {"connected": False, "qrcode_image": "", "qr_pending": True}
 
 
 def sync_connection_status(
@@ -586,7 +617,19 @@ def sync_connection_status(
             exc,
         )
         return instance.connection_status
-    status = evolution_client_module.EvolutionClient.extract_connection_status(payload)
+    session = parse_remote_session(payload)
+    logger.info(
+        "[Evolution] status instance=%s connected=%s loggedIn=%s",
+        instance.instance_name,
+        str(session.connected).lower(),
+        str(session.logged_in).lower(),
+    )
+    if session.logged_in or session.state == WhatsappInstance.ConnectionStatus.OPEN:
+        apply_authenticated_session(instance, reason="connected")
+        return WhatsappInstance.ConnectionStatus.OPEN
+    status = session.state if session.state in WhatsappInstance.ConnectionStatus.values else (
+        evolution_client_module.EvolutionClient.extract_connection_status(payload)
+    )
     if status in WhatsappInstance.ConnectionStatus.values:
         instance.connection_status = status
         update_fields = ["connection_status", "updated_at"]

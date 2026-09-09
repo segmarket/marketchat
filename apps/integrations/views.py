@@ -136,11 +136,7 @@ class WhatsappStatusView(APIView):
         instance = _resolve_dashboard_instance(request)
         if not instance:
             return Response(build_dashboard_payload(None, request_user=request.user))
-        if (
-            instance.is_active
-            and instance.connection_status
-            != WhatsappInstance.ConnectionStatus.CONNECTING
-        ):
+        if instance.is_active:
             try:
                 sync_connection_status(instance)
             except EvolutionProvisionError as exc:

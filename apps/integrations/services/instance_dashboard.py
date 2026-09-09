@@ -166,6 +166,10 @@ def build_dashboard_payload(
         and instance.is_active
         and instance.connection_status == WhatsappInstance.ConnectionStatus.OPEN
     )
+    if instance and not connected and not qrcode_image:
+        from apps.integrations.services.evolution_session import get_cached_pairing_qr
+
+        qrcode_image = get_cached_pairing_qr(instance)
 
     data: dict[str, Any] = {
         "has_instance": bool(instance),
