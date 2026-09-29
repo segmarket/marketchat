@@ -74,8 +74,8 @@ class WhatsappProvisionView(APIView):
                 request.user.tenant,
                 pair_phone=pair_phone,
             )
-        except WhatsappAlreadyProvisionedError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        except WhatsappAlreadyProvisionedError as extra:
+            return Response({"detail": str(extra)}, status=status.HTTP_409_CONFLICT)
         except IntegrityError:
             return Response(
                 {
@@ -86,14 +86,14 @@ class WhatsappProvisionView(APIView):
                 },
                 status=status.HTTP_409_CONFLICT,
             )
-        except EvolutionProvisionError as exc:
+        except EvolutionProvisionError as extra:
             logger.warning(
                 "WhatsApp provision failed (step=%s): %s",
-                exc.step or "?",
-                exc,
+                extra.step or "?",
+                extra,
             )
             return Response(
-                {"detail": str(exc), "step": exc.step},
+                {"detail": str(extra), "step": extra.step},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
@@ -117,14 +117,15 @@ class WhatsappQrcodeView(APIView):
             return Response({"detail": "Nenhuma instância WhatsApp ativa."}, status=404)
         try:
             result = refresh_qrcode(instance, skip_status_sync=True)
-        except Exception as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+        except Exception as extra:
+            return Response({"detail": str(extra)}, status=status.HTTP_502_BAD_GATEWAY)
 
         data = build_dashboard_payload(
             instance,
             request_user=request.user,
             qrcode_image=result.get("qrcode_image", ""),
             sync_evolution=False,
+            skip_health_probe=True,
         )
         return Response(data)
 
@@ -133,25 +134,34 @@ class WhatsappStatusView(APIView):
     permission_classes = [IsAuthenticated, IsTenantAdmin]
 
     def get(self, request: Request) -> Response:
-        instance = _resolve_dashboard_instance(request)
+        instance = _get_tenant_instance(request)
         if not instance:
-            return Response(build_dashboard_payload(None, request_user=request.user))
+            return Response(
+                build_dashboard_payload(
+                    None,
+                    request_user=request.user,
+                    skip_health_probe=True,
+                )
+            )
+        connecting = (
+            instance.is_active
+            and instance.connection_status == WhatsappInstance.ConnectionStatus.CONNECTING
+        )
         if instance.is_active:
             try:
+                if not connecting:
+                    instance = _resolve_dashboard_instance(request) or instance
                 sync_connection_status(instance)
-            except EvolutionProvisionError as exc:
-                return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+            except EvolutionProvisionError as extra:
+                return Response({"detail": str(extra)}, status=status.HTTP_502_BAD_GATEWAY)
             instance.refresh_from_db()
 
         return Response(
             build_dashboard_payload(
                 instance,
                 request_user=request.user,
-                sync_evolution=(
-                    bool(instance.is_active)
-                    and instance.connection_status
-                    != WhatsappInstance.ConnectionStatus.CONNECTING
-                ),
+                sync_evolution=False,
+                skip_health_probe=connecting,
             )
         )
 
@@ -165,8 +175,8 @@ class WhatsappRestartView(APIView):
             return Response({"detail": "Nenhuma instância WhatsApp ativa."}, status=404)
         try:
             instance, qrcode_image = restart_whatsapp_instance(instance)
-        except EvolutionRestartError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+        except EvolutionRestartError as extra:
+            return Response({"detail": str(extra)}, status=status.HTTP_502_BAD_GATEWAY)
 
         return Response(
             build_dashboard_payload(

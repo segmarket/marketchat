@@ -14,7 +14,6 @@ import WhatsappStatusBadge from "../../components/integrations/whatsapp/Whatsapp
 import {
   disconnectWhatsapp,
   fetchWhatsappIntegration,
-  fetchWhatsappQrcode,
   fetchWhatsappStatus,
   provisionWhatsapp,
   refreshWhatsappAvatar,
@@ -26,12 +25,17 @@ import { useOnboardingStatus } from "../../features/onboarding/useOnboardingStat
 import { useModal } from "../../hooks/useModal";
 import { getAxiosErrorMessage } from "../../utils/apiError";
 
-const POLL_MS = 3000;
+const POLL_MS = 4000;
 const RECONNECT_POLL_MS = 15000;
 const QR_FAIL_MSG = "Não foi possível gerar o QR Code no momento, tente novamente.";
 
 function isConnected(state: WhatsappDashboard): boolean {
   return state.connected || state.connection_status === "open";
+}
+
+function displayableQr(value: string | undefined | null): string {
+  const src = (value || "").trim();
+  return src.startsWith("data:image/") ? src : "";
 }
 
 function isQrFlow(state: WhatsappDashboard, qrcodeImage: string): boolean {
@@ -63,6 +67,9 @@ export default function WhatsAppConfig({ embedded = false, onConnected }: Props)
   const spotlightWasEligibleRef = useRef(false);
   const { status: onboarding, loading: onboardingLoading } = useOnboardingStatus();
 
+  const onConnectedRef = useRef(onConnected);
+  onConnectedRef.current = onConnected;
+
   const canManage = Boolean(state?.can_manage_integrations);
 
   const stopPolling = useCallback(() => {
@@ -81,7 +88,7 @@ export default function WhatsAppConfig({ embedded = false, onConnected }: Props)
     try {
       const data = await fetchWhatsappIntegration();
       setState(data);
-      if (data.qrcode_image) setQrcodeImage(data.qrcode_image);
+      setQrcodeImage(displayableQr(data.qr_image || data.qrcode_image));
       if (!data.can_manage_integrations) {
         if (data.is_platform_superuser && !data.has_tenant) {
           setAccessHint(
@@ -141,13 +148,14 @@ export default function WhatsAppConfig({ embedded = false, onConnected }: Props)
       const data = await fetchWhatsappStatus(ac.signal);
       if (ac.signal.aborted) return;
       setState(data);
-      if (data.qrcode_image && !isConnected(data)) setQrcodeImage(data.qrcode_image);
+      const qr = displayableQr(data.qr_image || data.qrcode_image);
+      if (qr && !isConnected(data)) setQrcodeImage(qr);
       if (isConnected(data)) {
         stopPolling();
         setQrcodeImage("");
         setConnectStep(null);
         toast.success("WhatsApp conectado com sucesso.");
-        onConnected?.();
+        onConnectedRef.current?.();
       }
     } catch (err) {
       if (axios.isCancel(err) || (err as { code?: string } | null)?.code === "ERR_CANCELED") {
@@ -155,12 +163,12 @@ export default function WhatsAppConfig({ embedded = false, onConnected }: Props)
       }
       /* polling silencioso */
     }
-  }, [onConnected, stopPolling]);
+  }, [stopPolling]);
 
   const shouldPollQr =
     Boolean(state?.has_instance && state.is_active) &&
     !isConnected(state!) &&
-    (state?.connection_status === "connecting" || Boolean(qrcodeImage));
+    state?.connection_status === "connecting";
 
   const shouldPollReconnect =
     Boolean(state?.needs_reconnect && state.is_active) &&
@@ -184,13 +192,12 @@ export default function WhatsAppConfig({ embedded = false, onConnected }: Props)
       if (state?.is_active) {
         const restarted = await restartWhatsapp();
         setState(restarted);
-        let latest = restarted;
-        if (restarted.qrcode_image) {
-          setQrcodeImage(restarted.qrcode_image);
+        if (restarted.qr_image || restarted.qrcode_image) {
+          setQrcodeImage(displayableQr(restarted.qr_image || restarted.qrcode_image));
         }
-        if (isConnected(latest)) {
+        if (isConnected(restarted)) {
           toast.success("WhatsApp conectado com sucesso.");
-          onConnected?.();
+          onConnectedRef.current?.();
         } else {
           toast.success("Escaneie o novo QR Code para reconectar o WhatsApp.");
         }
@@ -209,12 +216,12 @@ export default function WhatsAppConfig({ embedded = false, onConnected }: Props)
     try {
       const data = await provisionWhatsapp();
       setState(data);
-      if (data.qrcode_image) {
-        setQrcodeImage(data.qrcode_image);
+      if (data.qr_image || data.qrcode_image) {
+        setQrcodeImage(displayableQr(data.qr_image || data.qrcode_image));
       }
       if (isConnected(data)) {
         toast.success("WhatsApp conectado com sucesso.");
-        onConnected?.();
+        onConnectedRef.current?.();
       } else {
         toast.success("Escaneie o QR Code no WhatsApp para concluir a conexão.");
       }
@@ -234,16 +241,17 @@ export default function WhatsAppConfig({ embedded = false, onConnected }: Props)
     }
     setBusy(true);
     try {
-      const data = await fetchWhatsappQrcode();
+      const data = await fetchWhatsappStatus();
       setState(data);
-      if (data.qrcode_image) {
-        setQrcodeImage(data.qrcode_image);
+      const qr = displayableQr(data.qr_image || data.qrcode_image);
+      if (qr) {
+        setQrcodeImage(qr);
         toast.message("QR Code atualizado.");
       } else if (isConnected(data)) {
         setQrcodeImage("");
         toast.success("WhatsApp já está conectado.");
       } else {
-        toast.message("Aguardando o QR Code do WhatsApp…");
+        toast.message("Aguardando QR Code...");
       }
     } catch (err) {
       toast.error(getAxiosErrorMessage(err, { notAxiosMessage: QR_FAIL_MSG }));
@@ -261,7 +269,7 @@ export default function WhatsAppConfig({ embedded = false, onConnected }: Props)
         setQrcodeImage("");
         stopPolling();
         toast.success("WhatsApp já está conectado.");
-        onConnected?.();
+        onConnectedRef.current?.();
       } else {
         toast.success("Reinício solicitado. Aguarde a reconexão.");
       }
@@ -393,7 +401,7 @@ export default function WhatsAppConfig({ embedded = false, onConnected }: Props)
           </>
         ) : (
           <p className="text-center text-sm text-gray-600 dark:text-gray-400">
-            Gerando QR Code… aguarde alguns instantes.
+            Aguardando QR Code...
           </p>
         )}
         <p className="text-xs text-gray-500">

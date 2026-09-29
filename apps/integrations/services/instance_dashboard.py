@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Any
 
+from django.core.cache import cache
 from django.utils import timezone
 
 from apps.accounts.services.tenant_access import user_access_flags
@@ -21,6 +22,8 @@ from apps.integrations.services.provisioning import (
 
 
 WEBHOOK_OK_WINDOW = timedelta(minutes=10)
+EVOLUTION_HEALTH_CACHE_KEY = "evo_health_status"
+EVOLUTION_HEALTH_CACHE_TTL = 60
 SESSION_EXPIRED_HINTS = (
     "expired",
     "qr code limit",
@@ -101,6 +104,19 @@ def _webhook_status(instance: WhatsappInstance | None) -> str:
     return "error"
 
 
+def _evolution_api_status(
+    client: EvolutionClient,
+    *,
+    skip_probe: bool = False,
+) -> str:
+    if skip_probe:
+        cached = cache.get(EVOLUTION_HEALTH_CACHE_KEY)
+        return cached if isinstance(cached, str) and cached else "unknown"
+    status = client.check_evolution_health(timeout=3)
+    cache.set(EVOLUTION_HEALTH_CACHE_KEY, status, EVOLUTION_HEALTH_CACHE_TTL)
+    return status
+
+
 def sync_instance_from_evolution(
     instance: WhatsappInstance,
     *,
@@ -134,13 +150,21 @@ def build_dashboard_payload(
     evolution_api_status: str | None = None,
     sync_evolution: bool = False,
     refresh_avatar: bool = False,
+    skip_health_probe: bool = False,
 ) -> dict[str, Any]:
+    from apps.integrations.services.evolution_qr import is_normalized_qr_image
+
     client = EvolutionClient()
     evo_status = evolution_api_status
     if evo_status is None:
-        evo_status = client.check_evolution_health(timeout=3)
+        evo_status = _evolution_api_status(client, skip_probe=skip_health_probe)
 
-    if instance and instance.is_active and sync_evolution:
+    connecting = bool(
+        instance
+        and instance.is_active
+        and instance.connection_status == WhatsappInstance.ConnectionStatus.CONNECTING
+    )
+    if instance and instance.is_active and sync_evolution and not connecting:
         sync_instance_from_evolution(
             instance,
             client=client,
@@ -170,6 +194,8 @@ def build_dashboard_payload(
         from apps.integrations.services.evolution_session import get_cached_pairing_qr
 
         qrcode_image = get_cached_pairing_qr(instance)
+    if qrcode_image and not is_normalized_qr_image(qrcode_image):
+        qrcode_image = ""
 
     data: dict[str, Any] = {
         "has_instance": bool(instance),
@@ -194,6 +220,7 @@ def build_dashboard_payload(
         "evolution_api_status": evo_status,
         "webhook_status": _webhook_status(instance),
         "qrcode_image": qrcode_image,
+        "qr_image": qrcode_image,
     }
 
     if request_user is not None and getattr(request_user, "is_authenticated", False):

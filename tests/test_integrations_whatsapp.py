@@ -258,6 +258,7 @@ def test_whatsapp_status_no_502_when_remote_missing(mock_client_cls, api_client)
     mock_client = MagicMock()
     mock_client_cls.return_value = mock_client
     mock_client.fetch_remote_instance.return_value = None
+    mock_client.connection_state.return_value = {"data": {"state": "connecting"}}
 
     url = reverse("integrations-whatsapp-status")
     api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(user).access_token}")
@@ -265,7 +266,8 @@ def test_whatsapp_status_no_502_when_remote_missing(mock_client_cls, api_client)
 
     assert response.status_code == 200
     assert response.json()["has_instance"] is True
-    assert response.json()["needs_reconnect"] is True
+    assert response.json()["connection_status"] == "connecting"
+    assert response.json()["is_active"] is True
 
 
 @pytest.mark.django_db

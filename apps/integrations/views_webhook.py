@@ -45,9 +45,10 @@ class EvolutionWebhookView(APIView):
 
         if not self._allowed(request, instance):
             logger.warning(
-                "Webhook Evolution forbidden: instance=%s event=%s "
-                "query_secret=%s header_secret=%s apikey=%s",
+                "Webhook Evolution forbidden: instance=%s instance_id=%s event=%s "
+                "query_secret=%s header_secret=%s apikey=%s local_secret=%s",
                 instance.instance_name,
+                instance.instance_id,
                 event.event_type,
                 bool(request.query_params.get("secret")),
                 bool(request.headers.get("X-Webhook-Secret")),
@@ -56,6 +57,7 @@ class EvolutionWebhookView(APIView):
                     or request.headers.get("Apikey")
                     or request.headers.get("APIKEY")
                 ),
+                bool(instance.webhook_secret),
             )
             return Response({"error": "forbidden"}, status=403)
 

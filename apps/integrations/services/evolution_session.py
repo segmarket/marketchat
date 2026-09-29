@@ -124,8 +124,10 @@ def block_qr_after_connected(instance: WhatsappInstance, *, reason: str = "conne
 
 def cache_pairing_qr(instance: WhatsappInstance, image: str) -> None:
     """Guarda o QR vindo do webhook/connect. Nunca dispara GET /instance/qr."""
+    from apps.integrations.services.evolution_qr import is_normalized_qr_image
+
     image = (image or "").strip()
-    if not image:
+    if not image or not is_normalized_qr_image(image):
         return
     if session_forbids_qr(instance):
         logger.info(
@@ -142,10 +144,14 @@ def cache_pairing_qr(instance: WhatsappInstance, image: str) -> None:
 
 
 def get_cached_pairing_qr(instance: WhatsappInstance) -> str:
+    from apps.integrations.services.evolution_qr import is_normalized_qr_image
+
     if session_forbids_qr(instance):
         return ""
     value = cache.get(_pairing_qr_key(instance)) or ""
-    return value if isinstance(value, str) else ""
+    if isinstance(value, str) and is_normalized_qr_image(value):
+        return value
+    return ""
 
 
 def clear_pairing_qr(instance: WhatsappInstance) -> None:

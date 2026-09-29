@@ -167,6 +167,8 @@ def parse_evolution_payload(body: dict[str, Any]) -> EvolutionWebhookEvent | Non
     # Garante raw_message completo para download de mídia (Evolution GO).
     if isinstance(data, dict) and not raw_message:
         raw_message = data
+    if "QRCODE" in event_type or event_type in ("QR", "QR_CODE", "QR_SUCCESS"):
+        raw_message = data if isinstance(data, dict) else {"value": data}
 
     if not event_type and not instance_key:
         return None

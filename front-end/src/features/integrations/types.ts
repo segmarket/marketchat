@@ -15,6 +15,7 @@ export type WhatsappIntegrationState = {
   pair_phone: string;
   updated_at: string | null;
   qrcode_image?: string;
+  qr_image?: string;
   profile_name: string;
   profile_picture_url: string;
   phone_number: string;

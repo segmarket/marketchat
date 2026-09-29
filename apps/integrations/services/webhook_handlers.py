@@ -192,7 +192,10 @@ def _handle_connection(event: EvolutionWebhookEvent, instance: WhatsappInstance)
 
 
 def _handle_qrcode(event: EvolutionWebhookEvent, instance: WhatsappInstance) -> None:
-    from apps.integrations.services.evolution_client import EvolutionClient
+    from apps.integrations.services.evolution_qr import (
+        log_qrcode_payload_shape,
+        normalize_evolution_qr,
+    )
     from apps.integrations.services.evolution_session import (
         cache_pairing_qr,
         clear_pairing_qr,
@@ -209,15 +212,27 @@ def _handle_qrcode(event: EvolutionWebhookEvent, instance: WhatsappInstance) -> 
         )
         return
 
-    image = EvolutionClient.extract_qrcode_image(event.raw_message or {})
-    if not image and event.raw_message:
-        image = EvolutionClient.extract_qrcode_image({"data": event.raw_message})
+    payload = event.raw_message or {}
+    log_qrcode_payload_shape(
+        payload,
+        event_name=event.event_type,
+        instance_name=instance.instance_name,
+        instance_id=instance.instance_id,
+    )
+    image = normalize_evolution_qr(payload)
+    if not image:
+        image = normalize_evolution_qr({"data": payload})
     if image:
         cache_pairing_qr(instance, image)
     if instance.connection_status != WhatsappInstance.ConnectionStatus.OPEN:
         instance.connection_status = WhatsappInstance.ConnectionStatus.CONNECTING
         instance.save(update_fields=["connection_status", "updated_at"])
-    logger.info("WhatsApp QR update: instance=%s cached=%s", instance.instance_name, bool(image))
+    logger.info(
+        "WhatsApp QR update: instance=%s cached=%s normalized=%s",
+        instance.instance_name,
+        bool(image),
+        image[:22] if image else "",
+    )
 
 
 def _handle_message(event: EvolutionWebhookEvent, instance: WhatsappInstance) -> None:

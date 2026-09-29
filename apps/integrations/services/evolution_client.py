@@ -921,45 +921,12 @@ class EvolutionClient:
 
     @staticmethod
     def extract_qrcode_image(payload: Any) -> str:
-        def normalize(value: str) -> str:
-            value = value.strip()
-            if not value or len(value) < 80:
-                return ""
-            if value.startswith("data:"):
-                return value
-            return f"data:image/png;base64,{value}"
+        """Devolve data:image/png;base64,... a partir do webhook/connect. Nunca GET /instance/qr."""
+        from apps.integrations.services.evolution_qr import normalize_evolution_qr
 
-        def search(node: Any, depth: int = 0) -> str:
-            if depth > 4 or not isinstance(node, dict):
-                return ""
-            wanted = {"base64", "qrcode", "qr", "code", "image", "qrcodebase64"}
-            for raw_key, val in node.items():
-                if str(raw_key).lower() in wanted:
-                    if isinstance(val, str):
-                        out = normalize(val)
-                        if out:
-                            return out
-                    elif isinstance(val, dict):
-                        out = search(val, depth + 1)
-                        if out:
-                            return out
-            for val in node.values():
-                if isinstance(val, dict):
-                    out = search(val, depth + 1)
-                    if out:
-                        return out
+        if isinstance(payload, dict) and payload.get("connected"):
             return ""
-
-        if isinstance(payload, str):
-            return normalize(payload)
-        if not isinstance(payload, dict):
-            return ""
-        if payload.get("connected"):
-            return ""
-        data = payload.get("data")
-        if isinstance(data, str):
-            return normalize(data)
-        return search(data if isinstance(data, dict) else payload)
+        return normalize_evolution_qr(payload)
 
     @staticmethod
     def extract_connection_status(payload: Any) -> str:
