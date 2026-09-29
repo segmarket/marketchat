@@ -16,5 +16,8 @@ front-end/.env
 .venv/
 venv/
 staticfiles/
+# Uploads com fotos de clientes (MEDIA_ROOT e MEDIA_ROOT de testes): nunca versionar.
+/media/
+/test_media/
 .pytest_cache/
 .mypy_cache/
