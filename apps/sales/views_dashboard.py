@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import mimetypes
-
 from django.http import FileResponse, Http404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.media import protected_file_response
 from apps.sales.models import Cart
 from apps.sales.serializers_dashboard import (
     CartDetailSerializer,
@@ -101,12 +100,11 @@ class SalesCartSecurityPhotoView(APIView):
         if not tenant_id:
             raise Http404
 
-        cart = Cart.objects.filter(tenant_id=int(tenant_id), pk=pk).first()
-        if cart is None or not cart.product_photo:
-            raise Http404
-
-        content_type, _ = mimetypes.guess_type(cart.product_photo.name)
-        return FileResponse(
-            cart.product_photo.open("rb"),
-            content_type=content_type or "image/jpeg",
+        cart = (
+            Cart.objects.filter(tenant_id=int(tenant_id), pk=pk)
+            .only("id", "product_photo")
+            .first()
         )
+        if cart is None:
+            raise Http404
+        return protected_file_response(cart.product_photo)

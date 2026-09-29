@@ -1,7 +1,5 @@
-from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path
-from django.views.static import serve
 
 from apps.billing.views import AsaasWebhookView
 from apps.billing.urls import payments_urlpatterns
@@ -36,12 +34,6 @@ urlpatterns = [
     path("api/", include("apps.tenants.urls")),
 ]
 
-# django.conf.urls.static.static() só registra rotas com DEBUG=True; staging/prod
-# precisam servir anexos do inbox via o mesmo processo Django (ProxyPass).
-urlpatterns += [
-    path(
-        "media/<path:path>",
-        serve,
-        {"document_root": settings.MEDIA_ROOT},
-    ),
-]
+# Não há rota pública para MEDIA_ROOT: fotos de clientes são entregues apenas por
+# endpoints autenticados que validam o tenant dono do objeto
+# (chatbot-message-attachment, sales-cart-security-photo).

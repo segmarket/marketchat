@@ -7,6 +7,7 @@ import ChatImageLightbox from "./ChatImageLightbox";
 import TypingIndicator from "./TypingIndicator";
 import { formatAttendanceDateTime } from "../../features/chatLogs/format";
 import {
+  fetchChatMessageAttachment,
   fetchConversation,
   sendAgentMessage,
   toggleSessionBot,
@@ -14,7 +15,6 @@ import {
 import { markSessionSeen } from "../../features/chatLogs/inboxUnread";
 import type { ChatConversationResponse, ChatLogMessage } from "../../features/chatLogs/types";
 import { formatPhoneBR } from "../../features/residents/format";
-import { resolveMediaUrl } from "../../services/api";
 import { getAxiosErrorMessage } from "../../utils/apiError";
 import { useModal } from "../../hooks/useModal";
 
@@ -40,14 +40,42 @@ function directionLabel(direction: string): string {
   return "Bot";
 }
 
-function ChatAttachmentImage({ url }: { url: string }) {
+function ChatAttachmentImage({ messageId }: { messageId: number }) {
   const [failed, setFailed] = useState(false);
+  const [src, setSrc] = useState<string | null>(null);
   const [zoomedSrc, setZoomedSrc] = useState<string | null>(null);
-  const src = resolveMediaUrl(url);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    setFailed(false);
+    setSrc(null);
+
+    fetchChatMessageAttachment(messageId)
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setSrc(objectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [messageId]);
 
   const handleOpen = (_event: MouseEvent<HTMLImageElement>) => {
     setZoomedSrc(src);
   };
+
+  if (!failed && !src) {
+    return (
+      <div className="mb-2 h-32 w-full animate-pulse rounded-lg bg-black/10" aria-label="Carregando imagem" />
+    );
+  }
 
   if (failed || !src) {
     return (
@@ -429,7 +457,7 @@ export default function InboxChatPane({
                     {directionLabel(msg.direction)}
                   </p>
                   {msg.message_kind === "image" && msg.attachment_url ? (
-                    <ChatAttachmentImage url={msg.attachment_url} />
+                    <ChatAttachmentImage messageId={msg.id} />
                   ) : null}
                   {msg.message_text ? (
                     <p className="whitespace-pre-wrap break-words">{msg.message_text}</p>

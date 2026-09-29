@@ -42,6 +42,11 @@
 
     ProxyPreserveHost On
     RequestHeader set X-Forwarded-Proto "https"
+    # Fotos de clientes (MEDIA_ROOT) nunca são servidas por caminho: o Django só
+    # as entrega por /api autenticado (JWT + tenant dono do objeto).
+    <Location "/media">
+        Require all denied
+    </Location>
     ProxyPass / http://127.0.0.1:8001/
     ProxyPassReverse / http://127.0.0.1:8001/
 </VirtualHost>

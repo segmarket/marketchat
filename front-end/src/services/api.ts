@@ -24,15 +24,6 @@ export function resolveApiBaseUrl(): string {
   return "";
 }
 
-/** Monta URL absoluta para anexos `/media/...` quando a API e o app estão em hosts distintos. */
-export function resolveMediaUrl(url: string): string {
-  if (!url) return "";
-  if (/^https?:\/\//i.test(url) || url.startsWith("data:")) return url;
-  const base = resolveApiBaseUrl();
-  if (!base) return url;
-  return `${base}${url.startsWith("/") ? url : `/${url}`}`;
-}
-
 const baseURL = resolveApiBaseUrl();
 
 export const api = axios.create({

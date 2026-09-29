@@ -60,6 +60,13 @@ export async function fetchConversation(
   return data;
 }
 
+export async function fetchChatMessageAttachment(messageId: number): Promise<Blob> {
+  const { data } = await api.get<Blob>(`/api/chatbot/messages/${messageId}/attachment/`, {
+    responseType: "blob",
+  });
+  return data;
+}
+
 export async function toggleSessionBot(
   sessionId: number,
   isBotActive: boolean,

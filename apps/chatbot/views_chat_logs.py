@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from django.http import FileResponse, Http404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.chatbot.models import ChatMessageLog
 from apps.chatbot.serializers_chat_logs import (
     ChatAttendanceRowSerializer,
     ChatLogMessageSerializer,
@@ -19,6 +21,7 @@ from apps.chatbot.services.chat_logs_query import (
 )
 from apps.chatbot.services.chat_logs_query import _parse_date as parse_date_param
 from apps.chatbot.services.typing_presence import is_client_typing
+from apps.core.media import protected_file_response
 from apps.tenants.context import tenant_scope
 
 
@@ -117,3 +120,21 @@ class ChatLogsConversationView(APIView):
                 ).data,
             },
         )
+
+
+class ChatMessageAttachmentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request, pk: int) -> FileResponse:
+        tenant_id = getattr(request.user, "tenant_id", None)
+        if not tenant_id:
+            raise Http404
+
+        log = (
+            ChatMessageLog.all_objects.filter(tenant_id=int(tenant_id), pk=pk)
+            .only("id", "attachment")
+            .first()
+        )
+        if log is None:
+            raise Http404
+        return protected_file_response(log.attachment)

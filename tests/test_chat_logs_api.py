@@ -228,12 +228,12 @@ def test_chat_logs_conversation_with_image(api_client):
     msg = body["messages"][0]
     assert msg["direction"] == ChatMessageLog.Direction.INBOUND
     assert msg["message_kind"] == ChatMessageLog.MessageKind.IMAGE
-    assert msg["attachment_url"]
-    assert "/media/" in msg["attachment_url"]
+    attachment_path = reverse("chatbot-message-attachment", kwargs={"pk": msg["id"]})
     assert msg["attachment_url"].startswith("http")
+    assert msg["attachment_url"].endswith(attachment_path)
+    assert "/media/" not in msg["attachment_url"]
 
-    media_path = msg["attachment_url"].split("/media/", 1)[1]
-    media_resp = api_client.get(f"/media/{media_path}")
+    media_resp = api_client.get(attachment_path)
     assert media_resp.status_code == 200
     body_bytes = b"".join(media_resp.streaming_content)
     assert body_bytes == b"fake-image-bytes"

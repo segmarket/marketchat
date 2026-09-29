@@ -8,7 +8,11 @@ from apps.chatbot.views import (
     ChatbotWorkflowSaveView,
 )
 from apps.chatbot.views_analytics import ChatbotAnalyticsView
-from apps.chatbot.views_chat_logs import ChatLogsConversationView, ChatLogsListView
+from apps.chatbot.views_chat_logs import (
+    ChatLogsConversationView,
+    ChatLogsListView,
+    ChatMessageAttachmentView,
+)
 from apps.chatbot.views_handover import (
     ChatSessionAgentMessageView,
     ChatSessionToggleBotView,
@@ -22,6 +26,11 @@ urlpatterns = [
         "logs/conversation/",
         ChatLogsConversationView.as_view(),
         name="chatbot-logs-conversation",
+    ),
+    path(
+        "messages/<int:pk>/attachment/",
+        ChatMessageAttachmentView.as_view(),
+        name="chatbot-message-attachment",
     ),
     path(
         "sessions/",
