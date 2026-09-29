@@ -2,7 +2,6 @@ from decimal import Decimal
 from unittest import mock
 
 import pytest
-from django.core.cache import cache
 from django.urls import reverse
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -15,13 +14,6 @@ def _auth_client(api_client, user):
         HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(user).access_token}"
     )
     return api_client
-
-
-@pytest.fixture(autouse=True)
-def clear_throttle_cache():
-    cache.clear()
-    yield
-    cache.clear()
 
 
 @pytest.mark.django_db
@@ -109,3 +101,18 @@ def test_evolution_webhook_not_throttled(settings, api_client):
             **headers,
         )
         assert response.status_code == 200, f"request {i + 1} got {response.status_code}"
+
+
+@pytest.mark.django_db
+def test_throttle_counters_do_not_touch_default_cache(api_client):
+    from django.core.cache import cache
+
+    cache.set("sentinel-do-teste", "preservado")
+    api_client.post(
+        reverse("token_obtain_pair"),
+        {"email": "unknown@example.com", "password": "wrong"},
+        format="json",
+    )
+
+    assert cache.get("sentinel-do-teste") == "preservado"
+    assert not any("throttle_" in key for key in cache._cache)
