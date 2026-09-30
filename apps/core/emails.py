@@ -206,8 +206,8 @@ def send_subscription_suspended_email_safe(
     *,
     reason: str,
     reason_label: str,
-) -> None:
-    """Não propaga falha de SMTP na task de suspensão."""
+) -> bool:
+    """Não propaga falha de SMTP na task de suspensão. Retorna se o e-mail foi enviado."""
     try:
         send_subscription_suspended_email(
             user,
@@ -222,6 +222,8 @@ def send_subscription_suspended_email_safe(
             tenant.pk,
             reason,
         )
+        return False
+    return True
 
 
 def _whatsapp_settings_action_url() -> str:

@@ -15,9 +15,14 @@ from apps.billing.services.payment_method import (
     get_payment_method_summary,
     update_subscription_card,
 )
+from apps.billing.services.regularization import (
+    RegularizationError,
+    regularize_with_credit_card,
+)
 from apps.billing.services.subscription_cancel import cancel_tenant_subscription
 from apps.billing.services.subscription_reactivate import (
     ReactivationCardError,
+    ReactivationDebtError,
     ReactivationError,
     reactivate_tenant_subscription,
 )
@@ -63,6 +68,63 @@ class BillingHistoryView(BillingSettingsBaseView):
         return Response({"results": history})
 
 
+def _card_payload(request) -> tuple[dict, dict, str]:
+    serializer = UpdatePaymentMethodSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    card = dict(serializer.validated_data["credit_card"])
+    holder = dict(serializer.validated_data["credit_card_holder"])
+    if not (holder.get("cpfCnpj") or "").strip():
+        holder.pop("cpfCnpj", None)
+    forwarded = (request.META.get("HTTP_X_FORWARDED_FOR") or "").split(",")[0].strip()
+    remote_ip = forwarded or request.META.get("REMOTE_ADDR") or ""
+    return card, holder, remote_ip
+
+
+class RegularizeView(BillingSettingsBaseView):
+    """Paga com cartão a(s) cobrança(s) exigida(s); libera o acesso só com a confirmação."""
+
+    def post(self, request):
+        tenant = self._tenant_or_error(request)
+        if isinstance(tenant, Response):
+            return tenant
+
+        card, holder, remote_ip = _card_payload(request)
+        try:
+            result = regularize_with_credit_card(tenant, card, holder, remote_ip)
+        except RegularizationError as exc:
+            return Response({"detail": exc.detail, "code": exc.code}, status=exc.http_status)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+        except AsaasAPIError as exc:
+            logger.warning("Asaas regularize: %s", exc.payload or exc)
+            return Response(
+                {"detail": "Não foi possível processar o pagamento agora.", "code": "gateway_error"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        if result.status == "regularized":
+            return Response(
+                {
+                    "status": "regularized",
+                    "detail": "Pagamento confirmado. Seu acesso foi liberado.",
+                    "paid_charges": result.paid_charges,
+                },
+                status=status.HTTP_200_OK,
+            )
+        return Response(
+            {
+                "status": "pending_confirmation",
+                "detail": (
+                    "Pagamento enviado e aguardando confirmação da operadora. "
+                    "O acesso é liberado automaticamente assim que for aprovado."
+                ),
+                "paid_charges": result.paid_charges,
+                "pending_charges": result.pending_charges,
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
 class PaymentMethodView(BillingSettingsBaseView):
     def get(self, request):
         tenant = self._tenant_or_error(request)
@@ -85,20 +147,12 @@ class PaymentMethodView(BillingSettingsBaseView):
         if isinstance(tenant, Response):
             return tenant
 
-        serializer = UpdatePaymentMethodSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        card = serializer.validated_data["credit_card"]
-        holder = dict(serializer.validated_data["credit_card_holder"])
-        if not (holder.get("cpfCnpj") or "").strip():
-            holder.pop("cpfCnpj", None)
-
-        forwarded = (request.META.get("HTTP_X_FORWARDED_FOR") or "").split(",")[0].strip()
-        remote_ip = forwarded or request.META.get("REMOTE_ADDR") or ""
+        card, holder, remote_ip = _card_payload(request)
 
         try:
             summary = update_subscription_card(
                 tenant,
-                dict(card),
+                card,
                 holder,
                 remote_ip,
             )
@@ -165,6 +219,11 @@ class ReactivateSubscriptionView(BillingSettingsBaseView):
         try:
             reactivate_tenant_subscription(tenant)
             summary = get_payment_method_summary(tenant)
+        except ReactivationDebtError as exc:
+            return Response(
+                {"detail": str(exc), "code": "outstanding_debt"},
+                status=status.HTTP_409_CONFLICT,
+            )
         except ReactivationError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         except ReactivationCardError as exc:

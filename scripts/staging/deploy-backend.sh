@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rebuild e restart apenas do backend Django em staging (servidor 192.168.1.23).
+# Rebuild e restart do backend Django e do scheduler (check_subscriptions) em staging (servidor 192.168.1.23).
 # Uso: ./scripts/staging/deploy-backend.sh
 
 set -euo pipefail
@@ -16,8 +16,8 @@ staging_require_env
 
 echo "== MarketChat — deploy staging (backend) =="
 
-staging_compose build backend
-staging_compose up -d backend --no-deps
+staging_compose build backend scheduler
+staging_compose up -d --no-deps backend scheduler
 
 echo ""
 sleep 4

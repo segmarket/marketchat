@@ -1,14 +1,30 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from typing import Any
 
+from django.db import transaction
 from django.utils import timezone
 
 from apps.accounts.models import User
-from apps.billing.models import Subscription
+from apps.billing.models import AsaasWebhookEvent, Subscription, SubscriptionCharge
 from apps.billing.services.asaas_webhook_payload import normalize_asaas_webhook
 from apps.billing.services.meta_capi import schedule_meta_purchase_event
+from apps.billing.services.subscription_charges import (
+    PAID_STATUSES,
+    mark_charge_paid,
+    mark_charge_removed,
+    mark_tenant_overdue,
+    parse_asaas_datetime,
+    payment_id_of,
+    payment_status_of,
+    payment_subscription_id_of,
+    register_charge_failure,
+    settle_after_payment,
+    upsert_charge,
+)
 from apps.financial.services.asaas_transfer_webhook import process_transfer_asaas_event
 from apps.sales.services.asaas_payment_webhook import process_cart_asaas_event
 from apps.tenants.models import Tenant
@@ -17,14 +33,19 @@ logger = logging.getLogger(__name__)
 
 PAYMENT_SUCCESS_EVENTS = frozenset({"PAYMENT_CONFIRMED", "PAYMENT_RECEIVED"})
 
+# PAYMENT_OVERDUE e PAYMENT_CREDIT_CARD_CAPTURE_REFUSED são os eventos documentados pelo
+# Asaas; os demais nomes são mantidos por compatibilidade com integrações antigas.
 PAYMENT_FAILURE_EVENTS = frozenset(
     {
         "PAYMENT_OVERDUE",
+        "PAYMENT_CREDIT_CARD_CAPTURE_REFUSED",
         "PAYMENT_REJECTED",
         "PAYMENT_REFUSED",
         "PAYMENT_FAILED",
     },
 )
+
+PAYMENT_REMOVED_EVENTS = frozenset({"PAYMENT_DELETED"})
 
 SUBSCRIPTION_CANCELLATION_EVENTS = frozenset(
     {
@@ -34,45 +55,13 @@ SUBSCRIPTION_CANCELLATION_EVENTS = frozenset(
 )
 
 
-def _subscription_id_from_payment(payment: dict[str, Any]) -> str | None:
-    sid = payment.get("subscription")
-    if isinstance(sid, str):
-        return sid
-    if isinstance(sid, dict):
-        return sid.get("id")
-    return None
-
-
-def _activate_tenant_subscription(tenant: Tenant, sub: Subscription) -> None:
-    tenant.clear_billing_block()
-    tenant.subscription_status = Tenant.SubscriptionStatus.ACTIVE
-    tenant.overdue_since = None
-    tenant.save(
-        update_fields=[
-            "subscription_status",
-            "overdue_since",
-            "billing_blocked_at",
-            "updated_at",
-        ],
-    )
-    if sub.status != Subscription.Status.ACTIVE:
-        sub.status = Subscription.Status.ACTIVE
-        sub.save(update_fields=["status", "updated_at"])
-
-
-def _mark_tenant_overdue(tenant: Tenant, sub: Subscription) -> None:
-    if tenant.subscription_status == Tenant.SubscriptionStatus.CANCELED:
-        return
-
-    sub.status = Subscription.Status.OVERDUE
-    sub.save(update_fields=["status", "updated_at"])
-
-    tenant.subscription_status = Tenant.SubscriptionStatus.OVERDUE
-    update_fields = ["subscription_status", "updated_at"]
-    if tenant.overdue_since is None:
-        tenant.overdue_since = timezone.now()
-        update_fields.append("overdue_since")
-    tenant.save(update_fields=update_fields)
+def _event_key(payload: dict[str, Any]) -> str:
+    """`id` do evento (evt_…) quando presente; senão, impressão digital do corpo."""
+    root_id = str(payload.get("id") or "").strip()
+    if root_id and not root_id.startswith("pay_"):
+        return root_id[:191]
+    canonical = json.dumps(payload, sort_keys=True, default=str, separators=(",", ":"))
+    return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _schedule_purchase_for_tenant(tenant: Tenant, payment: dict[str, Any]) -> None:
@@ -109,7 +98,7 @@ def _schedule_purchase_for_tenant(tenant: Tenant, payment: dict[str, Any]) -> No
     )
 
 
-def _handle_subscription_cancellation_event(tenant: Tenant, sub: Subscription) -> None:
+def _handle_subscription_cancellation_event(tenant: Tenant, sub: Subscription) -> str:
     """
     Cancelamento definitivo só se o tenant já foi cancelado manualmente.
     Caso contrário (ex.: assinatura removida pelo gateway após falha de cobrança),
@@ -119,48 +108,136 @@ def _handle_subscription_cancellation_event(tenant: Tenant, sub: Subscription) -
         from apps.billing.services.subscription_cancel import _apply_local_cancellation
 
         _apply_local_cancellation(tenant, sub)
-        return
+        return "canceled"
 
-    _mark_tenant_overdue(tenant, sub)
+    mark_tenant_overdue(tenant, sub)
+    return "marked_overdue"
+
+
+def _resolve_subscription(payment: dict[str, Any], payload: dict[str, Any]) -> Subscription | None:
+    payment_id = payment_id_of(payment)
+    if payment_id:
+        charge = (
+            SubscriptionCharge.objects.filter(asaas_payment_id=payment_id)
+            .select_related("subscription")
+            .first()
+        )
+        if charge is not None:
+            return charge.subscription
+
+    sub_id = ""
+    subscription_block = payload.get("subscription")
+    if isinstance(subscription_block, dict) and subscription_block.get("id"):
+        sub_id = str(subscription_block["id"]).strip()
+    if not sub_id:
+        sub_id = payment_subscription_id_of(payment)
+    if not sub_id:
+        return None
+    return Subscription.objects.filter(asaas_subscription_id=sub_id).first()
+
+
+def _apply_subscription_event(
+    *,
+    event: str,
+    payment: dict[str, Any],
+    tenant: Tenant,
+    sub: Subscription,
+    event_at,
+) -> tuple[str, bool]:
+    """Aplica o evento ao ledger e ao tenant. Retorna (desfecho, cobrança recém-paga)."""
+    if event in SUBSCRIPTION_CANCELLATION_EVENTS:
+        return _handle_subscription_cancellation_event(tenant, sub), False
+
+    charge = upsert_charge(sub, payment, event=event, event_at=event_at)
+    status = payment_status_of(payment)
+
+    if event in PAYMENT_SUCCESS_EVENTS:
+        if charge is None:
+            return "ignored_without_payment_id", False
+        if status and status not in PAID_STATUSES:
+            return "ignored_status_not_paid", False
+        was_required = charge.is_outstanding
+        newly_paid = mark_charge_paid(charge, when=event_at)
+        outcome = settle_after_payment(
+            tenant,
+            sub,
+            charge,
+            newly_paid=newly_paid,
+            was_required=was_required,
+        )
+        return outcome, newly_paid
+
+    if event in PAYMENT_FAILURE_EVENTS:
+        outcome = register_charge_failure(
+            tenant,
+            sub,
+            charge,
+            payment_status=status,
+            when=event_at,
+        )
+        return outcome, False
+
+    if event in PAYMENT_REMOVED_EVENTS and charge is not None:
+        return ("charge_removed" if mark_charge_removed(charge, when=event_at) else "noop"), False
+
+    return ("recorded" if charge is not None else "ignored"), False
 
 
 def _process_subscription_webhook(*, event: str, payment: dict[str, Any], payload: dict[str, Any]) -> None:
-    subscription_block = payload.get("subscription")
-    sub_id: str | None = None
-    if isinstance(subscription_block, dict):
-        sid = subscription_block.get("id")
-        if sid:
-            sub_id = str(sid)
-    if not sub_id:
-        sub_id = _subscription_id_from_payment(payment)
-        if sub_id:
-            sub_id = str(sub_id)
-
-    if not sub_id:
-        logger.info("Webhook Asaas sem subscription id: event=%s", event)
+    found = _resolve_subscription(payment, payload)
+    if found is None:
+        logger.info(
+            "Webhook Asaas sem assinatura local: event=%s payment_id=%s",
+            event,
+            payment_id_of(payment),
+        )
         return
 
-    sub = Subscription.objects.filter(asaas_subscription_id=sub_id).select_related("tenant").first()
-    if not sub:
-        logger.info("Subscription local não encontrada para Asaas id=%s", sub_id)
-        return
+    event_key = _event_key(payload)
+    event_at = parse_asaas_datetime(payload.get("dateCreated")) or timezone.now()
+    newly_paid = False
 
-    tenant = sub.tenant
+    with transaction.atomic():
+        tenant = Tenant.objects.select_for_update().get(pk=found.tenant_id)
+        sub = Subscription.objects.select_for_update().get(pk=found.pk)
+        record, created = AsaasWebhookEvent.objects.get_or_create(
+            event_key=event_key,
+            defaults={
+                "event": event[:64],
+                "asaas_payment_id": payment_id_of(payment)[:64],
+                "asaas_subscription_id": sub.asaas_subscription_id,
+                "event_created_at": parse_asaas_datetime(payload.get("dateCreated")),
+            },
+        )
+        if not created and record.processed_at is not None:
+            logger.info(
+                "Webhook Asaas duplicado ignorado: key=%s event=%s outcome=%s",
+                event_key,
+                event,
+                record.outcome,
+            )
+            return
 
-    if event in PAYMENT_SUCCESS_EVENTS:
-        _activate_tenant_subscription(tenant, sub)
+        outcome, newly_paid = _apply_subscription_event(
+            event=event,
+            payment=payment,
+            tenant=tenant,
+            sub=sub,
+            event_at=event_at,
+        )
+        record.outcome = outcome[:64]
+        record.processed_at = timezone.now()
+        record.save(update_fields=["outcome", "processed_at"])
+
+    logger.info(
+        "Webhook Asaas (assinatura): event=%s payment_id=%s tenant=%s outcome=%s",
+        event,
+        payment_id_of(payment),
+        tenant.pk,
+        outcome,
+    )
+    if newly_paid:
         _schedule_purchase_for_tenant(tenant, payment)
-        return
-
-    if event in PAYMENT_FAILURE_EVENTS:
-        _mark_tenant_overdue(tenant, sub)
-        return
-
-    if event in SUBSCRIPTION_CANCELLATION_EVENTS:
-        _handle_subscription_cancellation_event(tenant, sub)
-        return
-
-    logger.debug("Evento Asaas (assinatura) não tratado: %s", event)
 
 
 def process_asaas_webhook_payload(payload: dict[str, Any]) -> None:

@@ -33,6 +33,24 @@ services:
     depends_on:
       - redis
 
+  # Ciclo de inadimplência (suspensão, e-mail pendente, logout Evolution). Mesma imagem e .env do
+  # backend; intervalo via CHECK_SUBSCRIPTIONS_INTERVAL_SECONDS no .env.staging (padrão 3600).
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    container_name: marketchat_scheduler_staging
+    restart: always
+    entrypoint: ["sh", "docker/scheduler.sh"]
+    env_file:
+      - .env.staging
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      DEBUG: "False"
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - backend
+
   frontend:
     build:
       context: ./front-end

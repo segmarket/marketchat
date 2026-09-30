@@ -11,7 +11,7 @@ import type {
   PaymentMethodSummary,
   TenantSubscriptionStatus,
 } from "../../features/settings/types";
-import { formatDateBR } from "../../features/settings/format";
+import { formatDateBR, formatDateTimeBR } from "../../features/settings/format";
 import { getAxiosErrorMessage } from "../../utils/apiError";
 import CreditCardDisplay from "./CreditCardDisplay";
 import UpdateCardModal from "./UpdateCardModal";
@@ -59,6 +59,7 @@ function planBadge(
 export default function PlanPaymentPanel({ accountData }: PlanPaymentPanelProps) {
   const { user, refreshUser } = useAuth();
   const cardModal = useModal();
+  const regularizeModal = useModal();
   const cancelModal = useModal();
   const reactivateModal = useModal();
   const [summary, setSummary] = useState<PaymentMethodSummary | null>(null);
@@ -100,7 +101,14 @@ export default function PlanPaymentPanel({ accountData }: PlanPaymentPanelProps)
 
   const isCanceled = status === "CANCELED" || summary?.subscription_canceled === true;
   const isOverdue = status === "OVERDUE";
+  const isSuspended = status === "SUSPENDED";
+  const canRegularize = summary?.can_regularize ?? (isOverdue || isSuspended);
   const canReactivate = summary?.can_reactivate ?? (isCanceled && marketCount > 0);
+  const graceEndsAt = summary?.grace_ends_at ?? user?.grace_ends_at ?? null;
+  const stillInGrace = isOverdue && (inGrace || summary?.is_in_grace_period === true);
+  const trialEndedUnpaid =
+    user?.billing_block_reason === "trial_expired" ||
+    (status === "TRIAL" && summary?.in_trial_period === false);
 
   const subscriptionNote = (() => {
     if (!summary) return null;
@@ -110,11 +118,8 @@ export default function PlanPaymentPanel({ accountData }: PlanPaymentPanelProps)
       }
       return "Sua assinatura está inativa. Não há cobranças programadas no momento.";
     }
-    if (isOverdue) {
+    if (isOverdue || isSuspended) {
       return null;
-    }
-    if (summary.is_in_grace_period || inGrace) {
-      return "Houve falha na cobrança da mensalidade. Atualize o cartão para evitar a suspensão dos atendimentos do WhatsApp.";
     }
     if (summary.in_trial_period) {
       const chargeDate = summary.next_due_date
@@ -140,21 +145,30 @@ export default function PlanPaymentPanel({ accountData }: PlanPaymentPanelProps)
 
   return (
     <div className="space-y-8">
-      {isOverdue && (
+      {canRegularize && (
         <div
           role="alert"
           className="rounded-xl border border-red-200 bg-red-50 p-5 dark:border-red-900/50 dark:bg-red-950/30"
         >
           <p className="text-sm font-semibold text-red-800 dark:text-red-200">
-            Falha na cobrança automática
+            {trialEndedUnpaid
+              ? "Período de testes encerrado"
+              : isSuspended
+                ? "Acesso suspenso por fatura em aberto"
+                : "Falha na cobrança automática"}
           </p>
           <p className="mt-2 text-sm text-red-700 dark:text-red-300/90">
-            Não conseguimos processar o pagamento recorrente no seu cartão cadastrado. Seu sistema
-            está operando em modo de carência.
+            {trialEndedUnpaid
+              ? "A primeira mensalidade ainda não foi confirmada."
+              : stillInGrace && graceEndsAt
+                ? `Não conseguimos cobrar a mensalidade no cartão cadastrado. Seu acesso continua liberado até ${formatDateTimeBR(graceEndsAt)}; depois disso, painel e atendimentos do WhatsApp são suspensos.`
+                : "Não conseguimos cobrar a mensalidade no cartão cadastrado e o prazo de carência terminou."}{" "}
+            Pague a fatura em aberto com um cartão: o valor é cobrado na hora e o acesso fica
+            regularizado assim que a operadora confirmar. Apenas trocar o cartão não quita a fatura.
           </p>
           <div className="mt-4">
-            <Button variant="primary" onClick={cardModal.openModal}>
-              Atualizar cartão e tentar novamente
+            <Button variant="primary" onClick={regularizeModal.openModal}>
+              Pagar fatura em aberto
             </Button>
           </div>
         </div>
@@ -244,6 +258,18 @@ export default function PlanPaymentPanel({ accountData }: PlanPaymentPanelProps)
           setSummary(s);
           cardModal.closeModal();
           void refreshUser();
+        }}
+      />
+
+      <UpdateCardModal
+        isOpen={regularizeModal.isOpen}
+        onClose={regularizeModal.closeModal}
+        accountData={accountData}
+        mode="regularize"
+        requiredCharges={summary?.required_charges ?? []}
+        onRegularized={() => {
+          regularizeModal.closeModal();
+          handleBillingRefresh();
         }}
       />
 

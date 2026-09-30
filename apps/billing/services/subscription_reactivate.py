@@ -7,6 +7,7 @@ from django.utils import timezone
 from apps.billing.models import Subscription
 from apps.billing.services.asaas_client import AsaasAPIError, AsaasClient
 from apps.billing.services.payment_method import _subscription_for_tenant
+from apps.billing.services.subscription_charges import outstanding_charges
 from apps.tenants.models import Tenant
 
 
@@ -16,6 +17,10 @@ class ReactivationError(Exception):
 
 class ReactivationCardError(Exception):
     """Gateway rejeitou o cartão salvo; o cliente deve cadastrar um novo."""
+
+
+class ReactivationDebtError(ReactivationError):
+    """Cancelada com fatura em atraso: reativar não pode apagar a pendência."""
 
 
 def _next_due_date_iso() -> str:
@@ -45,6 +50,11 @@ def reactivate_tenant_subscription(
         )
 
     subscription = _subscription_for_tenant(tenant)
+    if tenant.overdue_since is not None or outstanding_charges(subscription).exists():
+        raise ReactivationDebtError(
+            "A assinatura foi cancelada com fatura em atraso. "
+            "Fale com o suporte para regularizar antes de reativar.",
+        )
     client = client or AsaasClient()
     customer_id = subscription.asaas_customer_id
     subscription_id = subscription.asaas_subscription_id
@@ -96,14 +106,16 @@ def reactivate_tenant_subscription(
     subscription.status = Subscription.Status.ACTIVE
     subscription.save(update_fields=["status", "updated_at"])
 
-    tenant.clear_billing_block()
+    tenant.billing_blocked_at = None
     tenant.subscription_status = Tenant.SubscriptionStatus.ACTIVE
     tenant.overdue_since = None
+    tenant.whatsapp_logout_pending_since = None
     tenant.save(
         update_fields=[
             "subscription_status",
             "overdue_since",
             "billing_blocked_at",
+            "whatsapp_logout_pending_since",
             "updated_at",
         ],
     )

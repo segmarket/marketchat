@@ -11,8 +11,16 @@ import Input from "../form/input/InputField";
 import Button from "../ui/button/Button";
 import { UF_SELECT_OPTIONS } from "../../constants/brazilUF";
 import { updateCardSchema, type UpdateCardFormValues } from "../../features/settings/schemas";
-import { updatePaymentMethod, type UpdateCardPayload } from "../../features/settings/api";
-import type { AccountSettingsResponse, PaymentMethodSummary } from "../../features/settings/types";
+import {
+  regularizeWithCard,
+  updatePaymentMethod,
+  type UpdateCardPayload,
+} from "../../features/settings/api";
+import type {
+  AccountSettingsResponse,
+  PaymentMethodSummary,
+  RegularizeResponse,
+} from "../../features/settings/types";
 import { getAxiosErrorMessage } from "../../utils/apiError";
 import { digitsOnly } from "../../utils/cpfCnpj";
 
@@ -38,7 +46,13 @@ export function defaultHolder(account: AccountSettingsResponse): Partial<UpdateC
 
 type UpdateCardFormProps = {
   accountData: AccountSettingsResponse;
-  onSuccess: (summary: PaymentMethodSummary) => void;
+  /**
+   * "update": só troca o cartão das próximas cobranças (não paga fatura vencida).
+   * "regularize": troca o cartão e paga agora a(s) fatura(s) em aberto.
+   */
+  mode?: "update" | "regularize";
+  onSuccess?: (summary: PaymentMethodSummary) => void;
+  onRegularized?: (result: RegularizeResponse) => void;
   submitLabel?: string;
   showCancel?: boolean;
   onCancel?: () => void;
@@ -46,7 +60,9 @@ type UpdateCardFormProps = {
 
 export default function UpdateCardForm({
   accountData,
+  mode = "update",
   onSuccess,
+  onRegularized,
   submitLabel = "Salvar cartão",
   showCancel = false,
   onCancel,
@@ -106,11 +122,23 @@ export default function UpdateCardForm({
 
     setSubmitting(true);
     try {
+      if (mode === "regularize") {
+        const result = await regularizeWithCard(payload);
+        if (result.status === "regularized") {
+          toast.success(result.detail);
+        } else {
+          toast.info(result.detail);
+        }
+        onRegularized?.(result);
+        return;
+      }
       const summary = await updatePaymentMethod(payload);
-      toast.success("Cartão atualizado com sucesso.");
-      onSuccess(summary);
+      toast.success("Cartão atualizado. Ele será usado nas próximas cobranças.");
+      onSuccess?.(summary);
     } catch (e: unknown) {
-      if (axios.isAxiosError(e) && e.response?.status === 502) {
+      if (mode === "regularize") {
+        toast.error(getAxiosErrorMessage(e));
+      } else if (axios.isAxiosError(e) && e.response?.status === 502) {
         toast.error("Serviço de pagamentos temporariamente indisponível.");
       } else {
         toast.error(getAxiosErrorMessage(e));
@@ -279,7 +307,7 @@ export default function UpdateCardForm({
           </Button>
         )}
         <Button type="submit" className="min-h-[44px]" disabled={submitting}>
-          {submitting ? "Salvando…" : submitLabel}
+          {submitting ? (mode === "regularize" ? "Processando pagamento…" : "Salvando…") : submitLabel}
         </Button>
       </div>
     </form>

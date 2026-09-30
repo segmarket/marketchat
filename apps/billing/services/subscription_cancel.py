@@ -16,8 +16,10 @@ def _apply_local_cancellation(tenant: Tenant, subscription: Subscription) -> Non
     update_fields = ["subscription_status", "updated_at"]
     if tenant.is_trial_period_over():
         if tenant.billing_blocked_at is None:
-            tenant.billing_blocked_at = timezone.now()
-            update_fields.append("billing_blocked_at")
+            now = timezone.now()
+            tenant.billing_blocked_at = now
+            tenant.whatsapp_logout_pending_since = tenant.whatsapp_logout_pending_since or now
+            update_fields += ["billing_blocked_at", "whatsapp_logout_pending_since"]
     tenant.save(update_fields=update_fields)
 
 

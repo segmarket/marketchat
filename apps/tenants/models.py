@@ -28,6 +28,19 @@ class Tenant(models.Model):
     )
     overdue_since = models.DateTimeField(null=True, blank=True)
     billing_blocked_at = models.DateTimeField(null=True, blank=True)
+    whatsapp_logout_pending_since = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Bloqueio aplicado localmente; logout Evolution ainda não confirmado.",
+    )
+    whatsapp_logout_attempts = models.PositiveIntegerField(default=0)
+    whatsapp_logout_last_attempt_at = models.DateTimeField(null=True, blank=True)
+    whatsapp_logout_last_error = models.CharField(max_length=500, blank=True, default="")
+    billing_suspension_notified_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="E-mail de suspensão enviado ao admin. Anterior a billing_blocked_at = aviso pendente.",
+    )
     utm_source = models.CharField(max_length=255, blank=True, default="")
     utm_medium = models.CharField(max_length=255, blank=True, default="")
     utm_campaign = models.CharField(max_length=255, blank=True, default="")
@@ -83,30 +96,56 @@ class Tenant(models.Model):
         return round(total, 2)
 
     def days_overdue(self) -> int:
+        """Apenas exibição (dias corridos no fuso local); a carência usa billing_rules."""
         if self.overdue_since is None:
             return 0
-        delta = timezone.now().date() - self.overdue_since.date()
+        delta = timezone.localdate() - timezone.localdate(self.overdue_since)
         return max(0, delta.days)
 
-    def is_in_grace_period(self) -> bool:
-        grace_days = int(getattr(settings, "BILLING_GRACE_DAYS", 3))
-        return (
-            self.subscription_status == self.SubscriptionStatus.OVERDUE
-            and self.overdue_since is not None
-            and self.days_overdue() <= grace_days
+    def grace_ends_at(self):
+        from apps.tenants.billing_rules import grace_deadline
+
+        if self.subscription_status != self.SubscriptionStatus.OVERDUE:
+            return None
+        return grace_deadline(self.overdue_since)
+
+    def is_in_grace_period(self, *, now=None) -> bool:
+        from apps.tenants.billing_rules import is_within_grace
+
+        return self.subscription_status == self.SubscriptionStatus.OVERDUE and is_within_grace(
+            self.overdue_since,
+            now=now,
         )
 
     def ensure_billing_state(self) -> None:
-        """Transiciona OVERDUE fora da carência para SUSPENDED."""
+        """
+        Transiciona OVERDUE fora da carência para SUSPENDED (bloqueio local).
+        Logout Evolution e e-mail ficam pendentes para o check_subscriptions: nada de rede na request.
+        """
+        from apps.tenants.billing_rules import grace_expired
+
         if self.subscription_status != self.SubscriptionStatus.OVERDUE:
             return
-        if self.overdue_since is None:
-            return
-        grace_days = int(getattr(settings, "BILLING_GRACE_DAYS", 3))
-        if self.days_overdue() > grace_days:
+        if grace_expired(self.overdue_since):
             from apps.billing.services.tenant_suspension import suspend_tenant_for_overdue
 
             suspend_tenant_for_overdue(self)
+
+    def has_messaging_access(self, *, now=None) -> bool:
+        """Bot/WhatsApp: sem efeitos colaterais, mesma carência do painel e do check_subscriptions."""
+        now = now or timezone.now()
+        if self.subscription_status == self.SubscriptionStatus.SUSPENDED:
+            return False
+        if self.billing_blocked_at is not None:
+            return False
+        if self.subscription_status in (
+            self.SubscriptionStatus.TRIAL,
+            self.SubscriptionStatus.CANCELED,
+        ):
+            return now < self.trial_ends_at
+        if self.subscription_status == self.SubscriptionStatus.OVERDUE:
+            return self.is_in_grace_period(now=now)
+        return True
 
     def has_panel_access(self) -> bool:
         self.ensure_billing_state()

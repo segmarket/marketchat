@@ -5,6 +5,7 @@ from typing import Any, Mapping
 from apps.billing.models import Subscription
 from apps.billing.services.asaas_client import AsaasClient
 from apps.billing.services.billing_history import invalidate_billing_history_cache
+from apps.billing.services.subscription_charges import outstanding_charges
 from apps.tenants.models import Tenant
 
 _BILLING_TYPE_LABELS: dict[str, str] = {
@@ -31,6 +32,10 @@ def _subscription_for_tenant(tenant: Tenant) -> Subscription:
         return tenant.subscription
     except Subscription.DoesNotExist as exc:
         raise ValueError("Assinatura não encontrada para este tenant.") from exc
+
+
+def _iso_or_none(value) -> str | None:
+    return value.isoformat() if value else None
 
 
 def _brand_label(brand: str | None) -> str:
@@ -72,12 +77,24 @@ def get_payment_method_summary(
         "subscription_canceled": local_canceled,
         "can_cancel": not local_canceled and asaas_status == "ACTIVE",
         "can_reactivate": local_canceled and active_markets > 0,
+        "can_regularize": tenant_status
+        in (Tenant.SubscriptionStatus.OVERDUE, Tenant.SubscriptionStatus.SUSPENDED)
+        or (tenant_status == Tenant.SubscriptionStatus.TRIAL and not in_trial),
         "in_trial_period": in_trial,
         "trial_ends_at": tenant.trial_ends_at.date().isoformat(),
         "active_markets_count": active_markets,
         "monthly_total": round(active_markets * unit_price, 2),
         "unit_price": unit_price,
         "is_in_grace_period": tenant.is_in_grace_period(),
+        "grace_ends_at": _iso_or_none(tenant.grace_ends_at()),
+        "required_charges": [
+            {
+                "id": charge.asaas_payment_id,
+                "due_date": _iso_or_none(charge.competence),
+                "value": float(charge.value) if charge.value is not None else None,
+            }
+            for charge in outstanding_charges(subscription)
+        ],
     }
 
     if billing_type == "CREDIT_CARD":
@@ -106,18 +123,19 @@ def get_payment_method_summary(
     }
 
 
-def update_subscription_card(
-    tenant: Tenant,
+def attach_card_to_subscription(
+    subscription: Subscription,
     credit_card: Mapping[str, Any],
     credit_card_holder_info: Mapping[str, Any],
     remote_ip: str,
     *,
-    client: AsaasClient | None = None,
-) -> dict[str, Any]:
-    subscription = _subscription_for_tenant(tenant)
-    client = client or AsaasClient()
+    client: AsaasClient,
+) -> str:
+    """
+    Tokeniza o cartão e o define na assinatura (PUT /subscriptions/{id}/creditCard).
+    O Asaas NÃO cobra nada nessa chamada; retorna o creditCardToken.
+    """
     customer_id = subscription.asaas_customer_id
-
     token_payload = {
         "customer": customer_id,
         "creditCard": dict(credit_card),
@@ -137,6 +155,27 @@ def update_subscription_card(
     client.update_subscription_credit_card(
         subscription.asaas_subscription_id,
         update_body,
+    )
+    return str(credit_card_token)
+
+
+def update_subscription_card(
+    tenant: Tenant,
+    credit_card: Mapping[str, Any],
+    credit_card_holder_info: Mapping[str, Any],
+    remote_ip: str,
+    *,
+    client: AsaasClient | None = None,
+) -> dict[str, Any]:
+    """Troca o cartão das próximas cobranças; não quita cobrança vencida nem libera acesso."""
+    subscription = _subscription_for_tenant(tenant)
+    client = client or AsaasClient()
+    attach_card_to_subscription(
+        subscription,
+        credit_card,
+        credit_card_holder_info,
+        remote_ip,
+        client=client,
     )
     invalidate_billing_history_cache(tenant.pk)
     return get_payment_method_summary(tenant, client=client)

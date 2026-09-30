@@ -71,6 +71,23 @@ export type PaymentMethodSummary = {
   monthly_total?: number;
   unit_price?: number;
   is_in_grace_period?: boolean;
+  grace_ends_at?: string | null;
+  can_regularize?: boolean;
+  required_charges?: RequiredCharge[];
+};
+
+/** Fatura vencida/recusada que precisa ser paga para liberar o acesso. */
+export type RequiredCharge = {
+  id: string;
+  due_date: string | null;
+  value: number | null;
+};
+
+export type RegularizeResponse = {
+  status: "regularized" | "pending_confirmation";
+  detail: string;
+  paid_charges: string[];
+  pending_charges?: string[];
 };
 
 export type SettingsTabId = "account" | "plan" | "history";

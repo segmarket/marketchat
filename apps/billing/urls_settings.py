@@ -5,6 +5,7 @@ from apps.billing.views_settings import (
     CancelSubscriptionView,
     PaymentMethodView,
     ReactivateSubscriptionView,
+    RegularizeView,
 )
 
 urlpatterns = [
@@ -13,6 +14,11 @@ urlpatterns = [
         "payment-method/",
         PaymentMethodView.as_view(),
         name="settings-billing-payment-method",
+    ),
+    path(
+        "regularize/",
+        RegularizeView.as_view(),
+        name="settings-billing-regularize",
     ),
     path(
         "subscription/cancel/",

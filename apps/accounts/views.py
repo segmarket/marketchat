@@ -37,6 +37,18 @@ class TenantTokenObtainPairView(TokenObtainPairView):
     throttle_classes = [LoginRateThrottle]
 
 
+def _billing_block_reason(tenant: Tenant) -> str | None:
+    """Motivo exibido na tela de bloqueio: trial_expired, billing_overdue ou canceled."""
+    status_ = tenant.subscription_status
+    if status_ == Tenant.SubscriptionStatus.SUSPENDED:
+        return "trial_expired" if tenant.overdue_since is None else "billing_overdue"
+    if tenant.billing_blocked_at is None:
+        return None
+    if status_ == Tenant.SubscriptionStatus.CANCELED:
+        return "canceled"
+    return "billing_overdue"
+
+
 class MeView(APIView):
     """Perfil do usuário autenticado e dados do tenant (acessível mesmo com billing suspenso)."""
 
@@ -51,6 +63,8 @@ class MeView(APIView):
         trial_expired = False
         subscription_canceled = False
         is_in_grace_period = False
+        grace_ends_at = None
+        billing_block_reason = None
         days_overdue = 0
         is_whatsapp_connected = False
         has_whatsapp_instance = False
@@ -62,14 +76,17 @@ class MeView(APIView):
                     "name": tenant.name,
                     "slug": tenant.slug,
                 }
+                # Primeiro: pode suspender localmente quem saiu da carência.
+                has_panel_access = tenant.has_panel_access()
                 billing_blocked = tenant.billing_blocked_at is not None
                 subscription_status = tenant.subscription_status
                 days_left_in_trial = tenant.days_left_in_trial()
                 is_in_grace_period = tenant.is_in_grace_period()
+                deadline = tenant.grace_ends_at()
+                grace_ends_at = deadline.isoformat() if deadline else None
                 days_overdue = tenant.days_overdue()
-                trial_expired = (
-                    not tenant.has_panel_access() and tenant.is_trial_period_over()
-                )
+                trial_expired = not has_panel_access and tenant.is_trial_period_over()
+                billing_block_reason = _billing_block_reason(tenant)
                 subscription_canceled = (
                     subscription_status == Tenant.SubscriptionStatus.CANCELED
                 )
@@ -92,6 +109,8 @@ class MeView(APIView):
                 "trial_expired": trial_expired,
                 "subscription_canceled": subscription_canceled,
                 "is_in_grace_period": is_in_grace_period,
+                "grace_ends_at": grace_ends_at,
+                "billing_block_reason": billing_block_reason,
                 "days_overdue": days_overdue,
                 "is_tenant_admin": bool(getattr(user, "is_tenant_admin", False)),
                 "is_whatsapp_connected": is_whatsapp_connected,

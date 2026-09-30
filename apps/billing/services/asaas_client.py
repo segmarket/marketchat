@@ -105,6 +105,14 @@ class AsaasClient:
             return {}
         return self._require_dict_response(data, context="get_payment_pix_qrcode")
 
+    def pay_with_credit_card(self, payment_id: str, body: Mapping[str, Any]) -> dict[str, Any]:
+        """
+        Paga uma cobrança existente na hora (POST /payments/{id}/payWithCreditCard).
+        Não repetir sem antes consultar a cobrança: a chamada processa uma transação real.
+        """
+        data = self._request("POST", f"/payments/{payment_id}/payWithCreditCard", dict(body))
+        return self._require_dict_response(data, context="pay_with_credit_card")
+
     def tokenize_credit_card(self, body: Mapping[str, Any]) -> dict[str, Any]:
         data = self._request("POST", "/creditCard/tokenizeCreditCard", dict(body))
         return self._require_dict_response(data, context="tokenize_credit_card")

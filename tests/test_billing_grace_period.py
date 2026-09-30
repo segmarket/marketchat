@@ -83,26 +83,83 @@ def test_payment_overdue_webhook_sets_overdue_without_block():
     assert tenant.billing_blocked_at is None
 
 
-@pytest.mark.django_db
-def test_payment_received_clears_overdue():
+def _legacy_overdue_tenant():
+    """OVERDUE anterior ao ledger de cobranças: nenhuma cobrança exigida registrada."""
     tenant = TenantFactory(
         subscription_status=Tenant.SubscriptionStatus.OVERDUE,
         overdue_since=timezone.now() - timedelta(days=2),
         billing_blocked_at=timezone.now(),
     )
     sub = SubscriptionFactory(tenant=tenant, status=Subscription.Status.OVERDUE)
+    return tenant, sub
 
-    process_asaas_webhook_payload(
-        {
-            "event": "PAYMENT_RECEIVED",
-            "payment": {"subscription": sub.asaas_subscription_id},
+
+def _received(sub, payment_id="pay_legacy"):
+    return {
+        "id": f"evt_{payment_id}",
+        "event": "PAYMENT_RECEIVED",
+        "payment": {
+            "id": payment_id,
+            "subscription": sub.asaas_subscription_id,
+            "status": "RECEIVED",
+            "dueDate": timezone.localdate().isoformat(),
         },
-    )
+    }
 
+
+@pytest.mark.django_db
+def test_payment_received_clears_overdue_when_asaas_confirms_no_overdue_charge():
+    tenant, sub = _legacy_overdue_tenant()
+
+    with mock.patch("apps.billing.services.subscription_charges.AsaasClient") as mock_cls:
+        mock_cls.return_value.list_payments.return_value = {"data": []}
+        process_asaas_webhook_payload(_received(sub))
+
+    mock_cls.return_value.list_payments.assert_called_once_with(
+        subscription=sub.asaas_subscription_id,
+        status="OVERDUE",
+        limit=100,
+    )
     tenant.refresh_from_db()
     assert tenant.subscription_status == Tenant.SubscriptionStatus.ACTIVE
     assert tenant.overdue_since is None
     assert tenant.billing_blocked_at is None
+
+
+@pytest.mark.django_db
+def test_payment_received_keeps_overdue_when_asaas_still_has_overdue_charge():
+    tenant, sub = _legacy_overdue_tenant()
+
+    with mock.patch("apps.billing.services.subscription_charges.AsaasClient") as mock_cls:
+        mock_cls.return_value.list_payments.return_value = {
+            "data": [
+                {
+                    "id": "pay_still_open",
+                    "subscription": sub.asaas_subscription_id,
+                    "status": "OVERDUE",
+                    "dueDate": (timezone.localdate() - timedelta(days=3)).isoformat(),
+                },
+            ],
+        }
+        process_asaas_webhook_payload(_received(sub, "pay_old"))
+
+    tenant.refresh_from_db()
+    assert tenant.subscription_status == Tenant.SubscriptionStatus.OVERDUE
+    assert sub.charges.get(asaas_payment_id="pay_still_open").is_outstanding
+
+
+@pytest.mark.django_db
+def test_payment_received_keeps_overdue_when_asaas_is_unavailable():
+    from apps.billing.services.asaas_client import AsaasAPIError
+
+    tenant, sub = _legacy_overdue_tenant()
+
+    with mock.patch("apps.billing.services.subscription_charges.AsaasClient") as mock_cls:
+        mock_cls.return_value.list_payments.side_effect = AsaasAPIError("Falha de rede Asaas")
+        process_asaas_webhook_payload(_received(sub))
+
+    tenant.refresh_from_db()
+    assert tenant.subscription_status == Tenant.SubscriptionStatus.OVERDUE
 
 
 @pytest.mark.django_db

@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { useAuth } from "../../context/AuthContext";
+import { formatDateTimeBR } from "../../features/settings/format";
 
 export default function GracePeriodBanner() {
   const { user } = useAuth();
@@ -8,17 +9,19 @@ export default function GracePeriodBanner() {
     return null;
   }
 
+  const deadline = user.grace_ends_at ? ` até ${formatDateTimeBR(user.grace_ends_at)}` : "";
+
   return (
     <div className="shrink-0 border-b border-warning-200 bg-warning-50 px-4 py-2.5 text-center text-sm text-warning-900">
       <span>
-        Aviso de cobrança: tivemos um problema ao processar a mensalidade no seu cartão cadastrado.
-        Para evitar a suspensão dos atendimentos do WhatsApp nos seus condomínios nos próximos dias,{" "}
+        Aviso de cobrança: não conseguimos cobrar a mensalidade no seu cartão cadastrado. Pague a
+        fatura em aberto{deadline} para evitar a suspensão do painel e dos atendimentos do WhatsApp.{" "}
       </span>
       <Link
         to="/admin/settings?tab=plan"
         className="font-semibold underline underline-offset-2 hover:text-warning-950"
       >
-        atualize seus dados de pagamento em Configurações
+        Pagar fatura em Configurações
       </Link>
       <span>.</span>
     </div>

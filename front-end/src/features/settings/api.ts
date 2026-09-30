@@ -6,6 +6,7 @@ import type {
   BotScheduleDay,
   BotScheduleResponse,
   PaymentMethodSummary,
+  RegularizeResponse,
 } from "./types";
 
 export async function fetchAccountSettings(): Promise<AccountSettingsResponse> {
@@ -81,6 +82,12 @@ export async function updatePaymentMethod(
     "/api/settings/billing/payment-method/",
     payload,
   );
+  return data;
+}
+
+/** Paga agora, com o cartão informado, a(s) fatura(s) em aberto; o acesso só volta com a confirmação. */
+export async function regularizeWithCard(payload: UpdateCardPayload): Promise<RegularizeResponse> {
+  const { data } = await api.post<RegularizeResponse>("/api/settings/billing/regularize/", payload);
   return data;
 }
 

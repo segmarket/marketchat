@@ -33,7 +33,8 @@ Requer JWT e `is_tenant_admin=True`.
 |--------|---------|--------------|-----------|
 | GET | `/api/settings/billing/history/` | JWT + admin tenant | Histórico de cobranças no Asaas (cache 5 min). |
 | GET | `/api/settings/billing/payment-method/` | JWT + admin tenant | Forma de pagamento atual da assinatura. |
-| POST | `/api/settings/billing/payment-method/` | JWT + admin tenant | Atualiza cartão da assinatura (`credit_card`, `credit_card_holder`). |
+| POST | `/api/settings/billing/payment-method/` | JWT + admin tenant | Troca o cartão das **próximas** cobranças (`credit_card`, `credit_card_holder`). Não paga fatura vencida nem libera acesso. |
+| POST | `/api/settings/billing/regularize/` | JWT + admin tenant | Mesmo corpo; troca o cartão e paga agora (`payWithCreditCard`) a(s) fatura(s) exigida(s). `200 {"status":"regularized"}` libera o acesso; `202 {"status":"pending_confirmation"}` aguarda o webhook da mesma cobrança; `409` sem pendência ou fatura não localizada; `422` cartão recusado; `502` gateway indisponível ou resultado incerto. |
 
 Resposta do histórico (`results[]`): `due_date`, `value`, `status` (`PAID`, `PENDING`, `OVERDUE`), `billing_type`, `invoice_url`.
 
@@ -44,7 +45,7 @@ Acessível mesmo com cobrança em atraso (bypass do middleware 402).
 | Método | Caminho | Autenticação | Descrição |
 |--------|---------|--------------|-----------|
 | POST | `/api/webhooks/asaas/` | Igual à rota em billing. | Webhook Asaas (Pix de carrinho + assinatura SaaS). Em dev local o Asaas **não alcança** `localhost` — use túnel (ngrok) na URL do webhook ou `python manage.py sync_pending_cart_payments` após confirmar no sandbox. |
-| POST | `/api/billing/webhooks/asaas/` | Se `ASAAS_WEBHOOK_VERIFY=True`: header `asaas-access-token` = `ASAAS_WEBHOOK_TOKEN` (authToken do painel Asaas; **não** use `ASAAS_API_KEY`). Ausente ou inválido → **403**. Em dev (`ASAAS_WEBHOOK_VERIFY=False`) o corpo é aceito sem esse header. Isento de rate limit global. | Mesmo handler: `PAYMENT_RECEIVED`/`PAYMENT_CONFIRMED` (carrinho), `PAYMENT_OVERDUE`/`PAYMENT_DELETED` (Pix expirado), assinatura (`PAYMENT_CONFIRMED`, `PAYMENT_OVERDUE`, `SUBSCRIPTION_DELETED`). |
+| POST | `/api/billing/webhooks/asaas/` | Se `ASAAS_WEBHOOK_VERIFY=True`: header `asaas-access-token` = `ASAAS_WEBHOOK_TOKEN` (authToken do painel Asaas; **não** use `ASAAS_API_KEY`). Ausente ou inválido → **403**. Em dev (`ASAAS_WEBHOOK_VERIFY=False`) o corpo é aceito sem esse header. Isento de rate limit global. | Mesmo handler: `PAYMENT_RECEIVED`/`PAYMENT_CONFIRMED` (carrinho), `PAYMENT_OVERDUE`/`PAYMENT_DELETED` (Pix expirado), assinatura (`PAYMENT_CONFIRMED`/`PAYMENT_RECEIVED` quitam só a cobrança `pay_…` informada; `PAYMENT_OVERDUE`/`PAYMENT_CREDIT_CARD_CAPTURE_REFUSED` tornam a cobrança exigida; `PAYMENT_DELETED`; `SUBSCRIPTION_DELETED`). Eventos de assinatura são idempotentes pelo `id` do evento (ver `docs/billing-ciclo-inadimplencia.md`). |
 
 ## Produtos (`/api/products/`)
 

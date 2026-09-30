@@ -92,7 +92,7 @@ def test_enforce_trial_suspends_and_sends_email():
 
 
 @pytest.mark.django_db
-def test_enforce_skips_suspend_when_evolution_logout_fails():
+def test_enforce_blocks_locally_even_when_evolution_logout_fails():
     tenant = TenantFactory(
         trial_ends_at=timezone.now() - timedelta(days=1),
         subscription_status=Tenant.SubscriptionStatus.TRIAL,
@@ -105,9 +105,28 @@ def test_enforce_skips_suspend_when_evolution_logout_fails():
     ):
         ok = enforce_tenant_suspension(tenant, reason="trial_expired", send_email=True)
 
-    assert ok is False
+    assert ok is True
     tenant.refresh_from_db()
-    assert tenant.subscription_status == Tenant.SubscriptionStatus.TRIAL
+    assert tenant.subscription_status == Tenant.SubscriptionStatus.SUSPENDED
+    assert tenant.billing_blocked_at is not None
+    assert tenant.whatsapp_logout_pending_since is not None
+
+
+@pytest.mark.django_db
+def test_enforce_is_noop_when_tenant_no_longer_eligible():
+    tenant = TenantFactory(
+        trial_ends_at=timezone.now() - timedelta(days=1),
+        subscription_status=Tenant.SubscriptionStatus.ACTIVE,
+    )
+    with mock.patch(
+        "apps.billing.services.subscription_enforcement.logout_whatsapp_session",
+    ) as logout:
+        ok = enforce_tenant_suspension(tenant, reason="trial_expired", send_email=False)
+
+    assert ok is False
+    logout.assert_not_called()
+    tenant.refresh_from_db()
+    assert tenant.subscription_status == Tenant.SubscriptionStatus.ACTIVE
 
 
 @pytest.mark.django_db

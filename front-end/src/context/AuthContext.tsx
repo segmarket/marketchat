@@ -27,6 +27,8 @@ export type AuthUser = {
   trial_expired: boolean;
   subscription_canceled?: boolean;
   is_in_grace_period?: boolean;
+  grace_ends_at?: string | null;
+  billing_block_reason?: "trial_expired" | "billing_overdue" | "canceled" | null;
   days_overdue?: number;
   is_tenant_admin?: boolean;
   is_whatsapp_connected?: boolean;
@@ -40,7 +42,7 @@ type AuthContextValue = {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
-  refreshUser: () => Promise<void>;
+  refreshUser: () => Promise<AuthUser | null>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -54,19 +56,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refreshUser = useCallback(async () => {
+  const refreshUser = useCallback(async (): Promise<AuthUser | null> => {
     const token = getAccessToken();
     if (!token) {
       setUser(null);
       setLoading(false);
-      return;
+      return null;
     }
     try {
       const me = await fetchMe();
       setUser(me);
+      return me;
     } catch {
       clearTokens();
       setUser(null);
+      return null;
     } finally {
       setLoading(false);
     }
